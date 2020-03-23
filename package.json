@@ -1,0 +1,36 @@
+{
+  "name": "@web-native-js/mql",
+  "title": "MQL (Model Query Language)",
+  "description": "Model Query Language",
+  "keywords": [],
+  "homepage": "https://www.web-native.dev",
+  "icon": "https://www.web-native.dev/icon.svg",
+  "author": {
+    "name": "Oxford Harrison",
+    "email": "oxharriscreative@gmail.com"
+  },
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/web-native/mql.git"
+  },
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node ./tests/index.js",
+    "build": "webpack --config ../webpack.config.js",
+    "watch": "webpack --watch"
+  },
+  "dependencies": {
+    "@web-native-js/commons": "0.0.1",
+    "@web-native-js/jsen": "0.0.2"
+  },
+  "devDependencies": {
+    "webpack": "^4.41.6",
+    "webpack-cli": "^3.3.11"
+  },
+  "bugs": {
+    "url": "https://github.com/web-native/mql/issues"
+  }
+}
