@@ -35,11 +35,24 @@ const Delete = class extends _mixin(Stmt, DeleteInterface) {
 		var tables = (_isArray(this.exprs.table) ? this.exprs.table : [this.exprs.table]).concat(this.exprs.joins || []);
 		tables = tables.map(table => table.eval(database, trap))
 		this.base = new Base(trap, tables.shift(), this.exprs.where, ...tables);
-		var rowCount = 0;
-		while(this.base.next()) {
-			rowCount += this.base.delete();
+		var rowComposition, count = 0;
+		while(rowComposition = this.base.fetch()) {
+			Object.keys(rowComposition).forEach(alias => {
+				var sourceTable;
+				if (alias === this.base.table.alias) {
+					sourceTable = this.base.table;
+				} else {
+					sourceTable = this.base.joins.filter(join => join.alias === alias)[0];
+				}
+				sourceTable.rows.forEach((row, i) => {
+					if (row === rowComposition[alias]) {
+						delete sourceTable.rows[i];
+						count ++;
+					}
+				});
+			});
 		}
-		return rowCount;
+		return count;
 	}
 	
 	/**

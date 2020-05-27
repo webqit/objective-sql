@@ -8,7 +8,6 @@ import {
 	Lexer
 } from '../index.js';
 import _wrapped from '@web-native-js/commons/str/wrapped.js';
-import _unwrap from '@web-native-js/commons/str/unwrap.js';
 import _objFrom from '@web-native-js/commons/obj/from.js';
 import FieldInterface from './FieldInterface.js';
 
@@ -28,6 +27,34 @@ const Field = class extends FieldInterface {
 		this.expr = expr;
 		this.alias = alias;
 		this.claused = claused;
+	}
+		
+	/**
+	 * --------------
+	 */
+	
+	/**
+	 * @inheritdoc
+	 */
+	as(alias) {
+		this.alias = alias;
+		this.claused = true;
+		return this;
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	getName() {
+		// Without backticks
+		return (this.expr.name || '').replace(/`/g, '');
+	}
+		
+	/**
+	 * @inheritdoc
+	 */
+	getAlias() {
+		return (this.alias || '').replace(/`/g, '') || this.getName();
 	}
 	
 	/**
@@ -59,7 +86,7 @@ const Field = class extends FieldInterface {
 		var claused = alias.substr(0, 3).toLowerCase() === 'as ';
 		if (claused) {
 			// With an "AS" clause, its easy to obtain the alias...
-			// E.g: SELECT first_name fname, 4 + 5 result, 5 + 5
+			// E.g: SELECT first_name AS fname, 4 + 5 AS result, 5 + 5
 			alias = alias.substr(3).trim();
 			exprParse = parseCallback(splits.join('').trim());
 		} else if (splits.length && (!alias.match(/[^0-9a-zA-Z_]/) || _wrapped(alias, '`', '`'))) {
@@ -75,34 +102,8 @@ const Field = class extends FieldInterface {
 			alias = null;
 			exprParse = parseCallback(expr);
 		}
+		exprParse.isFieldName = true;
 		return new Static(exprParse, alias, claused);
-	}
-	
-	/**
-	 * --------------
-	 */
-	
-	/**
-	 * @inheritdoc
-	 */
-	as(alias) {
-		this.alias = alias;
-		this.claused = true;
-		return this;
-	}
-	
-	/**
-	 * @inheritdoc
-	 */
-	getAlias() {
-		var alias = this.alias 
-		if (!alias) {
-			alias = Lexer.split(this.expr.toString(), ['.']).pop();
-			if (_wrapped(alias, '`', '`')) {
-				alias = _unwrap(alias, '`', '`');
-			}
-		};
-		return alias;
 	}
 };
 

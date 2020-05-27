@@ -16,54 +16,11 @@ const Table = class extends FetchInterface {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(rows, alias, iterateOnce = false) {
+	constructor(rows, alias, schema) {
 		super();
 		this.rows = rows;
 		this.alias = alias;
-		this.iterateOnce = iterateOnce;
-		// -----------------
-		this.schema = rows.schema;
-		if (!rows.schema) {
-			this.schema = {fields:{}, uniqueKeys:[]};
-		}
-		// -----------------
-		this._onfinish = [];
-		this.cursor = -1;
-		this.next();
-	}
-	 
-	/**
-	 * @inheritdoc
-	 */
-	onfinish(callback) {this._onfinish.push(callback);}
-	 
-	/**
-	 * @inheritdoc
-	 */
-	next() {
-		if (this.cursor === -1) {
-			this.cursor = 0;
-			return;
-		}
-		if (this.cursor < this.rows.length - 1) {
-			this.cursor ++;
-			return;
-		}
-		if (!this.rows.length || this.cursor === this.rows.length - 1) {
-			this._onfinish.forEach(callback => callback());
-			if (!this.iterateOnce) {
-				this.cursor = 0;
-			}
-		}
-	}
-	 
-	/**
-	 * @inheritdoc
-	 */
-	fetch() {
-		if (this.cursor < this.rows.length) {
-			return this.rows[this.cursor];
-		}
+		this.schema = schema;
 	}
 	 
 	/**

@@ -11,7 +11,6 @@ import ExprInterface from './ExprInterface.js';
 import {
 	Abstraction,
 	Bool,
-	Comments,
 	Math,
 	Num,
 	Str
@@ -19,7 +18,6 @@ import {
 import {
 	AbstractionInterface,
 	BoolInterface,
-	CommentsInterface,
 	MathInterface,
 	NumInterface,
 	StrInterface
@@ -71,7 +69,6 @@ import WindowInterface from './Expr/WindowInterface.js';
  */
 Mql.grammars = {
 	// Statements and union
-	Comments: Comments,			// // single-line | /* double-line */
 	Union: Union,				// ... UNION ...
 	Select: Select,				// SELECT ... FROM ...
 	Insert: Insert,				// INSERT INTO ...
@@ -106,7 +103,6 @@ export {
 	Assignment,
 	Bool,
 	Call,
-	Comments,
 	Comparison,
 	Condition,
 	Delete,
@@ -132,7 +128,6 @@ export {
 	AssignmentInterface,
 	BoolInterface,
 	CallInterface,
-	CommentsInterface,
 	ComparisonInterface,
 	ConditionInterface,
 	DeleteInterface,

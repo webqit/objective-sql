@@ -20,7 +20,7 @@ import _after from '@web-native-js/commons/str/after.js';
 const Row = class {
 	
 	constructor(trap) {
-		this.trap = trap;
+		Object.defineProperty(this, '.trap', {value: trap});
 	}
 	 
 	/**
@@ -69,7 +69,7 @@ const Row = class {
 	 * @inheritdoc
 	 */
 	GROUP_CONCAT_WS(rows, separator, column) {
-		return this.COLUMN(rows, column).join(separator.eval(this, this.trap));
+		return this.COLUMN(rows, column).join(separator.eval(this, this['.trap']));
 	}
 	
 	/**
@@ -137,7 +137,7 @@ const Row = class {
 	 * @inheritdoc
 	 */
 	COLUMN(rows, arg) {
-		return rows.map(row => arg.eval(row, this.trap));
+		return rows.map(row => arg.eval(row, this['.trap']));
 	}
 	
 	/**

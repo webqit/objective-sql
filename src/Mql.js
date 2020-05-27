@@ -30,6 +30,7 @@ const Mql = class extends Jsen {
 		if (!('ci' in params.opts)) {
 			params.opts.ci = true;
 		}
+		params.allowCache = false;
 		return super.parse(expr, Parsers, params, Static);
 	}
 };

@@ -9,7 +9,7 @@
     "name": "Oxford Harrison",
     "email": "oxharriscreative@gmail.com"
   },
-  "version": "0.0.1",
+  "version": "0.0.3",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -18,13 +18,16 @@
   },
   "main": "src/index.js",
   "scripts": {
-    "test": "node ./tests/index.js",
+    "insert": "node ./tests/insert.js",
+    "select": "node ./tests/select.js",
+    "update": "node ./tests/update.js",
+    "delete": "node ./tests/delete.js",
     "build": "webpack --config ../webpack.config.js",
     "watch": "webpack --watch"
   },
   "dependencies": {
-    "@web-native-js/commons": "0.0.1",
-    "@web-native-js/jsen": "0.0.2"
+    "@web-native-js/commons": "file:../commons",
+    "@web-native-js/jsen": "file:../jsen"
   },
   "devDependencies": {
     "webpack": "^4.41.6",

@@ -37,7 +37,88 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 		this.clauses = clauses;
 		this.distinct = distinct;
 	}
-	
+
+	/**
+	 * Return the SELECT STMT's Fields
+	 * 
+	 * @return array
+	 */
+	getFields() {
+		return this.exprs.fields;
+	}
+
+	/**
+	 * Return the SELECT STMT's Table component
+	 * 
+	 * @return Object|array
+	 */
+	getTable() {
+		return this.exprs.table;
+	}
+
+	/**
+	 * Return the SELECT STMT's Where component
+	 * 
+	 * @return Object
+	 */
+	getWhere() {
+		return this.exprs.where;
+	}
+
+	/**
+	 * Return the SELECT STMT's Join components
+	 * 
+	 * @return array
+	 */
+	getJoins() {
+		return this.exprs.joins;
+	}
+
+	/**
+	 * Return the SELECT STMT's GroupBy components
+	 * 
+	 * @return array
+	 */
+	getGroupBy() {
+		return this.exprs.groupBy;
+	}
+
+	/**
+	 * Return the SELECT STMT's Windows components
+	 * 
+	 * @return array
+	 */
+	getWindows() {
+		return this.exprs.windows;
+	}
+
+	/**
+	 * Return the SELECT STMT's OrderBy components
+	 * 
+	 * @return array
+	 */
+	getOrderBy() {
+		return this.exprs.orderBy;
+	}
+
+	/**
+	 * Return the SELECT STMT's Offset components
+	 * 
+	 * @return string
+	 */
+	getOffset() {
+		return this.exprs.offset;
+	}
+
+	/**
+	 * Return the SELECT STMT's Limit components
+	 * 
+	 * @return string
+	 */
+	getLimit() {
+		return this.exprs.limit;
+	}
+
 	/**
 	 * @inheritdoc
 	 */
@@ -46,15 +127,12 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 		// UNDERSTAND AGGREGATIONS
 		// ---------------------------
 		var aggrExprs = {aggr:[], win:[]};
-		var pathExprs = [];
 		this.meta.vars.forEach(x => {
 			if (x instanceof AggrInterface) {
 				_pushUnique(x.window ? aggrExprs.win : aggrExprs.aggr, x);
 			}
-			if (x.isPath) {
-				_pushUnique(pathExprs, x);
-			}
 		});
+
 		// ---------------------------
 		// BUILD RESPONSE ROWS INTO THE "$" KEY
 		// ---------------------------
@@ -72,7 +150,7 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 						var aggrs = field.expr.meta.vars.slice().concat([field.expr]).filter(x => x instanceof AggrInterface);
 						if (aggrs.length) {
 							_pushUnique(aggrs.filter(x => x.window).length ? collectAggrs.win : collectAggrs.aggr, field);
-							// But we'll set it to UNDEFINED (not NULL), to secure slot
+							// But we'll set them to UNDEFINED (not NULL), to secure their slots
 							if (!(field.getAlias() in tempRow.$)) {
 								tempRow.$[field.getAlias()] = undefined;
 							}
@@ -96,29 +174,15 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 			.map(table => table.eval(database, trap));
 		var mainTable = tables.shift();
 		
-		/**
-		pathExprs.forEach(pathReference => {
-			var pathLexer = new PathLexer(pathReference.name);
-			var fields, fieldDef, match = pathLexer.match();
-			if (mainTable.schema 
-			&& (fields = mainTable.schema.fields) 
-			&& (fieldDef = fields[match.subject]) 
-			&& (fieldDef.type || '').toLowerCase() === 'json') {
-				this.handleJsonAccess(match.subject, Lexer.finalOperand);
-			} else {
-				this.handleSmartJoin(match);
-			}
-		});
-		*/
-		
 		this.base = new Base(trap, mainTable, this.exprs.where, ...tables);
 		// BUILD (TEMP) ROWS, WHERE
-		var tempRows = [];
-		while (this.base.next()) {
-			tempRows.push(this.base.fetch());
+		var tempRows = [], tempRow;
+		while (tempRow = this.base.fetch()) {
+			tempRows.push(tempRow);
 		}
 		// BUILD FIELDS
 		var aggrFields = applyFields(tempRows, this.exprs.fields, true/*collectAggrs*/);
+
 		// ---------------------------
 		// GROUP BY?
 		// ---------------------------
@@ -128,6 +192,7 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 			// REVISIT RESPONSE ROWS and apply AGGR columns
 			applyFields(tempRows, aggrFields.aggr);
 		}
+
 		// ---------------------------
 		// WINDOWING
 		// ---------------------------
@@ -143,18 +208,21 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 			// REVISIT RESPONSE ROWS and apply AGGR OVER () columns
 			applyFields(tempRows, aggrFields.win);
 		}
+
 		// ---------------------------
 		// ORDER BY
 		// ---------------------------
 		if (this.exprs.orderBy) {
 			tempRows = this.exprs.orderBy.eval(tempRows, trap);
 		}
+
 		// ---------------------------
 		// DISTINCT
 		// ---------------------------
 		if (this.distinct) {
 			tempRows = tempRows.filter((tempRow, i) => i === _find(tempRows, _tempRow => _even(_tempRow, tempRow)));
 		}
+
 		// ---------------------------
 		// LIMIT
 		// ---------------------------
@@ -165,66 +233,11 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 				? tempRows.slice(offset, offset + limit[0]) 
 				: tempRows.slice(offset);
 		}
+
 		// ---------------------------
 		// SEND RESPONSE ROWS
 		// ---------------------------
 		return tempRows.map(tempRow => tempRow.$);
-	}
-	
-	/**
-	 * Creates the necessary join to satisfy access field names with the "->" and/or "<-".
-	 *
-	 * @param object 	match
-	 *
-	 * @return void
-	 */
-	_handleSmartJoin(match) {
-		var accessPath = match.subject;
-		var fields = null;
-		match.functions.forEach((func, i) => {
-			if (func.name.toLowerCase() === 'select') {
-				fields = _arrFrom(fields).concat(func.args);
-				match.functions.splice(i, 1);
-			}
-		});
-		// -----------------------
-		var paramsObject = new Relationist(this.tableName, match.subject);
-		var paramsObject_immediateTarget = paramsObject.getImmediateTarget();
-		var actingKey = paramsObject_immediateTarget.actingKey;
-		var postTarget = paramsObject_immediateTarget.postTarget;
-		var uniqueTargetID = PathLexer.getSignature(paramsObject_immediateTarget.subject(), match.functions);
-		if (!this.smartJoins[uniqueTargetID]) {
-			this.smartJoins[uniqueTargetID] = paramsObject;
-			paramsObject_immediateTarget.query().apply(match.functions);
-		} else {
-			paramsObject_immediateTarget = this.smartJoins[uniqueTargetID].getImmediateTarget();
-		}
-		// -----------------------
-		// The acting key needed on the join's "on" clause.
-		paramsObject_immediateTarget.query().select(actingKey);
-		// The select magic, with the backtick saviour
-		if (postTarget) {
-			paramsObject_immediateTarget.query().select(new Expression('`' + postTarget + '` AS `' + match.query + '`'));
-		} else if (_array(fields) || _array(match.body) || match.functions) {
-			fields = _array(fields) ? fields : match.body;
-			if (_array(fields) && fields.length > 1 
-			|| (_arrFrom(fields)[0] === '*' && (fields = paramsObject_immediateTarget.blueprint().fields.keys()))
-			|| (fields = paramsObject_immediateTarget.blueprint().defaultFields)) {
-				fields = fields.map(field => {
-					var {field, alias} = Static.splitAlias(field);
-					return 'JSON_OBJECT("' + (alias || field) + '", ' + field + ')';
-				});
-				fields = fields.length > 1 ? 'JSON_MERGE(' + fields.join(', ') + ')' : fields[0];
-			} else {
-				fields = fields[0];
-			}
-			paramsObject_immediateTarget.query().select(new Expression(fields + ' AS `' + match.query + '`'));
-		}
-		// -----------------------
-		// Use UAC?
-		if (this.withUac) {
-			paramsObject_immediateTarget.query().withUac();
-		}
 	}
 	
 	/**

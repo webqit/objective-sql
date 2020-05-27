@@ -39,13 +39,12 @@ const Update = class extends _mixin(Stmt, UpdateInterface) {
 		var tables = (_isArray(this.exprs.table) ? this.exprs.table : [this.exprs.table]).concat(this.exprs.joins || []);
 		tables = tables.map(table => table.eval(database, trap))
 		this.base = new Base(trap, tables.shift(), this.exprs.where, ...tables);
-		var rowCount = 0;
-		while (this.base.next()) {
-			var rowBase = this.base.fetch();
-			this.exprs.assignments.forEach(assignment => assignment.eval(rowBase, trap));
-			rowCount ++;
+		var rowComposition, count = 0;
+		while(rowComposition = this.base.fetch()) {
+			this.exprs.assignments.forEach(assignment => assignment.eval(rowComposition, trap));
+			count ++;
 		}
-		return rowCount;
+		return count;
 	}
 	
 	/**

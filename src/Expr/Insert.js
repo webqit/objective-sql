@@ -42,6 +42,7 @@ const Insert = class extends InsertInterface {
 	 */
 	eval(database, trap = {}) {
 		var tableBase = this.table.eval(database, trap);
+		var tableSchema = this.table.getSchema();
 		// ---------------------------
 		var values = this.values;
 		var insertType = this.insertType.toUpperCase();
@@ -56,9 +57,10 @@ const Insert = class extends InsertInterface {
 					throw new Error('["' + values.toString() + '" in SELECT clause]: ' + e.message);
 				}
 			}
-			var columns = this.columns || (tableBase.schema.fields ? Object.keys(tableBase.schema.fields) : []);
+			var columns = this.columns || (tableSchema.fields ? Object.keys(tableSchema.fields) : []);
 		}
-		var uniqueKeys = _intersect(tableBase.schema.uniqueKeys, columns);
+		columns = columns.map(c => c + '');
+		var uniqueKeys = _intersect(tableSchema.uniqueKeys, columns);
 		var rowCount = 0;
 		var rowArr = null;
 		while (rowArr = values.shift()) {

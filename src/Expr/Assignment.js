@@ -18,8 +18,9 @@ const Assignment = class extends _Assignment {
 	 * @inheritdoc
 	 */
 	eval(tempRow, trap = {}) {
+		this.initKeyword = false;
 		// Lets find the table that contains the column
-		if (!this.isContext && this.searchWithoutContext !== false) {
+		if (!this.reference.isContext) {
 			var contexts = Reference.findContexts(tempRow, this.reference.name);
 			if (!contexts.length) {
 				throw new Error('"' + this.toString() + '" is unknown!');
@@ -29,7 +30,8 @@ const Assignment = class extends _Assignment {
 					throw new Error('"' + this.reference.name + '" is ambiguous!');
 				}
 				if (contexts.length) {
-					return this.parseCallback(contexts[0] + '.' + this.toString()/*full toString()*/, [this.Static], {mutates: true}).eval(tempRow, trap);
+					var context = contexts.reduce((_c, c) => _c === '$' ? _c : c, '');
+					return super.eval(tempRow[context], trap);
 				}
 			}
 		}

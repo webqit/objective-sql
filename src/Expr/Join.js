@@ -51,10 +51,10 @@ const Join = class extends JoinInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, params = {}, cntxt = null) {
+	static parse(expr, parseCallback, Static = Join) {
 		var parse = Lexer.lex(expr, Join.clauses);
 		if (parse.tokens.length === 2) {
-			return new /*static*/Join(
+			return new Static(
 				parseCallback(parse.tokens[0], [Table]), 
 				parseCallback(parse.tokens[1]), 
 				parse.matches[0]

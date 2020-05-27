@@ -10,6 +10,7 @@ import _each from '@web-native-js/commons/obj/each.js';
 import _isString from '@web-native-js/commons/js/isString.js';
 import _isEmpty from '@web-native-js/commons/js/isEmpty.js';
 import _isUndefined from '@web-native-js/commons/js/isUndefined.js';
+import _remove from '@web-native-js/commons/arr/remove.js';
 
 /**
  * ---------------------------
@@ -22,12 +23,12 @@ const Reference = class extends _Reference {
 	 * @inheritdoc
 	 */
 	constructor(context, name, backticks = false) {
-		var isPath = _isString(name) && /(<-|->)/.test(name);
-		if (isPath && !backticks) {
+		var isArrowReference = _isString(name) && /(<-|->)/.test(name);
+		if (isArrowReference && !backticks) {
 			backticks = true;
 		}
 		super(context, name, backticks);
-		this.isPath = isPath;
+		this.isArrowReference = isArrowReference;
 	}
 	
 	/**
@@ -35,24 +36,28 @@ const Reference = class extends _Reference {
 	 */
 	eval(tempRow, trap = {}) {
 		// Lets find the table that contains the column
-		if (!this.isContext && this.searchWithoutContext !== false) {
+		if (!this.isContext && !this.isTableName) {
 			var contexts = Reference.findContexts(tempRow, this.name);
+			if (this.isFieldName) {
+				_remove(contexts, '$');
+			}
 			if (!contexts.length) {
-				throw new Error('"' + this.toString() + '" is unknown!');
+				//throw new Error('"' + this.toString() + '" is unknown!');
 			}
 			if (!this.context) {
 				if (contexts.indexOf('$') === -1 && contexts.length > 1) {
 					throw new Error('"' + this.name + '" is ambiguous!');
 				}
 				if (contexts.length) {
-					return this.parseCallback(contexts.reduce((_c, c) => _c === '$' ? _c : c, '') + '.' + this.toString()/*full toString()*/).eval(tempRow, trap);
+					var context = contexts.reduce((_c, c) => _c === '$' ? _c : c, '');
+					return super.eval(tempRow[context], trap);
 				}
 			}
 		}
 		var val = super.eval(tempRow, trap);
 		// Table unknown?
 		if (this.isContext && _isUndefined(val)) {
-			throw new Error('Table "' + this.name + '" is unknown!');
+			//throw new Error('Table "' + this.name + '" is unknown!');
 		}
 		return val;
 	}
@@ -64,16 +69,8 @@ const Reference = class extends _Reference {
 		var contexts = [];
 		// We ask from schema first
 		Object.keys(tempRow).forEach(tableName => {
-			if (tableName !== '#') {
-				// + this.name does not have any backticka problem
-				if (tempRow['#'] && tempRow['#'][tableName] && !_isEmpty(tempRow['#'][tableName].fields)) {
-					var row = tempRow['#'][tableName].fields;
-				} else {
-					var row = tempRow[tableName];
-				}
-				if (!_isUndefined(row[name])) {
-					contexts.push(tableName);
-				}
+			if (name in tempRow[tableName]) {
+				contexts.push(tableName);
 			}
 		});
 		return contexts;
@@ -83,11 +80,7 @@ const Reference = class extends _Reference {
 	 * @inheritdoc
 	 */
 	static parse(expr, parseCallback, Static = Reference) {
-		var instance = super.parse(expr, parseCallback, Static);
-		if (instance) {
-			instance.parseCallback = parseCallback;
-			return instance;
-		}
+		return super.parse(expr, parseCallback, Static);
 	}
 }
 
