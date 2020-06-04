@@ -10,11 +10,13 @@ import {
 import Schema from '../Schema.js';
 import _isArray from '@web-native-js/commons/js/isArray.js';
 import _objFrom from '@web-native-js/commons/obj/from.js';
+import _each from '@web-native-js/commons/obj/each.js';
 import SelectInterface from './SelectInterface.js';
 import TableInterface from './TableInterface.js';
 import UnionInterface from './UnionInterface.js';
 import DerivedTableBase from '../Base/DerivedTable.js';
 import TableBase from '../Base/Table.js';
+import UACClient from '../Uac/Client.js';
 
 /**
  * ---------------------------
@@ -77,7 +79,7 @@ const Table = class extends TableInterface {
 		this.claused = true;
 		return this;
 	}
-
+	
 	/**
 	 * @inheritdoc
 	 */
@@ -105,10 +107,18 @@ const Table = class extends TableInterface {
 				fields: {},
 				uniqueKeys: [],
 			};
+			derivedTableSchemaAliased.name = this.getAlias();
+			// RUNTIME FIELDS
 			derivedQuery.getFields().forEach(field => {
 				derivedTableSchemaAliased.fields[field.getAlias()] = derivedTableSchema.fields[field.getName()];
 				if (derivedTableSchema.uniqueKeys.includes(field.getName())) {
 					derivedTableSchemaAliased.uniqueKeys.push(field.getAlias());
+				}
+			});
+			// STANDARD FIELDS
+			_each(derivedTableSchema.fields, (name, field) => {
+				if (!derivedTableSchemaAliased.fields[name]) {
+					derivedTableSchemaAliased.fields[name] = field;
 				}
 			});
 			return derivedTableSchemaAliased;
@@ -122,12 +132,16 @@ const Table = class extends TableInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Table) {
+	static parse(expr, parseCallback, params = {}, Static = Table) {
 		var parse = Lexer.lex(expr, [' (as )?'], {useRegex:'i'});
 		if (parse.tokens.length < 3) {
 			var tableParse = parseCallback(parse.tokens[0]);
 			if (tableParse instanceof ReferenceInterface) {
-				tableParse.isTableName = true;
+				if (params.withUac) {
+					tableParse = parseCallback('(' + UACClient.select(null, tableParse.toString()) + ')', null, {withUac: false});
+				} else {
+					tableParse.isTableName = true;
+				}
 			} else if (!(tableParse instanceof AbstractionInterface && (tableParse.expr instanceof SelectInterface || tableParse.expr instanceof UnionInterface))) {
 				throw new Error('Table expression must be either a plain reference or a (derived) query!');
 			}

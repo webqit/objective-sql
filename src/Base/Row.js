@@ -10,6 +10,9 @@ import _sum from '@web-native-js/commons/arr/sum.js';
 import _rand from '@web-native-js/commons/arr/rand.js';
 import _isNull from '@web-native-js/commons/js/isNull.js';
 import _after from '@web-native-js/commons/str/after.js';
+import _objFrom from '@web-native-js/commons/obj/from.js';
+import _merge from '@web-native-js/commons/obj/merge.js';
+import _get from '@web-native-js/commons/obj/get.js';
 
 /**
  * ---------------------------
@@ -17,7 +20,7 @@ import _after from '@web-native-js/commons/str/after.js';
  * ---------------------------
  */				
 
-const Row = class {
+export default class Row {
 	
 	constructor(trap) {
 		Object.defineProperty(this, '.trap', {value: trap});
@@ -36,7 +39,28 @@ const Row = class {
 	CONCAT_WS(...args) {
 		return args.join(args.shift());
 	}
-	
+	 
+	/**
+	 * @inheritdoc
+	 */
+	COALESCE(...args) {
+		return args.reduce((prev, next) => !_isNull(prev) ? prev : next, null);
+	}
+		 
+	/**
+	 * @inheritdoc
+	 */
+	FIND_IN_SET(substr, str) {
+		return str.indexOf(substr);
+	}
+			 
+	/**
+	 * @inheritdoc
+	 */
+	ISNULL(val) {
+		return _isNull(val);
+	}
+		
 	/**
 	 * ----------------
 	 * AGGREGATE FUNCTIONS
@@ -146,9 +170,31 @@ const Row = class {
 	COLUMNS(rows, args) {
 		return args.map(arg => this.COLUMN(rows, arg));
 	}
+	
+	/**
+	 * ----------------
+	 * JSON FUNCTIONS
+	 * ----------------
+	 */
+	
+	/**
+	 * @inheritdoc
+	 */
+	JSON_EXTRACT(doc, path) {
+		return _get(JSON.parse(doc), path.split('.').slice(1));
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	JSON_OBJECT(name, value) {
+		return _objFrom(name, value);
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	JSON_MERGE(doc1, doc2) {
+		return _merge(JSON.parse(doc1), JSON.parse(doc2));
+	}
 };
-
-/**
- * @exports
- */
-export default Row;

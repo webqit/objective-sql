@@ -36,7 +36,21 @@ const Join = class extends JoinInterface {
 		};
 		return TableBase;
 	}
-	
+
+	/**
+	 * @inheritdoc
+	 */
+	getName() {
+		return this.table.getName();
+	}	
+
+	/**
+	 * @inheritdoc
+	 */
+	getAlias() {
+		return this.table.getAlias();
+	}
+
 	/**
 	 * @inheritdoc
 	 */
@@ -51,7 +65,7 @@ const Join = class extends JoinInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Join) {
+	static parse(expr, parseCallback, params = {}, Static = Join) {
 		var parse = Lexer.lex(expr, Join.clauses);
 		if (parse.tokens.length === 2) {
 			return new Static(
@@ -66,7 +80,7 @@ const Join = class extends JoinInterface {
 /**
  * @prop object
  */
-Join.clauses = [' ON ', ' USING '];
+Join.clauses = [' on ', ' using ', ' ON ', ' USING ',];
 
 /**
  * @exports

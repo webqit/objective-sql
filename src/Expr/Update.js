@@ -23,10 +23,11 @@ const Update = class extends _mixin(Stmt, UpdateInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(exprs, clauses) {
+	constructor(exprs, clauses, withUac) {
 		super();
 		this.exprs = exprs;
 		this.clauses = clauses;
+		this.withUac = withUac;
 	}
 	
 	/**
@@ -61,15 +62,20 @@ const Update = class extends _mixin(Stmt, UpdateInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Update) {
+	static parse(expr, parseCallback, params = {}, Static = Update) {
 		if (expr.trim().substr(0, 6).toLowerCase() === 'update') {
-			var stmtParse = super.getParse(expr, Static.clauses, parseCallback, (clauseType, _expr) => {
+			var withUac = false;
+			if (expr.match(/UPDATE[ ]+WITH[ ]+UAC/i)) {
+				withUac = true;
+				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
+			}
+			var stmtParse = super.getParse(expr, withUac, Static.clauses, parseCallback, (clauseType, _expr) => {
 				if (clauseType === 'assignments') {
 					return Lexer.split(_expr, [','])
 						.map(assignment => parseCallback(assignment.trim(), [Assignment]));
 				}
 			});
-			return new Static(stmtParse.exprs, stmtParse.clauses);
+			return new Static(stmtParse.exprs, stmtParse.clauses, withUac);
 		}
 	}
 };

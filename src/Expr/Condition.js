@@ -40,7 +40,7 @@ const Condition = class extends _Condition {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Condition) {
+	static parse(expr, parseCallback, params = {}, Static = Condition) {
 		if (expr.match(/^if[ ]*?\(/i)) {
 			var tokens = Lexer.split(_unwrap(expr.trim().substr(2).trim(), '(', ')'), [',']);
 			if (tokens.length !== 3) {

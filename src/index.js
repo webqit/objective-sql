@@ -13,14 +13,16 @@ import {
 	Bool,
 	Math,
 	Num,
-	Str
+	Str,
+	Void,
 } from '@web-native-js/jsen';
 import {
 	AbstractionInterface,
 	BoolInterface,
 	MathInterface,
 	NumInterface,
-	StrInterface
+	StrInterface,
+	VoidInterface,
 } from '@web-native-js/jsen';
 import * as Commons from '@web-native-js/commons';
 // Extended
@@ -30,7 +32,7 @@ import {
 	CallInterface,
 	ComparisonInterface,
 	ConditionInterface,
-	ReferenceInterface
+	ReferenceInterface,
 } from '@web-native-js/jsen';
 import Assertion from './Expr/Assertion.js';
 import Assignment from './Expr/Assignment.js';
@@ -84,6 +86,7 @@ Mql.grammars = {
 	Num: Num,					// [0-9]
 	Str: Str,					// ""
 	Bool: Bool,					// true
+	Void: Void,					// null|undefined
 	Aggr: Aggr,					// MIN() OVER()
 	Call: Call,					// COUNT()
 	Reference: Reference,		// field1
@@ -119,6 +122,7 @@ export {
 	Table,
 	Union,
 	Update,
+	Void,
 	Window
 };
 export {
@@ -144,6 +148,7 @@ export {
 	TableInterface,
 	UnionInterface,
 	UpdateInterface,
+	VoidInterface,
 	WindowInterface
 };
 export default Mql;

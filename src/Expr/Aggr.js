@@ -48,7 +48,7 @@ const Aggr = class extends _mixin(Call, AggrInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Aggr) {
+	static parse(expr, parseCallback, params = {}, Static = Aggr) {
 		var aggrMatch = null;
 		var aggrMatchRegex = _flatten(Static.funcs).join("\\(|") + "\\(";
 		if (aggrMatch = expr.trim().match(new RegExp('^(' + aggrMatchRegex + ')', 'i'))) {
@@ -58,7 +58,7 @@ const Aggr = class extends _mixin(Call, AggrInterface) {
 			if (funcCategory === 'explicitOver' && splits.length === 1) {
 				throw new Error(aggrMatch[0] + '() requires an OVER clause!');
 			}
-			var instance = super.parse(splits.shift().trim(), parseCallback, Static);
+			var instance = super.parse(splits.shift().trim(), parseCallback, params, Static);
 			instance.funcCategory = funcCategory;
 			if (splits.length) {
 				instance.window = parseCallback(splits.pop().trim(), [Window]);

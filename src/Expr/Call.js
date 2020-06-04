@@ -38,8 +38,8 @@ const Call = class extends _Call {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Call) {
-		return super.parse(expr, parseCallback, Static);
+	static parse(expr, parseCallback, params = {}, Static = Call) {
+		return super.parse(expr, parseCallback, params, Static);
 	}
 }
 

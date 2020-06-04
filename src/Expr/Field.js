@@ -79,7 +79,7 @@ const Field = class extends FieldInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Field) {
+	static parse(expr, parseCallback, params = {}, Static = Field) {
 		var splits = Lexer.split(expr, [' (as )?'], {useRegex:'i', preserveDelims:true});
 		var exprParse = null;
 		var alias = splits.pop().trim();

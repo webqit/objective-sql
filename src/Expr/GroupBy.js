@@ -90,7 +90,7 @@ const GroupBy = class extends GroupByInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = GroupBy) {
+	static parse(expr, parseCallback, params = {}, Static = GroupBy) {
 		var parse = Lexer.lex(expr, ['WITH[ ]+ROLLUP', 'HAVING'], {useRegex:'i'});
 		var columns = Lexer.split(parse.tokens.shift().trim(), [',']).map(
 			c => parseCallback(c.trim())

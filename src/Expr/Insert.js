@@ -28,11 +28,12 @@ const Insert = class extends InsertInterface {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(table, columns, values, insertType, onDuplicateKeyUpdate) {
+	constructor(table, columns, values, withUac, insertType, onDuplicateKeyUpdate) {
 		super();
 		this.table = table;
 		this.columns = columns;
 		this.values = values;
+		this.withUac = withUac;
 		this.insertType = insertType;
 		this.onDuplicateKeyUpdate = onDuplicateKeyUpdate;
 	}
@@ -82,11 +83,11 @@ const Insert = class extends InsertInterface {
 				// Generate the assertion
 				var where = new Assertion(comparisons, Assertion.operators.or);
 				var base = new Base(trap, this.table.eval(database, trap), where);
-				while (base.next()) {
+				var rowBase;
+				while (rowBase = base.fetch()) {
 					if (!this.onDuplicateKeyUpdate) {
 						throw new Error('Inserting duplicate values on unique keys: ' + uniqueKeys.join(', '));
 					}
-					var rowBase = base.fetch();
 					this.onDuplicateKeyUpdate.forEach(assignment => assignment.eval(rowBase, trap));
 					duplicateKeyUpdateCount ++;
 				}
@@ -136,8 +137,13 @@ const Insert = class extends InsertInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Insert) {
-		if (expr.trim().match(/^INSERT([ ]+INTO)?/, 'i')) {
+	static parse(expr, parseCallback, params = {}, Static = Insert) {
+		if (expr.trim().match(/^INSERT([ ]+WITH[ ]+UAC)?([ ]+INTO)?/, 'i')) {
+			var withUac = false;
+			if (expr.match(/INSERT[ ]+WITH[ ]+UAC/i)) {
+				withUac = true;
+				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
+			}
 			var parse = Lexer.lex(expr, Object.values(Insert.clauses), {useRegex:'i'});
 			parse.tokens.shift();
 			var table = parse.tokens.shift().trim();
@@ -170,7 +176,7 @@ const Insert = class extends InsertInterface {
 				onDuplicateKeyUpdate = Lexer.split(onDuplicateKeyUpdate.trim(), [','])
 					.map(assignment => parseCallback(assignment.trim(), [Assignment]));
 			}
-			var instance = new Static(table, columns, values, insertType, onDuplicateKeyUpdate);
+			var instance = new Static(table, columns, values, withUac, insertType, onDuplicateKeyUpdate);
 			instance.parseCallback = parseCallback;
 			return instance;
 		}

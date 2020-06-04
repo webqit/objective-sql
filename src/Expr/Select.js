@@ -2,7 +2,7 @@
 /**
  * @imports
  */
-import {
+import Mql, {
 	Lexer
 } from '../index.js';
 import _mixin from '@web-native-js/commons/js/mixin.js';
@@ -13,12 +13,14 @@ import _merge from '@web-native-js/commons/obj/merge.js';
 import _find from '@web-native-js/commons/obj/find.js';
 import SelectInterface from './SelectInterface.js';
 import AggrInterface from './AggrInterface.js';
+import JoinInterface from './JoinInterface.js';
 import Field from './Field.js';
 import Stmt from './Stmt.js';
 import Window from './Window.js';
 import GroupBy from './GroupBy.js';
 import OrderBy from './OrderBy.js';
 import Base from '../Base/Base.js';
+import Schema from '../Schema.js';
 
 /**
  * ---------------------------
@@ -31,11 +33,12 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(exprs, clauses, distinct = false, references = []) {
+	constructor(exprs, clauses, withUac = false, flags = [], references = []) {
 		super();
 		this.exprs = exprs;
 		this.clauses = clauses;
-		this.distinct = distinct;
+		this.withUac = withUac;
+		this.flags = flags;
 	}
 
 	/**
@@ -170,18 +173,39 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 		// ---------------------------
 		// INITIALIZE DATASOURCES WITH JOIN ALGORITHIMS APPLIED
 		// ---------------------------
-		var tables = (_isArray(this.exprs.table) ? this.exprs.table : [this.exprs.table]).concat(this.exprs.joins || [])
-			.map(table => table.eval(database, trap));
-		var mainTable = tables.shift();
+		var tables = (_isArray(this.exprs.table) ? this.exprs.table : [this.exprs.table]).concat(this.exprs.joins || []);
+		var tablessss = tables.map(table => table.eval(database, trap));
+		var mainTable = tablessss.shift();
 		
-		this.base = new Base(trap, mainTable, this.exprs.where, ...tables);
+		this.base = new Base(trap, mainTable, this.exprs.where, ...tablessss);
 		// BUILD (TEMP) ROWS, WHERE
 		var tempRows = [], tempRow;
 		while (tempRow = this.base.fetch()) {
 			tempRows.push(tempRow);
 		}
 		// BUILD FIELDS
-		var aggrFields = applyFields(tempRows, this.exprs.fields, true/*collectAggrs*/);
+		var fields = [], _fields, _schema;
+		this.exprs.fields.forEach(field => {
+			if (field.getName() === '*') {
+				tables.forEach(table => {
+					if (table instanceof JoinInterface) {
+						table = table.table;
+					}
+					if (!(_schema = table.getSchema())) {
+						throw new Error('Can\'t resolve *; schema not found for table "' + table.getName() + '".');
+					}
+					if (!(_fields = Object.keys(_schema.fields)).length) {
+						throw new Error('Can\'t resolve *; fields not defined for table "' + table.getName() + '".');
+					}
+					_fields.forEach(_field => {
+						fields.push(Mql.parse(_field, [Field]));
+					});
+				});
+			} else {
+				fields.push(field);
+			}
+		});
+		var aggrFields = applyFields(tempRows, fields, true/*collectAggrs*/);
 
 		// ---------------------------
 		// GROUP BY?
@@ -219,7 +243,7 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 		// ---------------------------
 		// DISTINCT
 		// ---------------------------
-		if (this.distinct) {
+		if (this.flags.includes('DISTINCT')) {
 			tempRows = tempRows.filter((tempRow, i) => i === _find(tempRows, _tempRow => _even(_tempRow, tempRow)));
 		}
 
@@ -246,7 +270,7 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 	toString(context = null) {
 		return this.getToString(context, (clauseType, expr, clause) => {
 			if (clauseType === 'fields') {
-				return clause + ' ' + expr.map(x => x.toString(context)).join(', ');
+				return clause + ' ' + (this.flags.length ? ' ' + this.flags.join(' ') : '') + expr.map(x => x.toString(context)).join(', ');
 			} else if (clauseType === 'windows') {
 				return clause + ' ' + Object.keys(expr).map(
 					windowName => windowName + ' AS ' + expr[windowName].toString(context)
@@ -262,9 +286,14 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Select) {
+	static parse(expr, parseCallback, params = {}, Static = Select) {
 		if (expr.trim().substr(0, 6).toLowerCase() === 'select') {
-			var stmtParse = super.getParse(expr, Static.clauses, parseCallback, (clauseType, _expr) => {
+			var withUac = false;
+			if (expr.match(/SELECT[ ]+WITH[ ]+UAC/i)) {
+				withUac = true;
+				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
+			}
+			var stmtParse = super.getParse(expr, withUac, Static.clauses, parseCallback, (clauseType, _expr) => {
 				if (clauseType === 'fields') {
 					return Lexer.split(_expr, [',']).map(
 						field => parseCallback(field.trim(), [Field])
@@ -289,7 +318,8 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 			return new Static(
 				stmtParse.exprs, 
 				stmtParse.clauses, 
-				(stmtParse.clauses.fields.match(/DISTINCT/i) || [])[0],
+				withUac,
+				stmtParse.clauses.fields.replace(/SELECT/i, '').split(' ').filter(flag => flag),
 				stmtParse.references,
 			);
 		}

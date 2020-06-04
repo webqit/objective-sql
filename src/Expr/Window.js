@@ -89,7 +89,7 @@ const Window = class extends WindowInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Window) {
+	static parse(expr, parseCallback, params = {}, Static = Window) {
 		var dfn = {};
 		if (_wrapped(expr, '(', ')')) {
 			if (expr = _unwrap(expr, '(', ')')) {

@@ -19,10 +19,11 @@ const Delete = class extends _mixin(Stmt, DeleteInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(exprs, clauses) {
+	constructor(exprs, clauses, withUac) {
 		super();
 		this.exprs = exprs;
 		this.clauses = clauses;
+		this.withUac = withUac;
 	}
 	
 	/**
@@ -65,10 +66,15 @@ const Delete = class extends _mixin(Stmt, DeleteInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Delete) {
+	static parse(expr, parseCallback, params = {}, Static = Delete) {
 		if (expr.trim().match(/^DELETE[ ]+FROM/, 'i')) {
-			var stmtParse = super.getParse(expr, Static.clauses, parseCallback);
-			return new Static(stmtParse.exprs, stmtParse.clauses);
+			var withUac = false;
+			if (expr.match(/DELETE[ ]+WITH[ ]+UAC/i)) {
+				withUac = true;
+				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
+			}
+			var stmtParse = super.getParse(expr, withUac, Static.clauses, parseCallback);
+			return new Static(stmtParse.exprs, stmtParse.clauses, withUac);
 		}
 	}
 };

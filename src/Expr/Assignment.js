@@ -41,8 +41,8 @@ const Assignment = class extends _Assignment {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Assignment) {
-		var instance = super.parse(expr, parseCallback, Static);
+	static parse(expr, parseCallback, params = {}, Static = Assignment) {
+		var instance = super.parse(expr, parseCallback, params, Static);
 		if (instance) {
 			instance.parseCallback = parseCallback;
 			instance.Static = Static;

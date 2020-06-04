@@ -51,7 +51,7 @@ const Stmt = class {
 	/**
 	 * @inheritdoc
 	 */
-	static getParse(expr, stmtClauses, parseCallback, callback) {
+	static getParse(expr, withUac, stmtClauses, parseCallback, callback) {
 		// Match clauses; case-insensitively
 		var useRegex = 'i';
 		var parse = Lexer.lex(expr, Object.values(stmtClauses), {useRegex:useRegex});
@@ -63,7 +63,7 @@ const Stmt = class {
 				var _expr = parse.tokens[i + 1].trim();
 				var _exprParse = null;
 				if (clauseType === 'joins') {
-					var _exprParse = parseCallback(_expr);
+					var _exprParse = parseCallback(_expr, null, {withUac});
 					if (_exprParse.type = clause.match(new RegExp('(INNER|CROSS|LEFT|RIGHT)', 'i'))) {
 						_exprParse.type = _exprParse.type[0].toLowerCase();
 					}
@@ -77,11 +77,11 @@ const Stmt = class {
 				} else {
 					if (clauseType === 'table') {
 						var tables = Lexer.split(_expr, [',']).map(
-							table => parseCallback(table.trim(), [Table])
+							table => parseCallback(table.trim(), [Table], {withUac})
 						);
 						var _exprParse = tables.length === 1 ? tables[0] : tables;
 					} else if (!callback || !(_exprParse = callback(clauseType, _expr))) {
-						var _exprParse = parseCallback(_expr);
+						var _exprParse = parseCallback(_expr, null, {withUac});
 					}
 					if (!_instanceof(_exprParse, AbstractionInterface)) {
 						// Mine vars
@@ -109,21 +109,25 @@ const Stmt = class {
 				// ---------------
 				// Init
 				// ---------------
-				var smartJoins = {},
-					baseTable = _isArray(exprs.table) ? exprs.table[0] : exprs.table;
+				var smartJoins = {}, tables = (_isArray(exprs.table) ? exprs.table : [exprs.table]).concat(exprs.joins || []);
 				arrowReferences.forEach(arrowRef => {
-					var arrowRefEval = ArrowReference.eval(baseTable.getName(), arrowRef.toString().replace(/`/g, ''));
-					var uuid = [arrowRefEval.a.table.name, arrowRefEval.a.actingKey, arrowRefEval.b.actingKey, arrowRefEval.b.table.name,].join('_');
+					var baseTable = (arrowRef.context ? tables.filter(table => table.getAlias() === arrowRef.context.name + '') : tables)[0];
+					var arrowRefEval = ArrowReference.eval(baseTable.getSchema(), arrowRef.name.replace(/`/g, ''));
+					var uuid = [baseTable.getAlias(), arrowRefEval.a.actingKey, arrowRefEval.b.actingKey, arrowRefEval.b.table.name,].join('_');
 					if (!smartJoins[uuid]) {
 						smartJoins[uuid] = {
 							a: arrowRefEval.a,
 							b: arrowRefEval.b,
 							select: [],
+							baseTable,
 						}
 					}
+					// The actual table to resolve from
+					// id thid joined table
+					arrowRef.arrowContext = uuid;
 					smartJoins[uuid].select.push(
 						arrowRefEval.b.actingKey, // Must come first
-						arrowRefEval.b.select + ' AS `' + arrowRef.toString().replace(/`/g, '') + '`'
+						arrowRefEval.b.select + ' AS `' + arrowRef.name.replace(/`/g, '') + '`'
 					);
 				});
 				// ---------------
@@ -134,11 +138,12 @@ const Stmt = class {
 					clauses.joins = [];
 				}
 				_each(smartJoins, (uuid, join) => {
+					var alias = join.b.table.name;
 					// ------------------
-					var joinStmt = '(SELECT ' + _unique(join.select).join(', ') 
-						+ ' FROM ' + join.b.table.name
+					var joinStmt = '(SELECT ' + (withUac ? 'WITH UAC ' : '') + alias + '.' + _unique(join.select).join(', ' + alias + '.') 
+						+ ' FROM ' + join.b.table.name + ' AS ' + alias
 					+ ') AS ' + uuid
-					+ ' ON ' + uuid + '.' + join.b.actingKey + ' = ' + baseTable.getAlias() + '.' + join.a.actingKey;
+					+ ' ON ' + uuid + '.' + join.b.actingKey + ' = ' + join.baseTable.getAlias() + '.' + join.a.actingKey;
 					joinStmt = parseCallback(joinStmt);
 					joinStmt.type = 'left';
 					// ------------------

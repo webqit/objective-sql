@@ -44,6 +44,13 @@ const Reference = class extends _Reference {
 			if (!contexts.length) {
 				//throw new Error('"' + this.toString() + '" is unknown!');
 			}
+			if (this.arrowContext) {
+				var _context = this.context;
+				this.context = undefined;
+				var val = super.eval(tempRow[this.arrowContext], trap);
+				this.context = _context;
+				return val;
+			}
 			if (!this.context) {
 				if (contexts.indexOf('$') === -1 && contexts.length > 1) {
 					throw new Error('"' + this.name + '" is ambiguous!');
@@ -69,7 +76,7 @@ const Reference = class extends _Reference {
 		var contexts = [];
 		// We ask from schema first
 		Object.keys(tempRow).forEach(tableName => {
-			if (name in tempRow[tableName]) {
+			if (tempRow[tableName] && name in tempRow[tableName]) {
 				contexts.push(tableName);
 			}
 		});
@@ -79,8 +86,8 @@ const Reference = class extends _Reference {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Reference) {
-		return super.parse(expr, parseCallback, Static);
+	static parse(expr, parseCallback, params = {}, Static = Reference) {
+		return super.parse(expr, parseCallback, params, Static);
 	}
 }
 

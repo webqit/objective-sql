@@ -70,7 +70,7 @@ const OrderBy = class extends OrderByInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = OrderBy) {
+	static parse(expr, parseCallback, params = {}, Static = OrderBy) {
 		var columns = [];
 		var withRollup = false;
 		var parse = Lexer.lex(expr, ['WITH[ ]+ROLLUP'], {useRegex:'i'});

@@ -44,7 +44,7 @@ const Union = class extends UnionInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, Static = Union) {
+	static parse(expr, parseCallback, params = {}, Static = Union) {
 		var parse = null;
 		var paramsRegex = {useRegex: 'i'};
 		if ((parse = Lexer.lex(expr, [' UNION([ ]+(ALL|DISTINCT))? '], paramsRegex)) && parse.matches.length) {

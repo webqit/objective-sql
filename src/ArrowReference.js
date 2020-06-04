@@ -5,6 +5,8 @@
 import Schema from './Schema.js';
 import _before from '@web-native-js/commons/str/before.js';
 import _after from '@web-native-js/commons/str/after.js';
+import _isString from '@web-native-js/commons/js/isString.js';
+import _isObject from '@web-native-js/commons/js/isObject.js';
 
 export default class ArrowReference {
 	
@@ -56,12 +58,12 @@ export default class ArrowReference {
 	/**
 	 * Gets the immediate target in a reference path.
 	 * 
-	 * @param {String} tableName 
+	 * @param {String} base 
 	 * @param {String} reference 
 	 * 
 	 * @return {Object}
 	 */
-    static eval(tableName, reference) {
+    static eval(base, reference) {
 		var table1, table2;
 		if (ArrowReference.isIncoming(reference)) {
 			// reference === actingKey<-...
@@ -79,7 +81,7 @@ export default class ArrowReference {
 					throw new Error('[' + reference + ']: The implied table "' + _sourceTable + '" is not defined.');
 				}
 			}
-			if (!tableName) {
+			if (!base) {
 				// --------------------------
 				// Now get table1 from table2
 				// --------------------------
@@ -87,23 +89,31 @@ export default class ArrowReference {
 					throw new Error('[' + reference + ']: The "' + table2.name + '" table does not define the implied foreign key "' + actingKey + '".');
 				}
 				table1 = Schema.tables[table1.name];
-			} else {
-				table1 = Schema.tables[tableName];
+			} else if (_isString(base)) {
+				table1 = Schema.tables[base];
+			} else if (_isObject(base)) {
+				table1 = base;
 			}
 			return {
 				a: {table: table1, actingKey: table1.primaryKey,},
 				b: {table: table2, actingKey, select,},
 			};
 		}
+
 		// reference === foreignKey->...
-		table1 = Schema.tables[tableName];
+		if (_isString(base)) {
+			table1 = Schema.tables[base];
+		} else if (_isObject(base)) {
+			table1 = base;
+			base = table1.name;
+		}
 		// --------------------------
 		// Now get table2 from table1
 		// --------------------------
 		var foreignKey = _before(reference, '->')
 			select = _after(reference, '->');
 		if (!table1.fields[foreignKey] || !(table2 = table1.fields[foreignKey].referencedEntity)) {
-			throw new Error('[' + tableName + '->' + reference + ']: The "' + tableName + '" table does not define the implied foreign key "' + foreignKey + '".');
+			throw new Error('[' + base + '->' + reference + ']: The "' + base + '" table does not define the implied foreign key "' + foreignKey + '".');
 		}
 		table2 = Schema.tables[table2.name];
 		return {
