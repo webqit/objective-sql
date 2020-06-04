@@ -9,7 +9,7 @@
     "name": "Oxford Harrison",
     "email": "oxharriscreative@gmail.com"
   },
-  "version": "0.0.3",
+  "version": "0.1.0",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -26,8 +26,8 @@
     "watch": "webpack --watch"
   },
   "dependencies": {
-    "@web-native-js/commons": "file:../commons",
-    "@web-native-js/jsen": "file:../jsen"
+    "@web-native-js/commons": "^0.0.3",
+    "@web-native-js/jsen": "^0.1.1"
   },
   "devDependencies": {
     "webpack": "^4.41.6",
