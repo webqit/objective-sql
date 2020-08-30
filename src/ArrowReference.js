@@ -18,7 +18,7 @@ export default class ArrowReference {
 	 * @return bool
 	 */
 	static isReference(str) {
-		return str.indexOf('<-') > -1 || str.indexOf('->') > -1;
+		return str.indexOf(this.arrLeft) > -1 || str.indexOf(this.arrRight) > -1;
 	}
 	
 	/**
@@ -29,7 +29,7 @@ export default class ArrowReference {
 	 * @return bool
 	 */
 	static isOutgoing(reference) {
-		return reference.indexOf('->') > -1 && _before(reference, '->').indexOf('<-') === -1;
+		return reference.indexOf(this.arrRight) > -1 && _before(reference, this.arrRight).indexOf(this.arrLeft) === -1;
 	}
 	
 	/**
@@ -40,7 +40,7 @@ export default class ArrowReference {
 	 * @return bool
 	 */
 	static isIncoming(reference) {
-		return reference.indexOf('<-') > -1 && _before(reference, '<-').indexOf('->') === -1;
+		return reference.indexOf(this.arrLeft) > -1 && _before(reference, this.arrLeft).indexOf(this.arrRight) === -1;
 	}
 	
 	/**
@@ -51,8 +51,8 @@ export default class ArrowReference {
 	 * @return string
 	 */
 	static reverse(reference) {
-		return reference.replace(/->/g, '|->|').replace(/<-/g, '|<-|')
-			.split('|').map(str => str === '->' ? '<-' : (str === '<-' ? '->' : str)).reverse().join('');
+		return reference.replace(new RegExp(this.arrRight, 'g'), '|' + this.arrRight + '|').replace(new RegExp(this.arrLeft, 'g'), '|' + this.arrLeft + '|')
+			.split('|').map(str => str === this.arrRight ? this.arrLeft : (str === this.arrLeft ? this.arrRight : str)).reverse().join('');
 	}
 
 	/**
@@ -65,18 +65,18 @@ export default class ArrowReference {
 	 */
     static eval(base, reference) {
 		var table1, table2;
-		if (ArrowReference.isIncoming(reference)) {
+		if (this.isIncoming(reference)) {
 			// reference === actingKey<-...
-			var actingKey = _before(reference, '<-'),
-				sourceTable = _after(reference, '<-');
-			if (ArrowReference.isIncoming(sourceTable)) {
+			var actingKey = _before(reference, this.arrLeft),
+				sourceTable = _after(reference, this.arrLeft);
+			if (this.isIncoming(sourceTable)) {
 				// reference === actingKey<-actingKey2<-table->?...
-				table2 = ArrowReference.eval('', sourceTable).a.table;
+				table2 = this.eval('', sourceTable).a.table;
 				var select = sourceTable;
 			} else {
 				// reference === actingKey<-table->?...
-				var _sourceTable = _before(sourceTable, '->')
-					select = _after(sourceTable, '->');
+				var _sourceTable = _before(sourceTable, this.arrRight)
+					select = _after(sourceTable, this.arrRight);
 				if (!(table2 = Schema.tables[_sourceTable])) {
 					throw new Error('[' + reference + ']: The implied table "' + _sourceTable + '" is not defined.');
 				}
@@ -110,10 +110,10 @@ export default class ArrowReference {
 		// --------------------------
 		// Now get table2 from table1
 		// --------------------------
-		var foreignKey = _before(reference, '->')
-			select = _after(reference, '->');
+		var foreignKey = _before(reference, this.arrRight)
+			select = _after(reference, this.arrRight);
 		if (!table1.fields[foreignKey] || !(table2 = table1.fields[foreignKey].referencedEntity)) {
-			throw new Error('[' + base + '->' + reference + ']: The "' + base + '" table does not define the implied foreign key "' + foreignKey + '".');
+			throw new Error('[' + base + this.arrRight + reference + ']: The "' + base + '" table does not define the implied foreign key "' + foreignKey + '".');
 		}
 		table2 = Schema.tables[table2.name];
 		return {
@@ -121,4 +121,10 @@ export default class ArrowReference {
 			b: {table: table2, actingKey: table2.primaryKey, select,},
 		};
 	}
-}
+};
+
+/**
+ * @var string
+ */
+ArrowReference.arrRight = '~>';
+ArrowReference.arrLeft = '<~';

@@ -2,15 +2,14 @@
 /**
  * @imports
  */
-import {
-	Lexer
-} from '@web-native-js/jsen';
-import Mql from './Mql.js';
+import Rql from './Rql.js';
 import ExprInterface from './ExprInterface.js';
 // Reuse
 import {
 	Abstraction,
+	Assignment,
 	Bool,
+	Call,
 	Math,
 	Num,
 	Str,
@@ -18,25 +17,22 @@ import {
 } from '@web-native-js/jsen';
 import {
 	AbstractionInterface,
+	AssignmentInterface,
 	BoolInterface,
+	CallInterface,
 	MathInterface,
 	NumInterface,
 	StrInterface,
 	VoidInterface,
 } from '@web-native-js/jsen';
-import * as Commons from '@web-native-js/commons';
 // Extended
 import {
 	AssertionInterface,
-	AssignmentInterface,
-	CallInterface,
 	ComparisonInterface,
 	ConditionInterface,
 	ReferenceInterface,
 } from '@web-native-js/jsen';
 import Assertion from './Expr/Assertion.js';
-import Assignment from './Expr/Assignment.js';
-import Call from './Expr/Call.js';
 import Comparison from './Expr/Comparison.js';
 import Condition from './Expr/Condition.js';
 import Reference from './Expr/Reference.js';
@@ -69,7 +65,7 @@ import WindowInterface from './Expr/WindowInterface.js';
 /**
  * @var object
  */
-Mql.grammars = {
+Rql.grammars = {
 	// Statements and union
 	Union: Union,				// ... UNION ...
 	Select: Select,				// SELECT ... FROM ...
@@ -95,9 +91,9 @@ Mql.grammars = {
 /**
  * @exports
  */
+export default Rql;
 export {
 	ExprInterface,
-	Lexer
 };
 export {
 	Abstraction,
@@ -151,4 +147,3 @@ export {
 	VoidInterface,
 	WindowInterface
 };
-export default Mql;

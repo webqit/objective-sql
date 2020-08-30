@@ -27,10 +27,14 @@ export default class Client {
         // OBJECT_QUERY
         // ---------------
         var OBJECT_QUERY = new Query(USER, tableName, true);
-        // The UAC fields control
-		_each(OBJECT_QUERY.deriveFieldsAccess(columns, 'view'), (field, accessPassExpression) => {
-			OBJECT_QUERY.select.push('IF(' + accessPassExpression + ' <> 0, ' + OBJECT_QUERY.alias + '.' + field + ', NULL) AS ' + field);
-        });
+		// The UAC fields control
+		if (0) {
+			_each(OBJECT_QUERY.deriveFieldsAccess(columns, 'view'), (field, accessPassExpression) => {
+				OBJECT_QUERY.select.push('IF(' + accessPassExpression + ' <> 0, ' + OBJECT_QUERY.alias + '.' + field + ', NULL) AS ' + field);
+			});
+		} else {
+			OBJECT_QUERY.select.push(...columns);
+		}
         return OBJECT_QUERY;
 	}
 		

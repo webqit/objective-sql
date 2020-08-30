@@ -15,12 +15,12 @@ import Jsen from '@web-native-js/jsen';
  * ---------------------------
  */				
 
-const Mql = class extends Jsen {
+export default class Rql extends Jsen {
 	 
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, Parsers, params = {}, Static = Mql) {
+	static parse(expr, Parsers, params = {}) {
 		if (!('mutates' in params)) {
 			params.mutates = true;
 		}
@@ -31,9 +31,6 @@ const Mql = class extends Jsen {
 			params.opts.ci = true;
 		}
 		params.allowCache = false;
-		return super.parse(expr, Parsers, params, Static);
+		return super.parse(expr, Parsers, params);
 	}
 };
-
-
-export default Mql;

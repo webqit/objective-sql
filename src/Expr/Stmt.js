@@ -3,7 +3,6 @@
  * @imports
  */
 import {
-	Lexer,
 	AbstractionInterface,
 } from '../index.js';
 import _instanceof from '@web-native-js/commons/js/instanceof.js';
@@ -12,7 +11,9 @@ import _each from '@web-native-js/commons/obj/each.js';
 import _unique from '@web-native-js/commons/arr/unique.js';
 import _arrFrom from '@web-native-js/commons/arr/from.js';
 import _find from '@web-native-js/commons/obj/find.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import ArrowReference from '../ArrowReference.js';
+import Base from '../Base/Base.js';
 import Table from './Table.js';
 
 /**
@@ -21,8 +22,18 @@ import Table from './Table.js';
  * ---------------------------
  */				
 
-const Stmt = class {
-	
+export default class Stmt {
+
+	/**
+	 * @inheritdoc
+	 */
+	getBase(database, params = {}) {
+		var tables = (_isArray(this.exprs.table) ? this.exprs.table : [this.exprs.table]).concat(this.exprs.joins || []);
+		tables = tables.map(table => table.eval(database, params));
+		var mainTable = tables.shift();
+		return new Base(params, mainTable, this.exprs.where, ...tables);
+	}
+
 	/**
 	 * @inheritdoc
 	 */
@@ -156,8 +167,3 @@ const Stmt = class {
 		}
 	}
 };
-
-/**
- * @exports
- */
-export default Stmt;

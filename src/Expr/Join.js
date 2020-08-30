@@ -3,7 +3,7 @@
  * @imports
  */
 import JoinInterface from './JoinInterface.js';
-import {Lexer} from '../index.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import Table from './Table.js';
 
 /**
@@ -12,7 +12,7 @@ import Table from './Table.js';
  * ---------------------------
  */				
 
-const Join = class extends JoinInterface {
+export default class Join extends JoinInterface {
 	 
 	/**
 	 * @inheritdoc
@@ -27,8 +27,8 @@ const Join = class extends JoinInterface {
 	/**
 	 * @inheritdoc
 	 */
-	eval(database, trap = {}) {
-		var TableBase = this.table.eval(database, trap);
+	eval(database, params = {}) {
+		var TableBase = this.table.eval(database, params);
 		TableBase.join = {
 			type: this.type, // Expected to be added by context
 			condition: this.condition, 
@@ -65,10 +65,10 @@ const Join = class extends JoinInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = Join) {
+	static parse(expr, parseCallback, params = {}) {
 		var parse = Lexer.lex(expr, Join.clauses);
 		if (parse.tokens.length === 2) {
-			return new Static(
+			return new this(
 				parseCallback(parse.tokens[0], [Table]), 
 				parseCallback(parse.tokens[1]), 
 				parse.matches[0]
@@ -81,8 +81,3 @@ const Join = class extends JoinInterface {
  * @prop object
  */
 Join.clauses = [' on ', ' using ', ' ON ', ' USING ',];
-
-/**
- * @exports
- */
-export default Join;

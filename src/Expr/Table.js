@@ -5,18 +5,19 @@
 import {
 	AbstractionInterface,
 	ReferenceInterface,
-	Lexer
 } from '../index.js';
-import Schema from '../Schema.js';
 import _isArray from '@web-native-js/commons/js/isArray.js';
 import _objFrom from '@web-native-js/commons/obj/from.js';
+import _copy from '@web-native-js/commons/obj/copy.js';
 import _each from '@web-native-js/commons/obj/each.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import SelectInterface from './SelectInterface.js';
 import TableInterface from './TableInterface.js';
 import UnionInterface from './UnionInterface.js';
 import DerivedTableBase from '../Base/DerivedTable.js';
 import TableBase from '../Base/Table.js';
 import UACClient from '../Uac/Client.js';
+import Schema from '../Schema.js';
 
 /**
  * ---------------------------
@@ -24,7 +25,7 @@ import UACClient from '../Uac/Client.js';
  * ---------------------------
  */				
 
-const Table = class extends TableInterface {
+export default class Table extends TableInterface {
 	
 	/**
 	 * @inheritdoc
@@ -40,17 +41,19 @@ const Table = class extends TableInterface {
 	/**
 	 * @inheritdoc
 	 */
-	eval(database = null, trap = {}) {
+	eval(database = null, params = {}) {
 		// Derived table???
 		if (this.expr instanceof AbstractionInterface) {
-			return new DerivedTableBase(database, this.expr/*ABS*/.expr/*SELECT*/, this.alias, this.getSchema());
+			var _params = _copy(params);
+			_params.fieldsByReference = true;
+			return new DerivedTableBase(this.expr/*ABS*/.expr/*SELECT*/.eval(database, _params), this.alias, this.getSchema());
 		}
 		if (this.expr instanceof ReferenceInterface) {
 			// We must eval() without context...
 			if (this.expr.context) {
-				var tableData = this.expr.eval(_objFrom(this.expr.context.name, database), trap);
+				var tableData = this.expr.eval(_objFrom(this.expr.context.name, database), params);
 			} else {
-				var tableData = this.expr.eval(database, trap);
+				var tableData = this.expr.eval(database, params);
 			}
 			if (!_isArray(tableData)) {
 				throw new Error('Table "' + this.getName() + '" could not be initialized!');
@@ -132,7 +135,7 @@ const Table = class extends TableInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = Table) {
+	static parse(expr, parseCallback, params = {}) {
 		var parse = Lexer.lex(expr, [' (as )?'], {useRegex:'i'});
 		if (parse.tokens.length < 3) {
 			var tableParse = parseCallback(parse.tokens[0]);
@@ -145,7 +148,7 @@ const Table = class extends TableInterface {
 			} else if (!(tableParse instanceof AbstractionInterface && (tableParse.expr instanceof SelectInterface || tableParse.expr instanceof UnionInterface))) {
 				throw new Error('Table expression must be either a plain reference or a (derived) query!');
 			}
-			return new Static(
+			return new this(
 				tableParse, 
 				(parse.tokens[1] || '').trim(), 
 				(parse.matches[0] || '').trim()
@@ -153,8 +156,3 @@ const Table = class extends TableInterface {
 		}
 	}
 };
-
-/**
- * @exports
- */
-export default Table;

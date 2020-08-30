@@ -3,8 +3,14 @@
  * @imports
  */
 import {
-	Comparison
+	Comparison as _Comparison
 } from '@web-native-js/jsen';
+
+
+/**
+ * @extends
+ */
+export default class Comparison extends _Comparison {};
 
 /**
  * @prop array
@@ -27,8 +33,3 @@ Comparison.operators = {
 		is: '=',
 	},
 };
-
-/**
- * @exports
- */
-export default Comparison;

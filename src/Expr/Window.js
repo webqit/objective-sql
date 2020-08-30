@@ -2,12 +2,10 @@
 /**
  * @imports
  */
-import {
-	Lexer
-} from '../index.js';
 import _inherit from '@web-native-js/commons/obj/inherit.js';
 import _wrapped from '@web-native-js/commons/str/wrapped.js';
 import _unwrap from '@web-native-js/commons/str/unwrap.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import WindowInterface from './WindowInterface.js';
 import OrderBy from './OrderBy.js';
 
@@ -17,7 +15,7 @@ import OrderBy from './OrderBy.js';
  * ---------------------------
  */				
 
-const Window = class extends WindowInterface {
+export default class Window extends WindowInterface {
 	
 	/**
 	 * @inheritdoc
@@ -30,7 +28,7 @@ const Window = class extends WindowInterface {
 	/**
 	 * @inheritdoc
 	 */
-	eval(tempRows, definitions = {}, trap = {}) {
+	eval(tempRows, definitions = {}, params = {}) {
 		var dfn = this.dfn;
 		var uuid = this.toString();
 		if (this.dfn.name) {
@@ -44,14 +42,14 @@ const Window = class extends WindowInterface {
 				// Drilldown...
 				var partitioning = {};
 				rows.forEach(row => {
-					var _for = partitionBy[0].eval(row, trap);
+					var _for = partitionBy[0].eval(row, params);
 					partitioning[_for] = partitioning[_for] || [];
 					partitioning[_for].push(row);
 				});
 				Object.values(partitioning).map(partition => exec(partition, partitionBy.slice(1)));
 			} else {
 				if (dfn.orderBy) {
-					rows = dfn.orderBy.eval(rows, trap);
+					rows = dfn.orderBy.eval(rows, params);
 				}
 				rows.forEach(row => {
 					if (!row.WINDOWS) {
@@ -89,7 +87,7 @@ const Window = class extends WindowInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = Window) {
+	static parse(expr, parseCallback, params = {}) {
 		var dfn = {};
 		if (_wrapped(expr, '(', ')')) {
 			if (expr = _unwrap(expr, '(', ')')) {
@@ -107,11 +105,6 @@ const Window = class extends WindowInterface {
 		} else {
 			dfn.name = expr;
 		}
-		return new Static(dfn);
+		return new this(dfn);
 	}
 };
-
-/**
- * @exports
- */
-export default Window;

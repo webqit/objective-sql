@@ -2,12 +2,10 @@
 /**
  * @imports
  */
-import {
-	Lexer
-} from '../index.js';
 import _sort from '@web-native-js/commons/arr/sort.js';
 import _before from '@web-native-js/commons/str/before.js';
 import _beforeLast from '@web-native-js/commons/str/beforeLast.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import OrderByInterface from './OrderByInterface.js';
 
 /**
@@ -16,7 +14,7 @@ import OrderByInterface from './OrderByInterface.js';
  * ---------------------------
  */				
 
-const OrderBy = class extends OrderByInterface {
+export default class OrderBy extends OrderByInterface {
 	
 	/**
 	 * @inheritdoc
@@ -30,12 +28,12 @@ const OrderBy = class extends OrderByInterface {
 	/**
 	 * @inheritdoc
 	 */
-	eval(tempRows, trap = {}) {
+	eval(tempRows, params = {}) {
 		var order = (rows, by) => {
 			// Drilldown...
 			var grouping = {};
 			rows.forEach(row => {
-				var _for = by[0].expr.eval(row, trap);
+				var _for = by[0].expr.eval(row, params);
 				grouping[_for] = grouping[_for] || [];
 				grouping[_for].push(row);
 			});
@@ -70,7 +68,7 @@ const OrderBy = class extends OrderByInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = OrderBy) {
+	static parse(expr, parseCallback, params = {}) {
 		var columns = [];
 		var withRollup = false;
 		var parse = Lexer.lex(expr, ['WITH[ ]+ROLLUP'], {useRegex:'i'});
@@ -85,11 +83,6 @@ const OrderBy = class extends OrderByInterface {
 		if (parse.matches.length === 1) {
 			withRollup = true;
 		}
-		return new Static(columns, withRollup);
+		return new this(columns, withRollup);
 	}
 };
-
-/**
- * @exports
- */
-export default OrderBy;

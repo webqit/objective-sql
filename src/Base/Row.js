@@ -22,8 +22,8 @@ import _get from '@web-native-js/commons/obj/get.js';
 
 export default class Row {
 	
-	constructor(trap) {
-		Object.defineProperty(this, '.trap', {value: trap});
+	constructor(params) {
+		Object.defineProperty(this, '.params', {value: params});
 	}
 	 
 	/**
@@ -93,7 +93,7 @@ export default class Row {
 	 * @inheritdoc
 	 */
 	GROUP_CONCAT_WS(rows, separator, column) {
-		return this.COLUMN(rows, column).join(separator.eval(this, this['.trap']));
+		return this.COLUMN(rows, column).join(separator.eval(this, this['.params']));
 	}
 	
 	/**
@@ -161,7 +161,7 @@ export default class Row {
 	 * @inheritdoc
 	 */
 	COLUMN(rows, arg) {
-		return rows.map(row => arg.eval(row, this['.trap']));
+		return rows.map(row => arg.eval(row, this['.params']));
 	}
 	
 	/**

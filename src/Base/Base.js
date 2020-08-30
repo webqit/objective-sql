@@ -19,8 +19,8 @@ export default class Base {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(trap, table, where, ...joins) {
-		this.trap = trap;
+	constructor(params, table, where, ...joins) {
+		this.params = params;
 		this.table = table;
 		this.where = where;
 		this.joins = joins;
@@ -66,10 +66,10 @@ export default class Base {
 							var column = joinTable.join.condition.toString();
 							var shouldJoin = joinRow[column] === baseRow[column];
 						} else {
-							var rowComposition = new Row(this.trap);
+							var rowComposition = new Row(this.params);
 							rowComposition[baseAlias] = baseRow;
 							rowComposition[joinTable.alias] = joinRow;
-							var shouldJoin = joinTable.join.condition.eval(rowComposition, this.trap);
+							var shouldJoin = joinTable.join.condition.eval(rowComposition, this.params);
 						}
 						if (shouldJoin) {
 							cursor.push(joinRow);
@@ -117,7 +117,7 @@ export default class Base {
 		if (this.eof) {
 			return;
 		}
-		var rowComposition = new Row(this.trap);
+		var rowComposition = new Row(this.params);
 		rowComposition[this.table.alias] = this.cursor.fetch();
 		if (this.joins.length) {
 			// ----------
@@ -149,7 +149,7 @@ export default class Base {
 		// Apply where
 		// ----------
 		try {
-			if (this.where && !this.where.eval(rowComposition, this.trap)) {
+			if (this.where && !this.where.eval(rowComposition, this.params)) {
 				return this.fetch();
 			}
 		} catch(e) {

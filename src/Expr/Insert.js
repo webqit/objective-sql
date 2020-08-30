@@ -2,14 +2,12 @@
 /**
  * @imports
  */
-import {
-	Lexer
-} from '../index.js';
 import _wrapped from '@web-native-js/commons/str/wrapped.js';
 import _unwrap from '@web-native-js/commons/str/unwrap.js';
 import _intersect from '@web-native-js/commons/arr/intersect.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import InsertInterface from './InsertInterface.js';
-import Assignment from './Assignment.js';
+import { Assignment } from '@web-native-js/jsen';
 import Reference from './Reference.js';
 import Assertion from './Assertion.js';
 import Comparison from './Comparison.js';
@@ -23,7 +21,7 @@ import Val from './Val.js';
  * ---------------------------
  */				
 
-const Insert = class extends InsertInterface {
+export default class Insert extends InsertInterface {
 	 
 	/**
 	 * @inheritdoc
@@ -41,8 +39,8 @@ const Insert = class extends InsertInterface {
 	/**
 	 * @inheritdoc
 	 */
-	eval(database, trap = {}) {
-		var tableBase = this.table.eval(database, trap);
+	eval(database, params = {}) {
+		var tableBase = this.table.eval(database, params);
 		var tableSchema = this.table.getSchema();
 		// ---------------------------
 		var values = this.values;
@@ -53,7 +51,7 @@ const Insert = class extends InsertInterface {
 		} else {
 			if (insertType === 'SELECT') {
 				try {
-					values = values.eval(database, trap).map(row => Object.values(row));
+					values = values.eval(database, params).map(row => Object.values(row));
 				} catch(e) {
 					throw new Error('["' + values.toString() + '" in SELECT clause]: ' + e.message);
 				}
@@ -82,13 +80,13 @@ const Insert = class extends InsertInterface {
 				});
 				// Generate the assertion
 				var where = new Assertion(comparisons, Assertion.operators.or);
-				var base = new Base(trap, this.table.eval(database, trap), where);
+				var base = new Base(params, this.table.eval(database, params), where);
 				var rowBase;
 				while (rowBase = base.fetch()) {
 					if (!this.onDuplicateKeyUpdate) {
 						throw new Error('Inserting duplicate values on unique keys: ' + uniqueKeys.join(', '));
 					}
-					this.onDuplicateKeyUpdate.forEach(assignment => assignment.eval(rowBase, trap));
+					this.onDuplicateKeyUpdate.forEach(assignment => assignment.eval(rowBase, params));
 					duplicateKeyUpdateCount ++;
 				}
 				rowCount += duplicateKeyUpdateCount;
@@ -98,7 +96,7 @@ const Insert = class extends InsertInterface {
 			// ------------------------
 			if (!duplicateKeyUpdateCount) {
 				if (insertType !== 'SELECT') {
-					rowArr = rowArr.map(val => val.eval(database, trap));
+					rowArr = rowArr.map(val => val.eval(database, params));
 				}
 				tableBase.insert(rowArr, columns);
 				rowCount ++;
@@ -137,7 +135,7 @@ const Insert = class extends InsertInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = Insert) {
+	static parse(expr, parseCallback, params = {}) {
 		if (expr.trim().match(/^INSERT([ ]+WITH[ ]+UAC)?([ ]+INTO)?/, 'i')) {
 			var withUac = false;
 			if (expr.match(/INSERT[ ]+WITH[ ]+UAC/i)) {
@@ -176,7 +174,7 @@ const Insert = class extends InsertInterface {
 				onDuplicateKeyUpdate = Lexer.split(onDuplicateKeyUpdate.trim(), [','])
 					.map(assignment => parseCallback(assignment.trim(), [Assignment]));
 			}
-			var instance = new Static(table, columns, values, withUac, insertType, onDuplicateKeyUpdate);
+			var instance = new this(table, columns, values, withUac, insertType, onDuplicateKeyUpdate);
 			instance.parseCallback = parseCallback;
 			return instance;
 		}
@@ -191,8 +189,3 @@ Insert.clauses = {
 	values: '(VALUES|VALUE|SET|SELECT)',
 	update: 'ON[ ]+DUPLICATE[ ]+KEY[ ]+UPDATE',
 };
-
-/**
- * @exports
- */
-export default Insert;

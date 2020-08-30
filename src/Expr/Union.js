@@ -2,9 +2,9 @@
 /**
  * @imports
  */
-import {Lexer} from '../index.js';
-import OrderBy from './OrderBy.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import UnionInterface from './UnionInterface.js';
+import OrderBy from './OrderBy.js';
 
 /**
  * ---------------------------
@@ -12,7 +12,7 @@ import UnionInterface from './UnionInterface.js';
  * ---------------------------
  */				
 
-const Union = class extends UnionInterface {
+export default class Union extends UnionInterface {
 	 
 	/**
 	 * @inheritdoc
@@ -44,7 +44,7 @@ const Union = class extends UnionInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = Union) {
+	static parse(expr, parseCallback, params = {}) {
 		var parse = null;
 		var paramsRegex = {useRegex: 'i'};
 		if ((parse = Lexer.lex(expr, [' UNION([ ]+(ALL|DISTINCT))? '], paramsRegex)) && parse.matches.length) {
@@ -65,7 +65,7 @@ const Union = class extends UnionInterface {
 					}
 				});
 			}
-			return new Static(
+			return new this(
 				parseCallback(selects.shift().trim()),
 				selects.map((select, i) => {return {
 					select: parseCallback(select.trim()),
@@ -77,8 +77,3 @@ const Union = class extends UnionInterface {
 		}
 	}
 };
-
-/**
- * @exports
- */
-export default Union;

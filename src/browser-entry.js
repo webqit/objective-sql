@@ -2,10 +2,14 @@
 /**
  * @imports
  */
-import Mql from './index.js';
+import Rql from './index.js';
 
 // As globals
+if (!window.WN) {
+	window.WN = {};
+}
+window.WN.Rql = Rql;
 if (!window.WebNative) {
 	window.WebNative = {};
 }
-window.WebNative.Mql = Mql;
+window.WebNative.Rql = Rql;

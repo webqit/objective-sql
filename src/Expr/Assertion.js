@@ -3,9 +3,17 @@
  * @imports
  */
 import {
-	Assertion
+	Assertion as _Assertion
 } from '@web-native-js/jsen';
 
+/**
+ * @extends
+ */
+export default class Assertion extends _Assertion {};
+
+/**
+ * @var string
+ */
 Assertion.negation = 'NOT ';
 
 /**
@@ -17,8 +25,3 @@ Assertion.operators = {
 	AND: ' AND ',
 	OR: ' OR ',
 };
-
-/**
- * @exports
- */
-export default Assertion;

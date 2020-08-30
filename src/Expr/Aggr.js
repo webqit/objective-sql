@@ -2,23 +2,21 @@
 /**
  * @imports
  */
-import {
-	Lexer
-} from '../index.js';
+import { Call } from '@web-native-js/jsen';
 import _mixin from '@web-native-js/commons/js/mixin.js';
 import _flatten from '@web-native-js/commons/arr/flatten.js';
 import _find from '@web-native-js/commons/obj/find.js';
 import _before from '@web-native-js/commons/str/before.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import AggrInterface from './AggrInterface.js';
 import Window from './Window.js';
-import Call from './Call.js';
 
 /**
  * ---------------------------
  * Aggr class
  * ---------------------------
  */				
-const Aggr = class extends _mixin(Call, AggrInterface) {
+export default class Aggr extends _mixin(Call, AggrInterface) {
 
 	/**
 	 * @inheritdoc
@@ -32,10 +30,10 @@ const Aggr = class extends _mixin(Call, AggrInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	eval(context, trap = {}) {
+	eval(context, params = {}) {
 		var args = this.args.list.slice();
 		args.unshift(this.window ? context.WINDOWS[this.window.toString()] : context.AGGR.rows);
-		return this.evalWithArgs(context, args, trap);
+		return this.reference.getEval(context, params).exec(args);
 	}
 	
 	/**
@@ -48,17 +46,17 @@ const Aggr = class extends _mixin(Call, AggrInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = Aggr) {
+	static parse(expr, parseCallback, params = {}) {
 		var aggrMatch = null;
-		var aggrMatchRegex = _flatten(Static.funcs).join("\\(|") + "\\(";
+		var aggrMatchRegex = _flatten(this.funcs).join("\\(|") + "\\(";
 		if (aggrMatch = expr.trim().match(new RegExp('^(' + aggrMatchRegex + ')', 'i'))) {
 			var funcName = _before(aggrMatch[0], '(').toUpperCase();
-			var funcCategory = _find(Static.funcs, val => val === funcName, true)[0];
+			var funcCategory = _find(this.funcs, val => val === funcName, true)[0];
 			var splits = Lexer.split(expr, ['OVER'], {ci:true});
 			if (funcCategory === 'explicitOver' && splits.length === 1) {
 				throw new Error(aggrMatch[0] + '() requires an OVER clause!');
 			}
-			var instance = super.parse(splits.shift().trim(), parseCallback, params, Static);
+			var instance = super.parse(splits.shift().trim(), parseCallback, params);
 			instance.funcCategory = funcCategory;
 			if (splits.length) {
 				instance.window = parseCallback(splits.pop().trim(), [Window]);
@@ -114,8 +112,3 @@ Aggr.funcs = {
 		'GROUPING', 
 	],
 };
-
-/**
- * @exports
- */
-export default Aggr;

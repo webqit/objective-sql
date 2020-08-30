@@ -5,10 +5,10 @@
 import {
 	AbstractionInterface,
 	ReferenceInterface,
-	Lexer
 } from '../index.js';
 import _wrapped from '@web-native-js/commons/str/wrapped.js';
 import _objFrom from '@web-native-js/commons/obj/from.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import FieldInterface from './FieldInterface.js';
 
 /**
@@ -17,7 +17,7 @@ import FieldInterface from './FieldInterface.js';
  * ---------------------------
  */				
 
-const Field = class extends FieldInterface {
+export default class Field extends FieldInterface {
 	
 	/**
 	 * @inheritdoc
@@ -54,19 +54,44 @@ const Field = class extends FieldInterface {
 	 * @inheritdoc
 	 */
 	getAlias() {
-		return (this.alias || '').replace(/`/g, '') || this.getName();
+		return (this.alias || '').replace(/`/g, '') || this.getName() || this.expr + '';
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	eval(tempRow, database, trap = {}) {
-		if (this.expr instanceof AbstractionInterface) {
-			var value = this.expr.eval(database, trap);
+	eval(tempRow, database, params = {}) {
+		var alias = this.getAlias();
+		if (params.fieldsByReference && this.expr instanceof ReferenceInterface) {
+			var reference = this.expr.getEval(tempRow, params);
+			return {
+				get [alias] () {
+					return reference.get();
+				},
+				set [alias] (val) {
+					reference.set(val);
+					return true;
+				},
+			};
 		} else {
-			var value = this.expr.eval(tempRow, trap);
+			var value;
+			if (this.expr instanceof AbstractionInterface) {
+				value = this.expr.eval(database, params);
+			} else {
+				value = this.expr.eval(tempRow, params);
+			}
+			if (params.fieldsByReference) {
+				return {
+					get [alias] () {
+						return value;
+					},
+					set [alias] (val) {
+						throw new Error('"' + alias + '" cannot be modified; not a reference!');
+					},
+				};
+			}
+			return _objFrom(alias, value);
 		}
-		return _objFrom(this.getAlias(), value);
 	}
 	
 	/**
@@ -79,7 +104,7 @@ const Field = class extends FieldInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = Field) {
+	static parse(expr, parseCallback, params = {}) {
 		var splits = Lexer.split(expr, [' (as )?'], {useRegex:'i', preserveDelims:true});
 		var exprParse = null;
 		var alias = splits.pop().trim();
@@ -103,11 +128,6 @@ const Field = class extends FieldInterface {
 			exprParse = parseCallback(expr);
 		}
 		exprParse.isFieldName = true;
-		return new Static(exprParse, alias, claused);
+		return new this(exprParse, alias, claused);
 	}
 };
-
-/**
- * @exports
- */
-export default Field;

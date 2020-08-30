@@ -9,7 +9,7 @@
  * Val class
  * ---------------------------
  */				
-const Val = class {
+export default class Val {
 
 	/**
 	 * @inheritdoc
@@ -32,8 +32,3 @@ const Val = class {
 		return '?';
 	}
 };
-
-/**
- * @exports
- */
-export default Val;

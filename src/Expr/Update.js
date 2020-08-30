@@ -2,14 +2,11 @@
 /**
  * @imports
  */
-import {
-	Lexer
-} from '../index.js';
 import _mixin from '@web-native-js/commons/js/mixin.js';
 import _isArray from '@web-native-js/commons/js/isArray.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import UpdateInterface from './UpdateInterface.js';
-import Assignment from './Assignment.js';
-import Base from '../Base/Base.js';
+import { Assignment } from '@web-native-js/jsen';
 import Stmt from './Stmt.js';
 
 /**
@@ -18,7 +15,7 @@ import Stmt from './Stmt.js';
  * ---------------------------
  */				
 
-const Update = class extends _mixin(Stmt, UpdateInterface) {
+export default class Update extends _mixin(Stmt, UpdateInterface) {
 	 
 	/**
 	 * @inheritdoc
@@ -33,16 +30,14 @@ const Update = class extends _mixin(Stmt, UpdateInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	eval(database, trap = {}) {
+	eval(database, params = {}) {
 		// ---------------------------
 		// INITIALIZE DATASOURCES WITH JOIN ALGORITHIMS APPLIED
 		// ---------------------------
-		var tables = (_isArray(this.exprs.table) ? this.exprs.table : [this.exprs.table]).concat(this.exprs.joins || []);
-		tables = tables.map(table => table.eval(database, trap))
-		this.base = new Base(trap, tables.shift(), this.exprs.where, ...tables);
+		this.base = this.getBase(database, params);
 		var rowComposition, count = 0;
 		while(rowComposition = this.base.fetch()) {
-			this.exprs.assignments.forEach(assignment => assignment.eval(rowComposition, trap));
+			this.exprs.assignments.forEach(assignment => assignment.eval(rowComposition, params));
 			count ++;
 		}
 		return count;
@@ -62,20 +57,20 @@ const Update = class extends _mixin(Stmt, UpdateInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = Update) {
+	static parse(expr, parseCallback, params = {}) {
 		if (expr.trim().substr(0, 6).toLowerCase() === 'update') {
 			var withUac = false;
 			if (expr.match(/UPDATE[ ]+WITH[ ]+UAC/i)) {
 				withUac = true;
 				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
 			}
-			var stmtParse = super.getParse(expr, withUac, Static.clauses, parseCallback, (clauseType, _expr) => {
+			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback, (clauseType, _expr) => {
 				if (clauseType === 'assignments') {
 					return Lexer.split(_expr, [','])
 						.map(assignment => parseCallback(assignment.trim(), [Assignment]));
 				}
 			});
-			return new Static(stmtParse.exprs, stmtParse.clauses, withUac);
+			return new this(stmtParse.exprs, stmtParse.clauses, withUac);
 		}
 	}
 };
@@ -90,8 +85,3 @@ Update.clauses = {
 	// inner join, cross join, {left|right} [outer] join
 	joins: '(INNER[ ]+|CROSS[ ]+|(LEFT|RIGHT)([ ]+OUTER)?[ ]+)?JOIN',
 };
-
-/**
- * @exports
- */
-export default Update;

@@ -3,9 +3,9 @@
  * @imports
  */
 import {
-	Lexer,
 	Condition as _Condition
 } from '@web-native-js/jsen';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import _unwrap from '@web-native-js/commons/str/unwrap.js';
 
 /**
@@ -14,7 +14,7 @@ import _unwrap from '@web-native-js/commons/str/unwrap.js';
  * ---------------------------
  */				
 
-const Condition = class extends _Condition {
+export default class Condition extends _Condition {
 	
 	/**
 	 * @inheritdoc
@@ -40,18 +40,13 @@ const Condition = class extends _Condition {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = Condition) {
+	static parse(expr, parseCallback, params = {}) {
 		if (expr.match(/^if[ ]*?\(/i)) {
 			var tokens = Lexer.split(_unwrap(expr.trim().substr(2).trim(), '(', ')'), [',']);
 			if (tokens.length !== 3) {
 				throw new Error('Malformed condition expression: ' + expr + '!');
 			}
-			return new Static(...tokens.map(expr => parseCallback(expr.trim())));
+			return new this(...tokens.map(expr => parseCallback(expr.trim())));
 		}
 	}
 };
-
-/**
- * @exports
- */
-export default Condition;

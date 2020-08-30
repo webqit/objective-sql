@@ -2,12 +2,10 @@
 /**
  * @imports
  */
-import {
-	Lexer
-} from '../index.js';
 import _inherit from '@web-native-js/commons/obj/inherit.js';
 import _copy from '@web-native-js/commons/obj/copy.js';
 import _after from '@web-native-js/commons/str/after.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import GroupByInterface from './GroupByInterface.js';
 import Row from '../Base/Row.js';
 
@@ -17,7 +15,7 @@ import Row from '../Base/Row.js';
  * ---------------------------
  */				
 
-const GroupBy = class extends GroupByInterface {
+export default class GroupBy extends GroupByInterface {
 	
 	/**
 	 * @inheritdoc
@@ -32,7 +30,7 @@ const GroupBy = class extends GroupByInterface {
 	/**
 	 * @inheritdoc
 	 */
-	eval(tempRows, trap = {}) {
+	eval(tempRows, params = {}) {
 		var groupBy = (rows, by, result) => {
 			// This will end up either as
 			// regular summary or rollup {super summary}
@@ -41,7 +39,7 @@ const GroupBy = class extends GroupByInterface {
 				var grouping = {};
 				rows.forEach(row => {
 					try {
-						var _for = by[0].eval(row, trap);
+						var _for = by[0].eval(row, params);
 					} catch(e) {
 						throw new Error('["' + this.toString() + '" in group by clause]: ' + e.message);
 					}
@@ -51,7 +49,7 @@ const GroupBy = class extends GroupByInterface {
 				Object.values(grouping).map(group => groupBy(group, by.slice(1), result));
 			}
 			if (!by.length/*We're on end nodes*/ || this.withRollup) {
-				var summaryRow = new Row(trap); _inherit(summaryRow, rows[0]);
+				var summaryRow = new Row(params); _inherit(summaryRow, rows[0]);
 				summaryRow.$ = _copy(summaryRow.$);
 				summaryRow.AGGR = {rows: rows, by: by};
 				// HOW WE'LL DETERMINE A SUPER AGGREGATE ROW...
@@ -90,7 +88,7 @@ const GroupBy = class extends GroupByInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = GroupBy) {
+	static parse(expr, parseCallback, params = {}) {
 		var parse = Lexer.lex(expr, ['WITH[ ]+ROLLUP', 'HAVING'], {useRegex:'i'});
 		var columns = Lexer.split(parse.tokens.shift().trim(), [',']).map(
 			c => parseCallback(c.trim())
@@ -105,11 +103,6 @@ const GroupBy = class extends GroupByInterface {
 				having = parseCallback(parse.tokens.shift().trim());
 			}
 		});
-		return new Static(columns, having, withRollup);
+		return new this(columns, having, withRollup);
 	}
 };
-
-/**
- * @exports
- */
-export default GroupBy;

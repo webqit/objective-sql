@@ -2,15 +2,13 @@
 /**
  * @imports
  */
-import Mql, {
-	Lexer
-} from '../index.js';
 import _mixin from '@web-native-js/commons/js/mixin.js';
 import _isArray from '@web-native-js/commons/js/isArray.js';
+import _instanceof from '@web-native-js/commons/js/instanceof.js';
 import _arrFrom from '@web-native-js/commons/arr/from.js';
 import _pushUnique from '@web-native-js/commons/arr/pushUnique.js';
-import _merge from '@web-native-js/commons/obj/merge.js';
 import _find from '@web-native-js/commons/obj/find.js';
+import Lexer from '@web-native-js/commons/str/Lexer.js';
 import SelectInterface from './SelectInterface.js';
 import AggrInterface from './AggrInterface.js';
 import JoinInterface from './JoinInterface.js';
@@ -19,8 +17,6 @@ import Stmt from './Stmt.js';
 import Window from './Window.js';
 import GroupBy from './GroupBy.js';
 import OrderBy from './OrderBy.js';
-import Base from '../Base/Base.js';
-import Schema from '../Schema.js';
 
 /**
  * ---------------------------
@@ -28,7 +24,7 @@ import Schema from '../Schema.js';
  * ---------------------------
  */				
 
-const Select = class extends _mixin(Stmt, SelectInterface) {
+export default class Select extends _mixin(Stmt, SelectInterface) {
 	 
 	/**
 	 * @inheritdoc
@@ -125,16 +121,16 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	eval(database, trap = {}) {
+	eval(database, params = {}) {
 		// ---------------------------
-		// UNDERSTAND AGGREGATIONS
+		// INITIALIZE DATASOURCES WITH JOIN ALGORITHIMS APPLIED
 		// ---------------------------
-		var aggrExprs = {aggr:[], win:[]};
-		this.meta.vars.forEach(x => {
-			if (x instanceof AggrInterface) {
-				_pushUnique(x.window ? aggrExprs.win : aggrExprs.aggr, x);
-			}
-		});
+		this.base = this.getBase(database, params);
+		// BUILD (TEMP) ROWS, WHERE
+		var tempRows = [], tempRow;
+		while (tempRow = this.base.fetch()) {
+			tempRows.push(tempRow);
+		}
 
 		// ---------------------------
 		// BUILD RESPONSE ROWS INTO THE "$" KEY
@@ -161,7 +157,9 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 						}
 					}
 					try {
-						_merge(1, tempRow.$, field.eval(tempRow, database, trap));
+						var fieldValObject = field.eval(tempRow, database, params);
+						var key = field.getAlias();
+						Object.defineProperty(tempRow.$, key, Object.getOwnPropertyDescriptor(fieldValObject, key));
 					} catch(e) {
 						throw new Error('["' + field.toString() + '" in field list]: ' + e.message);
 					}
@@ -169,20 +167,17 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 			});
 			return collectAggrs;
 		};
-		
+
 		// ---------------------------
-		// INITIALIZE DATASOURCES WITH JOIN ALGORITHIMS APPLIED
+		// UNDERSTAND AGGREGATIONS
 		// ---------------------------
-		var tables = (_isArray(this.exprs.table) ? this.exprs.table : [this.exprs.table]).concat(this.exprs.joins || []);
-		var tablessss = tables.map(table => table.eval(database, trap));
-		var mainTable = tablessss.shift();
-		
-		this.base = new Base(trap, mainTable, this.exprs.where, ...tablessss);
-		// BUILD (TEMP) ROWS, WHERE
-		var tempRows = [], tempRow;
-		while (tempRow = this.base.fetch()) {
-			tempRows.push(tempRow);
-		}
+		var aggrExprs = {aggr:[], win:[]};
+		this.meta.vars.forEach(x => {
+			//if (_instanceof(x, AggrInterface)) {
+			if (x instanceof AggrInterface) {
+				_pushUnique(x.window ? aggrExprs.win : aggrExprs.aggr, x);
+			}
+		});
 		// BUILD FIELDS
 		var fields = [], _fields, _schema;
 		this.exprs.fields.forEach(field => {
@@ -212,7 +207,7 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 		// ---------------------------
 		if (this.exprs.groupBy || aggrExprs.aggr.length) {
 			var groupBy = this.exprs.groupBy || new GroupBy([]);
-			tempRows = groupBy.eval(tempRows, trap);
+			tempRows = groupBy.eval(tempRows, params);
 			// REVISIT RESPONSE ROWS and apply AGGR columns
 			applyFields(tempRows, aggrFields.aggr);
 		}
@@ -225,7 +220,7 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 			aggrExprs.win.forEach(expr => {
 				var uuid = expr.window.toString();
 				if (completed.indexOf(uuid) === -1) {
-					expr.window.eval(tempRows, this.exprs.windows, trap);
+					expr.window.eval(tempRows, this.exprs.windows, params);
 					completed.push(uuid);
 				}
 			});
@@ -237,7 +232,7 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 		// ORDER BY
 		// ---------------------------
 		if (this.exprs.orderBy) {
-			tempRows = this.exprs.orderBy.eval(tempRows, trap);
+			tempRows = this.exprs.orderBy.eval(tempRows, params);
 		}
 
 		// ---------------------------
@@ -286,14 +281,14 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}, Static = Select) {
+	static parse(expr, parseCallback, params = {}) {
 		if (expr.trim().substr(0, 6).toLowerCase() === 'select') {
 			var withUac = false;
 			if (expr.match(/SELECT[ ]+WITH[ ]+UAC/i)) {
 				withUac = true;
 				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
 			}
-			var stmtParse = super.getParse(expr, withUac, Static.clauses, parseCallback, (clauseType, _expr) => {
+			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback, (clauseType, _expr) => {
 				if (clauseType === 'fields') {
 					return Lexer.split(_expr, [',']).map(
 						field => parseCallback(field.trim(), [Field])
@@ -315,7 +310,7 @@ const Select = class extends _mixin(Stmt, SelectInterface) {
 					return _expr.split(',').map(n => parseInt(n));
 				}
 			});
-			return new Static(
+			return new this(
 				stmtParse.exprs, 
 				stmtParse.clauses, 
 				withUac,
@@ -341,8 +336,3 @@ Select.clauses = {
 	offset: 'OFFSET',
 	limit: 'LIMIT',
 };
-
-/**
- * @exports
- */
-export default Select;

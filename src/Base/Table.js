@@ -11,7 +11,7 @@ import FetchInterface from './FetchInterface.js';
  * ---------------------------
  */				
 
-const Table = class extends FetchInterface {
+export default class Table extends FetchInterface {
 	 
 	/**
 	 * @inheritdoc
@@ -21,16 +21,6 @@ const Table = class extends FetchInterface {
 		this.rows = rows;
 		this.alias = alias;
 		this.schema = schema;
-	}
-	 
-	/**
-	 * @inheritdoc
-	 */
-	delete() {
-		if (this.cursor < this.rows.length) {
-			delete this.rows[this.cursor];
-			return true;
-		}
 	}
 	 
 	/**
@@ -66,8 +56,3 @@ const Table = class extends FetchInterface {
 		this.rows.push(rowObj);
 	}
 };
-
-/**
- * @exports
- */
-export default Table;

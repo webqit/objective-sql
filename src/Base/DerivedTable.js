@@ -10,17 +10,4 @@ import Table from './Table.js';
  * ---------------------------
  */				
 
-const DerivedTable = class extends Table {
-	 
-	/**
-	 * @inheritdoc
-	 */
-	constructor(database, query, alias, schema, iterateOnce = false) {
-		super(query.eval(database), alias, schema, iterateOnce);
-	}
-};
-
-/**
- * @exports
- */
-export default DerivedTable;
+export default class DerivedTable extends Table {};

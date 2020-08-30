@@ -3,27 +3,29 @@
  * @imports
  */
 import {
-	Lexer,
-	Reference as _Reference
+	Scope,
+	Reference as _Reference,
+	ExprInterface,
 } from '@web-native-js/jsen';
 import _each from '@web-native-js/commons/obj/each.js';
 import _isString from '@web-native-js/commons/js/isString.js';
 import _isEmpty from '@web-native-js/commons/js/isEmpty.js';
 import _isUndefined from '@web-native-js/commons/js/isUndefined.js';
 import _remove from '@web-native-js/commons/arr/remove.js';
+import ArrowReference from '../ArrowReference.js';
 
 /**
  * ---------------------------
  * Reference class
  * ---------------------------
  */				
-const Reference = class extends _Reference {
+export default class Reference extends _Reference {
 
 	/**
 	 * @inheritdoc
 	 */
 	constructor(context, name, backticks = false) {
-		var isArrowReference = _isString(name) && /(<-|->)/.test(name);
+		var isArrowReference = _isString(name) && ArrowReference.isReference(name);
 		if (isArrowReference && !backticks) {
 			backticks = true;
 		}
@@ -34,8 +36,9 @@ const Reference = class extends _Reference {
 	/**
 	 * @inheritdoc
 	 */
-	eval(tempRow, trap = {}) {
+	getEval(tempRow, params = {}) {
 		// Lets find the table that contains the column
+		var sourceContext = tempRow, name = this.name;
 		if (!this.isContext && !this.isTableName) {
 			var contexts = Reference.findContexts(tempRow, this.name);
 			if (this.isFieldName) {
@@ -45,26 +48,49 @@ const Reference = class extends _Reference {
 				//throw new Error('"' + this.toString() + '" is unknown!');
 			}
 			if (this.arrowContext) {
-				var _context = this.context;
-				this.context = undefined;
-				var val = super.eval(tempRow[this.arrowContext], trap);
-				this.context = _context;
-				return val;
-			}
-			if (!this.context) {
+				sourceContext = tempRow[this.arrowContext];
+			} else if (!this.context) {
 				if (contexts.indexOf('$') === -1 && contexts.length > 1) {
 					throw new Error('"' + this.name + '" is ambiguous!');
 				}
 				if (contexts.length) {
 					var context = contexts.reduce((_c, c) => _c === '$' ? _c : c, '');
-					return super.eval(tempRow[context], trap);
+					sourceContext = tempRow[context];
 				}
+			} else {
+				if (name instanceof ExprInterface) {
+					name = name.eval(tempRow, params);
+				}
+				sourceContext = this.context.eval(tempRow, params);
 			}
 		}
-		var val = super.eval(tempRow, trap);
+		return {
+			get() {
+				return Scope.create(sourceContext).get(name, params.trap);
+			},
+			del() {
+				return Scope.create(sourceContext).del(name, params.trap);
+			},
+			has(prop) {
+				return Scope.create(sourceContext).has(name, prop, params.trap);
+			},
+			set(val, initKeyword = null) {
+				return Scope.create(sourceContext).set(name, val, params.trap, initKeyword);
+			},
+			exec(args) {
+				return Scope.create(sourceContext).exec(name.toUpperCase(), args, params.trap);
+			},
+		};
+	}
+		
+	/**
+	 * @inheritdoc
+	 */
+	eval(tempRow, params = {}) {
+		var val = super.eval(tempRow, params);
 		// Table unknown?
 		if (this.isContext && _isUndefined(val)) {
-			//throw new Error('Table "' + this.name + '" is unknown!');
+			throw new Error('Table "' + this.name + '" is unknown!');
 		}
 		return val;
 	}
@@ -82,16 +108,4 @@ const Reference = class extends _Reference {
 		});
 		return contexts;
 	}
-	
-	/**
-	 * @inheritdoc
-	 */
-	static parse(expr, parseCallback, params = {}, Static = Reference) {
-		return super.parse(expr, parseCallback, params, Static);
-	}
-}
-
-/**
- * @exports
- */
-export default Reference;
+};
