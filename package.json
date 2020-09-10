@@ -5,27 +5,22 @@
   "keywords": [],
   "homepage": "https://www.web-native.dev",
   "icon": "https://www.web-native.dev/icon.svg",
-  "author": {
-    "name": "Oxford Harrison",
-    "email": "oxharriscreative@gmail.com"
-  },
   "version": "0.1.1",
   "license": "MIT",
-  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/web-native/rql.git"
   },
-  "funding": {
-    "type": "patreon",
-    "url": "https://patreon.com/ox_harris"
+  "bugs": {
+    "url": "https://github.com/web-native/rql/issues"
   },
+  "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "insert": "node ./tests/insert.js",
-    "select": "node ./tests/select.js",
-    "update": "node ./tests/update.js",
-    "delete": "node ./tests/delete.js",
+    "insert": "node ./.tests/insert.js",
+    "select": "node ./.tests/select.js",
+    "update": "node ./.tests/update.js",
+    "delete": "node ./.tests/delete.js",
     "build": "webpack --config ../webpack.config.js",
     "watch": "webpack --watch"
   },
@@ -37,7 +32,27 @@
     "webpack": "^4.41.6",
     "webpack-cli": "^3.3.11"
   },
-  "bugs": {
-    "url": "https://github.com/web-native/rql/issues"
+  "author": "Oxford Harrison <oxharris.dev@gmail.com>",
+  "maintainers": [
+    "Oxford Harrison <oxharris.dev@gmail.com>"
+  ],
+  "contributors": [],
+  "funding": {
+    "type": "patreon",
+    "url": "https://patreon.com/ox_harris"
+  },
+  "badges": {
+    "list": [
+      "npmversion",
+      "npmdownloads",
+      "patreon"
+    ],
+    "config": {
+      "patreonUsername": "ox_harris",
+      "githubUsername": "web-native",
+      "githubRepository": "rql",
+      "githubSlug": "web-native/rql",
+      "npmPackageName": "@web-native-js/observables"
+    }
   }
 }
