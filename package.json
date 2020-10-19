@@ -5,7 +5,7 @@
   "keywords": [],
   "homepage": "https://www.web-native.dev",
   "icon": "https://www.web-native.dev/icon.svg",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,20 +17,20 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
+    "install": "node ./.tests/index.js",
     "insert": "node ./.tests/insert.js",
     "select": "node ./.tests/select.js",
     "update": "node ./.tests/update.js",
     "delete": "node ./.tests/delete.js",
-    "build": "webpack --config ../webpack.config.js",
-    "watch": "webpack --watch"
+    "build": "webpack --config ./webpack.config.cjs"
   },
   "dependencies": {
-    "@web-native-js/commons": "file:../commons",
+    "@onephrase/util": "file:../../onephrase/util",
     "@web-native-js/jsen": "file:../jsen"
   },
   "devDependencies": {
-    "webpack": "^4.41.6",
-    "webpack-cli": "^3.3.11"
+    "webpack": "^4.44.2",
+    "webpack-cli": "^3.3.12"
   },
   "author": "Oxford Harrison <oxharris.dev@gmail.com>",
   "maintainers": [

@@ -2,10 +2,10 @@
 /**
  * @imports
  */
-import _inherit from '@web-native-js/commons/obj/inherit.js';
-import _wrapped from '@web-native-js/commons/str/wrapped.js';
-import _unwrap from '@web-native-js/commons/str/unwrap.js';
-import Lexer from '@web-native-js/commons/str/Lexer.js';
+import _inherit from '@onephrase/util/obj/inherit.js';
+import _wrapped from '@onephrase/util/str/wrapped.js';
+import _unwrap from '@onephrase/util/str/unwrap.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
 import WindowInterface from './WindowInterface.js';
 import OrderBy from './OrderBy.js';
 
@@ -30,7 +30,7 @@ export default class Window extends WindowInterface {
 	 */
 	eval(tempRows, definitions = {}, params = {}) {
 		var dfn = this.dfn;
-		var uuid = this.toString();
+		var uuid = this.stringify();
 		if (this.dfn.name) {
 			if (!definitions || !definitions[this.dfn.name]) {
 				throw new Error('Window name "' + this.dfn.name + '" is undefined!');
@@ -62,24 +62,31 @@ export default class Window extends WindowInterface {
 		try {
 			exec(tempRows, dfn.partitionBy || []);
 		} catch(e) {
-			throw new Error('["' + this.toString() + '" in window definition]: ' + e.message);
+			throw new Error('["' + this.stringify() + '" in window definition]: ' + e.message);
 		}
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	toString(context = null) {
+	toString() {
+		return this.stringify();
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
 		var length = Object.keys(this.dfn).length;
 		if (length === 1 && this.dfn.name) {
 			return this.dfn.name;
 		}
 		var str = [this.dfn.name];
 		if (this.dfn.partitionBy) {
-			str.push('PARTITION BY ' + this.dfn.partitionBy.map(expr => expr.toString(context)).join(', '));
+			str.push('PARTITION BY ' + this.dfn.partitionBy.map(expr => expr.stringify(params)).join(', '));
 		}
 		if (this.dfn.orderBy) {
-			str.push('ORDER BY ' + this.dfn.orderBy.toString(context));
+			str.push('ORDER BY ' + this.dfn.orderBy.stringify(params));
 		}
 		return '(' + str.filter(a => a).join(' ') + ')';
 	}

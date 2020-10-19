@@ -5,8 +5,8 @@
 import {
 	Condition as _Condition
 } from '@web-native-js/jsen';
-import Lexer from '@web-native-js/commons/str/Lexer.js';
-import _unwrap from '@web-native-js/commons/str/unwrap.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
+import _unwrap from '@onephrase/util/str/unwrap.js';
 
 /**
  * ---------------------------
@@ -29,11 +29,18 @@ export default class Condition extends _Condition {
 	/**
 	 * @inheritdoc
 	 */
-	toString(context = null) {
+	toString() {
+		return this.stringify();
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
 		return 'IF (' + [
-			this.assertion.toString(context), 
-			this.onTrue.toString(context),
-			this.onFalse.toString(context)
+			this.assertion.stringify(params), 
+			this.onTrue.stringify(params),
+			this.onFalse.stringify(params)
 		].join(', ') + ')';
 	}
 	

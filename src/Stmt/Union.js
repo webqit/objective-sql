@@ -2,9 +2,9 @@
 /**
  * @imports
  */
-import Lexer from '@web-native-js/commons/str/Lexer.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
+import OrderBy from '../Expr/OrderBy.js';
 import UnionInterface from './UnionInterface.js';
-import OrderBy from './OrderBy.js';
 
 /**
  * ---------------------------
@@ -28,12 +28,19 @@ export default class Union extends UnionInterface {
 	/**
 	 * @inheritdoc
 	 */
-	toString(context = null) {
-		var str = [[this.query.toString(context)].concat(
-			this.queries.map(q => (q.onDuplicate ? q.onDuplicate.toUpperCase() + ' ' : '') + q.select.toString(context))
+	toString() {
+		return this.stringify();
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
+		var str = [[this.query.stringify(params)].concat(
+			this.queries.map(q => (q.onDuplicate ? q.onDuplicate.toUpperCase() + ' ' : '') + q.select.stringify(params))
 		).join(' UNION ')];
 		if (this.orderBy) {
-			str.push('ORDER BY ' + this.orderBy.toString(context));
+			str.push('ORDER BY ' + this.orderBy.stringify(params));
 		}
 		if (this.limit) {
 			str.push('LIMIT ' + this.limit.join(', '));

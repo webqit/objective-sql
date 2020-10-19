@@ -2,7 +2,7 @@
 /**
  * @imports
  */
-import {ExprInterface} from '@web-native-js/jsen';
+import { ExprInterface } from '@web-native-js/jsen';
 
 /**
  * ---------------------------

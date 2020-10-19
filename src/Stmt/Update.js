@@ -2,9 +2,9 @@
 /**
  * @imports
  */
-import _mixin from '@web-native-js/commons/js/mixin.js';
-import _isArray from '@web-native-js/commons/js/isArray.js';
-import Lexer from '@web-native-js/commons/str/Lexer.js';
+import _mixin from '@onephrase/util/js/mixin.js';
+import _isArray from '@onephrase/util/js/isArray.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
 import UpdateInterface from './UpdateInterface.js';
 import { Assignment } from '@web-native-js/jsen';
 import Stmt from './Stmt.js';
@@ -30,13 +30,13 @@ export default class Update extends _mixin(Stmt, UpdateInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	eval(database, params = {}) {
+	async eval(database, params = {}) {
 		// ---------------------------
 		// INITIALIZE DATASOURCES WITH JOIN ALGORITHIMS APPLIED
 		// ---------------------------
 		this.base = this.getBase(database, params);
 		var rowComposition, count = 0;
-		while(rowComposition = this.base.fetch()) {
+		while(rowComposition = await this.base.fetch()) {
 			this.exprs.assignments.forEach(assignment => assignment.eval(rowComposition, params));
 			count ++;
 		}
@@ -46,10 +46,17 @@ export default class Update extends _mixin(Stmt, UpdateInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	toString(context = null) {
-		return this.getToString(context, (clauseType, expr, clause) => {
+	toString() {
+		return this.stringify();
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
+		return this.getToString(params, (clauseType, expr, clause) => {
 			if (clauseType === 'assignments') {
-				return clause + ' ' + expr.map(assignment => assignment.toString(context)).join(', ');
+				return clause + ' ' + expr.map(assignment => assignment.stringify(params)).join(', ');
 			}
 		});
 	}
@@ -64,7 +71,7 @@ export default class Update extends _mixin(Stmt, UpdateInterface) {
 				withUac = true;
 				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
 			}
-			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback, (clauseType, _expr) => {
+			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback, params, (clauseType, _expr) => {
 				if (clauseType === 'assignments') {
 					return Lexer.split(_expr, [','])
 						.map(assignment => parseCallback(assignment.trim(), [Assignment]));

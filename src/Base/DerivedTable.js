@@ -10,4 +10,12 @@ import Table from './Table.js';
  * ---------------------------
  */				
 
-export default class DerivedTable extends Table {};
+export default class DerivedTable extends Table {
+    	 
+	/**
+	 * @inheritdoc
+	 */
+	async getStore() {
+		return await this.DB;
+	}
+};

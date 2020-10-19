@@ -2,9 +2,9 @@
 /**
  * imports
  */
-import Schema from '../Schema.js';
-import _arrFrom from '@web-native-js/commons/arr/from.js';
-import _each from '@web-native-js/commons/obj/each.js';
+import Schema from '../Base/Schema.js';
+import _arrFrom from '@onephrase/util/arr/from.js';
+import _each from '@onephrase/util/obj/each.js';
 import Query from './Query.js';
 
 export default class Client {
@@ -19,9 +19,12 @@ export default class Client {
 	 * @return Query
 	 */
 	static select(USER, tableName, columns) {
+		var tableNameSplit = tableName.split('.');
+		var tableName = tableNameSplit.pop(),
+			databaseName = tableNameSplit[0] || 'default';
 		columns = _arrFrom(columns);
 		if (!columns.length || columns[0] === '*') {
-			columns = Object.keys(Schema.tables[tableName].fields);
+			columns = Object.keys(Schema.schemas[databaseName][tableName].fields);
 		}
         // ---------------
         // OBJECT_QUERY
@@ -48,7 +51,7 @@ export default class Client {
 	 * @return Query
 	 */
 	static getRelatedAccounts(USER, organicRights, priorityAccounts = []) {
-		var accountSchema = Schema.tables.account;
+		var accountSchema = Schema.schemas[this.databaseName || 'default'].account;
 		var ACCOUNT_QUERY = {
 			table: accountSchema,
 			alias: 'ACCOUNT',

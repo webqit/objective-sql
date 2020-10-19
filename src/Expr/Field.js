@@ -6,9 +6,9 @@ import {
 	AbstractionInterface,
 	ReferenceInterface,
 } from '../index.js';
-import _wrapped from '@web-native-js/commons/str/wrapped.js';
-import _objFrom from '@web-native-js/commons/obj/from.js';
-import Lexer from '@web-native-js/commons/str/Lexer.js';
+import _wrapped from '@onephrase/util/str/wrapped.js';
+import _objFrom from '@onephrase/util/obj/from.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
 import FieldInterface from './FieldInterface.js';
 
 /**
@@ -54,7 +54,7 @@ export default class Field extends FieldInterface {
 	 * @inheritdoc
 	 */
 	getAlias() {
-		return (this.alias || '').replace(/`/g, '') || this.getName() || this.expr + '';
+		return (this.alias || '').replace(/`/g, '') || this.getName() || this.expr.toString();
 	}
 	
 	/**
@@ -97,8 +97,8 @@ export default class Field extends FieldInterface {
 	/**
 	 * @inheritdoc
 	 */
-	toString(tempRow = null) {
-		return [this.expr.toString(tempRow), this.claused ? 'AS' : '', this.alias].filter(a => a).join(' ');
+	stringify(tempRow = {}) {
+		return [this.expr.stringify(tempRow), this.claused ? 'AS' : '', this.alias].filter(a => a).join(' ');
 	}
 	
 	/**

@@ -2,21 +2,21 @@
 /**
  * @imports
  */
-import _mixin from '@web-native-js/commons/js/mixin.js';
-import _isArray from '@web-native-js/commons/js/isArray.js';
-import _instanceof from '@web-native-js/commons/js/instanceof.js';
-import _arrFrom from '@web-native-js/commons/arr/from.js';
-import _pushUnique from '@web-native-js/commons/arr/pushUnique.js';
-import _find from '@web-native-js/commons/obj/find.js';
-import Lexer from '@web-native-js/commons/str/Lexer.js';
+import _mixin from '@onephrase/util/js/mixin.js';
+import _isArray from '@onephrase/util/js/isArray.js';
+import _instanceof from '@onephrase/util/js/instanceof.js';
+import _arrFrom from '@onephrase/util/arr/from.js';
+import _pushUnique from '@onephrase/util/arr/pushUnique.js';
+import _find from '@onephrase/util/obj/find.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
 import SelectInterface from './SelectInterface.js';
-import AggrInterface from './AggrInterface.js';
-import JoinInterface from './JoinInterface.js';
-import Field from './Field.js';
+import AggrInterface from '../Expr/AggrInterface.js';
+import JoinInterface from '../Expr/JoinInterface.js';
+import Field from '../Expr/Field.js';
+import Window from '../Expr/Window.js';
+import GroupBy from '../Expr/GroupBy.js';
+import OrderBy from '../Expr/OrderBy.js';
 import Stmt from './Stmt.js';
-import Window from './Window.js';
-import GroupBy from './GroupBy.js';
-import OrderBy from './OrderBy.js';
 
 /**
  * ---------------------------
@@ -121,14 +121,15 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	eval(database, params = {}) {
+	async eval(database, params = {}) {
+		
 		// ---------------------------
 		// INITIALIZE DATASOURCES WITH JOIN ALGORITHIMS APPLIED
 		// ---------------------------
 		this.base = this.getBase(database, params);
 		// BUILD (TEMP) ROWS, WHERE
 		var tempRows = [], tempRow;
-		while (tempRow = this.base.fetch()) {
+		while ((tempRow = await this.base.fetch())) {
 			tempRows.push(tempRow);
 		}
 
@@ -161,7 +162,7 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 						var key = field.getAlias();
 						Object.defineProperty(tempRow.$, key, Object.getOwnPropertyDescriptor(fieldValObject, key));
 					} catch(e) {
-						throw new Error('["' + field.toString() + '" in field list]: ' + e.message);
+						throw new Error('["' + field.stringify() + '" in field list]: ' + e.message);
 					}
 				});
 			});
@@ -218,7 +219,7 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 		if (this.exprs.windows || aggrExprs.win.length) {
 			var completed = [];
 			aggrExprs.win.forEach(expr => {
-				var uuid = expr.window.toString();
+				var uuid = expr.window.stringify();
 				if (completed.indexOf(uuid) === -1) {
 					expr.window.eval(tempRows, this.exprs.windows, params);
 					completed.push(uuid);
@@ -262,16 +263,23 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	toString(context = null) {
-		return this.getToString(context, (clauseType, expr, clause) => {
+	toString() {
+		return this.stringify();
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
+		return this.getToString(params, (clauseType, expr, clause) => {
 			if (clauseType === 'fields') {
-				return clause + ' ' + (this.flags.length ? ' ' + this.flags.join(' ') : '') + expr.map(x => x.toString(context)).join(', ');
+				return clause + ' ' + (this.flags.length ? ' ' + this.flags.join(' ') : '') + expr.map(x => x.stringify(params)).join(', ');
 			} else if (clauseType === 'windows') {
 				return clause + ' ' + Object.keys(expr).map(
-					windowName => windowName + ' AS ' + expr[windowName].toString(context)
+					windowName => windowName + ' AS ' + expr[windowName].stringify(params)
 				).join(', ');
 			} else if (clauseType === 'groupBy' || clauseType === 'orderBy') {
-				return clause + ' ' + expr.toString(context);
+				return clause + ' ' + expr.stringify(params);
 			} else if (clauseType === 'limit') {
 				return clause + ' ' + expr.join(', ');
 			}
@@ -288,7 +296,7 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 				withUac = true;
 				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
 			}
-			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback, (clauseType, _expr) => {
+			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback, params, (clauseType, _expr) => {
 				if (clauseType === 'fields') {
 					return Lexer.split(_expr, [',']).map(
 						field => parseCallback(field.trim(), [Field])

@@ -5,16 +5,16 @@
 import {
 	AbstractionInterface,
 } from '../index.js';
-import _instanceof from '@web-native-js/commons/js/instanceof.js';
-import _isArray from '@web-native-js/commons/js/isArray.js';
-import _each from '@web-native-js/commons/obj/each.js';
-import _unique from '@web-native-js/commons/arr/unique.js';
-import _arrFrom from '@web-native-js/commons/arr/from.js';
-import _find from '@web-native-js/commons/obj/find.js';
-import Lexer from '@web-native-js/commons/str/Lexer.js';
+import _instanceof from '@onephrase/util/js/instanceof.js';
+import _isArray from '@onephrase/util/js/isArray.js';
+import _each from '@onephrase/util/obj/each.js';
+import _unique from '@onephrase/util/arr/unique.js';
+import _arrFrom from '@onephrase/util/arr/from.js';
+import _find from '@onephrase/util/obj/find.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
 import ArrowReference from '../ArrowReference.js';
+import Table from '../Expr/Table.js';
 import Base from '../Base/Base.js';
-import Table from './Table.js';
 
 /**
  * ---------------------------
@@ -62,7 +62,7 @@ export default class Stmt {
 	/**
 	 * @inheritdoc
 	 */
-	static getParse(expr, withUac, stmtClauses, parseCallback, callback) {
+	static getParse(expr, withUac, stmtClauses, parseCallback, params, callback) {
 		// Match clauses; case-insensitively
 		var useRegex = 'i';
 		var parse = Lexer.lex(expr, Object.values(stmtClauses), {useRegex:useRegex});
@@ -123,7 +123,7 @@ export default class Stmt {
 				var smartJoins = {}, tables = (_isArray(exprs.table) ? exprs.table : [exprs.table]).concat(exprs.joins || []);
 				arrowReferences.forEach(arrowRef => {
 					var baseTable = (arrowRef.context ? tables.filter(table => table.getAlias() === arrowRef.context.name + '') : tables)[0];
-					var arrowRefEval = ArrowReference.eval(baseTable.getSchema(), arrowRef.name.replace(/`/g, ''));
+					var arrowRefEval = ArrowReference.eval(baseTable.getDatabaseName(params), baseTable.getSchema(params), arrowRef.name.replace(/`/g, ''));
 					var uuid = [baseTable.getAlias(), arrowRefEval.a.actingKey, arrowRefEval.b.actingKey, arrowRefEval.b.table.name,].join('_');
 					if (!smartJoins[uuid]) {
 						smartJoins[uuid] = {

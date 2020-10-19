@@ -2,18 +2,12 @@
 /**
  * @imports
  */
-import _wrapped from '@web-native-js/commons/str/wrapped.js';
-import _unwrap from '@web-native-js/commons/str/unwrap.js';
-import _intersect from '@web-native-js/commons/arr/intersect.js';
-import Lexer from '@web-native-js/commons/str/Lexer.js';
+import _wrapped from '@onephrase/util/str/wrapped.js';
+import _unwrap from '@onephrase/util/str/unwrap.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
 import InsertInterface from './InsertInterface.js';
 import { Assignment } from '@web-native-js/jsen';
-import Reference from './Reference.js';
-import Assertion from './Assertion.js';
-import Comparison from './Comparison.js';
-import Base from '../Base/Base.js';
-import Table from './Table.js';
-import Val from './Val.js';
+import Table from '../Expr/Table.js';
 
 /**
  * ---------------------------
@@ -39,7 +33,7 @@ export default class Insert extends InsertInterface {
 	/**
 	 * @inheritdoc
 	 */
-	eval(database, params = {}) {
+	async eval(database, params = {}) {
 		var tableBase = this.table.eval(database, params);
 		var tableSchema = this.table.getSchema();
 		// ---------------------------
@@ -47,87 +41,61 @@ export default class Insert extends InsertInterface {
 		var insertType = this.insertType.toUpperCase();
 		if (insertType === 'SET') {
 			var columns = values.map(assignment => assignment.reference.name);
-			values = [values.map(assignment => assignment.val)];
+			values = [values.map(assignment => assignment.val.eval({}, params))];
 		} else {
+			var columns = this.columns || (tableSchema.fields ? Object.keys(tableSchema.fields) : []);
 			if (insertType === 'SELECT') {
 				try {
-					values = values.eval(database, params).map(row => Object.values(row));
+					values = (await values.eval(database, params)).map(row => Object.values(row));
 				} catch(e) {
-					throw new Error('["' + values.toString() + '" in SELECT clause]: ' + e.message);
+					throw new Error('["' + values.stringify() + '" in SELECT clause]: ' + e.message);
 				}
+			} else if (insertType === 'VALUES') {
+				values = values.map(row => row.map(val => val.eval({}, params)));
+			} else {
+				throw new Error('Invalid insert statement "' + this + '"!');
 			}
-			var columns = this.columns || (tableSchema.fields ? Object.keys(tableSchema.fields) : []);
 		}
 		columns = columns.map(c => c + '');
-		var uniqueKeys = _intersect(tableSchema.uniqueKeys, columns);
-		var rowCount = 0;
-		var rowArr = null;
-		while (rowArr = values.shift()) {
-			// ------------------------
-			// HANDLE ON_DUPLICATE_KEY_UPDATE
-			// ------------------------
-			var duplicateKeyUpdateCount = 0;
-			if (uniqueKeys.length) {
-				// Generate a comparisons list on values going into unique keys
-				var comparisons = uniqueKeys.map(columnName => {
-					var keyColumnPosition = columns.indexOf(columnName);
-					var valueExpr = insertType === 'SELECT' 
-						? new Val(rowArr[keyColumnPosition]) 
-						: rowArr[keyColumnPosition]/*Still a parse object*/;
-					var nameExpr = new Reference(null, columnName);
-					nameExpr.parseCallback = this.parseCallback;
-					return new Comparison(nameExpr, valueExpr, '=');
-				});
-				// Generate the assertion
-				var where = new Assertion(comparisons, Assertion.operators.or);
-				var base = new Base(params, this.table.eval(database, params), where);
-				var rowBase;
-				while (rowBase = base.fetch()) {
-					if (!this.onDuplicateKeyUpdate) {
-						throw new Error('Inserting duplicate values on unique keys: ' + uniqueKeys.join(', '));
-					}
-					this.onDuplicateKeyUpdate.forEach(assignment => assignment.eval(rowBase, params));
-					duplicateKeyUpdateCount ++;
-				}
-				rowCount += duplicateKeyUpdateCount;
+		await tableBase.insert(values, columns, newRow => {
+			if (this.onDuplicateKeyUpdate) {
+				this.onDuplicateKeyUpdate.forEach(assignment => assignment.eval({$: newRow}, params));
+				return true
 			}
-			// ------------------------
-			// HANDLE INSERT
-			// ------------------------
-			if (!duplicateKeyUpdateCount) {
-				if (insertType !== 'SELECT') {
-					rowArr = rowArr.map(val => val.eval(database, params));
-				}
-				tableBase.insert(rowArr, columns);
-				rowCount ++;
-			}
-		}
-		return rowCount;
+		});
+		return values.length;
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	toString(context = null) {
-		var str = [this.table.toString(context)];
+	toString() {
+		return this.stringify();
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
+		var str = [this.table.stringify(params)];
 		if (this.insertType.toUpperCase() === 'SET') {
-			str.push('SET ' + this.values.map(assignment => assignment.toString(context)).join(', '));
+			str.push('SET ' + this.values.map(assignment => assignment.stringify(params)).join(', '));
 		} else {
 			if (this.columns) {
 				str.push('(' + this.columns.join(', ') + ')');
 			}
 			if (this.insertType.toUpperCase() === 'SELECT') {
-				str.push(this.values.toString(context));
+				str.push(this.values.stringify(params));
 			} else {
 				str.push('VALUES (' + this.values.map(
 					row => row.map(
-						val => val.toString(context)
+						val => val.stringify(params)
 					).join(', ')
 				).join('), (') + ')');
 			}
 		}
 		if (this.onDuplicateKeyUpdate) {
-			str.push('ON DUPLICATE KEY UPDATE ' + this.onDuplicateKeyUpdate.map(assignment => assignment.toString(context)).join(', '));
+			str.push('ON DUPLICATE KEY UPDATE ' + this.onDuplicateKeyUpdate.map(assignment => assignment.stringify(params)).join(', '));
 		}
 		return 'INSERT INTO ' + str.join(' ');
 	}

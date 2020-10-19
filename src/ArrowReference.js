@@ -2,11 +2,11 @@
 /**
  * @imports
  */
-import Schema from './Schema.js';
-import _before from '@web-native-js/commons/str/before.js';
-import _after from '@web-native-js/commons/str/after.js';
-import _isString from '@web-native-js/commons/js/isString.js';
-import _isObject from '@web-native-js/commons/js/isObject.js';
+import Schema from './Base/Schema.js';
+import _before from '@onephrase/util/str/before.js';
+import _after from '@onephrase/util/str/after.js';
+import _isString from '@onephrase/util/js/isString.js';
+import _isObject from '@onephrase/util/js/isObject.js';
 
 export default class ArrowReference {
 	
@@ -58,41 +58,42 @@ export default class ArrowReference {
 	/**
 	 * Gets the immediate target in a reference path.
 	 * 
-	 * @param {String} base 
+	 * @param {String} databaseName 
+	 * @param {Object} baseSchema
 	 * @param {String} reference 
 	 * 
 	 * @return {Object}
 	 */
-    static eval(base, reference) {
-		var table1, table2;
+    static eval(databaseName, baseSchema, reference) {
+		var SCHEMAS = Schema.schemas[databaseName], table1, table2;
 		if (this.isIncoming(reference)) {
 			// reference === actingKey<-...
 			var actingKey = _before(reference, this.arrLeft),
 				sourceTable = _after(reference, this.arrLeft);
 			if (this.isIncoming(sourceTable)) {
 				// reference === actingKey<-actingKey2<-table->?...
-				table2 = this.eval('', sourceTable).a.table;
+				table2 = this.eval(databaseName, '', sourceTable).a.table;
 				var select = sourceTable;
 			} else {
 				// reference === actingKey<-table->?...
 				var _sourceTable = _before(sourceTable, this.arrRight)
 					select = _after(sourceTable, this.arrRight);
-				if (!(table2 = Schema.tables[_sourceTable])) {
+				if (!(table2 = SCHEMAS[_sourceTable])) {
 					throw new Error('[' + reference + ']: The implied table "' + _sourceTable + '" is not defined.');
 				}
 			}
-			if (!base) {
+			if (!baseSchema) {
 				// --------------------------
 				// Now get table1 from table2
 				// --------------------------
 				if (!table2.fields[actingKey] || !(table1 = table2.fields[actingKey].referencedEntity)) {
 					throw new Error('[' + reference + ']: The "' + table2.name + '" table does not define the implied foreign key "' + actingKey + '".');
 				}
-				table1 = Schema.tables[table1.name];
-			} else if (_isString(base)) {
-				table1 = Schema.tables[base];
-			} else if (_isObject(base)) {
-				table1 = base;
+				table1 = SCHEMAS[table1.name];
+			} else if (_isString(baseSchema)) {
+				table1 = SCHEMAS[baseSchema];
+			} else if (_isObject(baseSchema)) {
+				table1 = baseSchema;
 			}
 			return {
 				a: {table: table1, actingKey: table1.primaryKey,},
@@ -101,11 +102,11 @@ export default class ArrowReference {
 		}
 
 		// reference === foreignKey->...
-		if (_isString(base)) {
-			table1 = Schema.tables[base];
-		} else if (_isObject(base)) {
-			table1 = base;
-			base = table1.name;
+		if (_isString(baseSchema)) {
+			table1 = SCHEMAS[baseSchema];
+		} else if (_isObject(baseSchema)) {
+			table1 = baseSchema;
+			baseSchema = table1.name;
 		}
 		// --------------------------
 		// Now get table2 from table1
@@ -113,9 +114,9 @@ export default class ArrowReference {
 		var foreignKey = _before(reference, this.arrRight)
 			select = _after(reference, this.arrRight);
 		if (!table1.fields[foreignKey] || !(table2 = table1.fields[foreignKey].referencedEntity)) {
-			throw new Error('[' + base + this.arrRight + reference + ']: The "' + base + '" table does not define the implied foreign key "' + foreignKey + '".');
+			throw new Error('[' + baseSchema + this.arrRight + reference + ']: The "' + baseSchema + '" table does not define the implied foreign key "' + foreignKey + '".');
 		}
-		table2 = Schema.tables[table2.name];
+		table2 = SCHEMAS[table2.name];
 		return {
 			a: {table: table1, actingKey: foreignKey,},
 			b: {table: table2, actingKey: table2.primaryKey, select,},

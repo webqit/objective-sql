@@ -3,7 +3,7 @@
  * @imports
  */
 import JoinInterface from './JoinInterface.js';
-import Lexer from '@web-native-js/commons/str/Lexer.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
 import Table from './Table.js';
 
 /**
@@ -50,15 +50,22 @@ export default class Join extends JoinInterface {
 	getAlias() {
 		return this.table.getAlias();
 	}
-
+	
 	/**
 	 * @inheritdoc
 	 */
-	toString(context = null) {
+	toString() {
+		return this.stringify();
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
 		return [
-			this.table.toString(context), 
+			this.table.stringify(params), 
 			this.conditionClause, 
-			this.condition.toString(context)
+			this.condition.stringify(params)
 		].join('');
 	}
 	

@@ -6,15 +6,16 @@
  * ---------------------------
  */				
 
-export default class Cursor extends Array {
+export default class Cursor {
 	 
 	/**
 	 * @inheritdoc
 	 */
-	constructor(...args) {
-		super(...args);
+	constructor(rows) {
+		this._rows = rows;
+		this.key = 0;
+		this.flags = {};
 		this._onfinish = [];
-		this.cursor = 0;
 	}
 	 
 	/**
@@ -25,20 +26,28 @@ export default class Cursor extends Array {
 	/**
 	 * @inheritdoc
 	 */
-	advance() {
-		if (this.cursor === this.length - 1) {
+	next() {
+		if (!this._rows.length || this.key === this._rows.length - 1) {
 			this._onfinish.forEach(callback => callback());
+			this.key = 0;
 			return;
 		}
-        this.cursor ++;
+        this.key ++;
+	}
+		 
+	/**
+	 * @inheritdoc
+	 */
+	eof() {
+		return !this._rows.length || this.key === this._rows.length - 1;
 	}
 	 
 	/**
 	 * @inheritdoc
 	 */
-	fetch() {
-		if (this.cursor < this.length) {
-			return this[this.cursor];
+	async fetch() {
+		if (this.key < this._rows.length) {
+			return this._rows[this.key];
 		}
 	}
 };

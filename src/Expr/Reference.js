@@ -7,11 +7,11 @@ import {
 	Reference as _Reference,
 	ExprInterface,
 } from '@web-native-js/jsen';
-import _each from '@web-native-js/commons/obj/each.js';
-import _isString from '@web-native-js/commons/js/isString.js';
-import _isEmpty from '@web-native-js/commons/js/isEmpty.js';
-import _isUndefined from '@web-native-js/commons/js/isUndefined.js';
-import _remove from '@web-native-js/commons/arr/remove.js';
+import _each from '@onephrase/util/obj/each.js';
+import _isString from '@onephrase/util/js/isString.js';
+import _isEmpty from '@onephrase/util/js/isEmpty.js';
+import _isUndefined from '@onephrase/util/js/isUndefined.js';
+import _remove from '@onephrase/util/arr/remove.js';
 import ArrowReference from '../ArrowReference.js';
 
 /**
@@ -45,7 +45,7 @@ export default class Reference extends _Reference {
 				_remove(contexts, '$');
 			}
 			if (!contexts.length) {
-				//throw new Error('"' + this.toString() + '" is unknown!');
+				//throw new Error('"' + this.stringify() + '" is unknown!');
 			}
 			if (this.arrowContext) {
 				sourceContext = tempRow[this.arrowContext];

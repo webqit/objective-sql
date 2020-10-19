@@ -3,11 +3,11 @@
  * @imports
  */
 import { Call } from '@web-native-js/jsen';
-import _mixin from '@web-native-js/commons/js/mixin.js';
-import _flatten from '@web-native-js/commons/arr/flatten.js';
-import _find from '@web-native-js/commons/obj/find.js';
-import _before from '@web-native-js/commons/str/before.js';
-import Lexer from '@web-native-js/commons/str/Lexer.js';
+import _mixin from '@onephrase/util/js/mixin.js';
+import _flatten from '@onephrase/util/arr/flatten.js';
+import _find from '@onephrase/util/obj/find.js';
+import _before from '@onephrase/util/str/before.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
 import AggrInterface from './AggrInterface.js';
 import Window from './Window.js';
 
@@ -32,15 +32,22 @@ export default class Aggr extends _mixin(Call, AggrInterface) {
 	 */
 	eval(context, params = {}) {
 		var args = this.args.list.slice();
-		args.unshift(this.window ? context.WINDOWS[this.window.toString()] : context.AGGR.rows);
+		args.unshift(this.window ? context.WINDOWS[this.window.stringify()] : context.AGGR.rows);
 		return this.reference.getEval(context, params).exec(args);
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	toString(context = null) {
-		return super.toString(context) + (this.window ? ' OVER ' + this.window.toString(context) : '');
+	toString() {
+		return this.stringify();
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
+		return super.stringify(params) + (this.window ? ' OVER ' + this.window.stringify(params) : '');
 	}
 	
 	/**

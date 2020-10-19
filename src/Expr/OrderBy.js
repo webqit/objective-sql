@@ -2,10 +2,10 @@
 /**
  * @imports
  */
-import _sort from '@web-native-js/commons/arr/sort.js';
-import _before from '@web-native-js/commons/str/before.js';
-import _beforeLast from '@web-native-js/commons/str/beforeLast.js';
-import Lexer from '@web-native-js/commons/str/Lexer.js';
+import _sort from '@onephrase/util/arr/sort.js';
+import _before from '@onephrase/util/str/before.js';
+import _beforeLast from '@onephrase/util/str/beforeLast.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
 import OrderByInterface from './OrderByInterface.js';
 
 /**
@@ -47,7 +47,7 @@ export default class OrderBy extends OrderByInterface {
 		try {
 			var ordering = order(tempRows, this.columns);
 		} catch(e) {
-			throw new Error('["' + this.toString() + '" in order by clause]: ' + e.message);
+			throw new Error('["' + this.stringify() + '" in order by clause]: ' + e.message);
 		}
 		return ordering;
 	}
@@ -55,9 +55,16 @@ export default class OrderBy extends OrderByInterface {
 	/**
 	 * @inheritdoc
 	 */
-	toString(context = null) {
+	toString() {
+		return this.stringify();
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
 		var str = [this.columns.map(
-			c => c.expr.toString(context) + (c.order ? ' ' + c.order : '')
+			c => c.expr.stringify(params) + (c.order ? ' ' + c.order : '')
 		).join(', ')];
 		if (this.withRollup) {
 			str.push('WITH ROLLUP');

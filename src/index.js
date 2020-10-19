@@ -39,26 +39,28 @@ import Reference from './Expr/Reference.js';
 // New types
 import Aggr from './Expr/Aggr.js';
 import AggrInterface from './Expr/AggrInterface.js';
-import Delete from './Expr/Delete.js';
-import DeleteInterface from './Expr/DeleteInterface.js';
+import Delete from './Stmt/Delete.js';
+import DeleteInterface from './Stmt/DeleteInterface.js';
 import Field from './Expr/Field.js';
 import FieldInterface from './Expr/FieldInterface.js';
 import GroupBy from './Expr/GroupBy.js';
 import GroupByInterface from './Expr/GroupByInterface.js';
-import Insert from './Expr/Insert.js';
-import InsertInterface from './Expr/InsertInterface.js';
+import Insert from './Stmt/Insert.js';
+import InsertInterface from './Stmt/InsertInterface.js';
 import Join from './Expr/Join.js';
 import JoinInterface from './Expr/JoinInterface.js';
 import OrderBy from './Expr/OrderBy.js';
 import OrderByInterface from './Expr/OrderByInterface.js';
-import Select from './Expr/Select.js';
-import SelectInterface from './Expr/SelectInterface.js';
+import Placeholder from './Expr/Placeholder.js';
+import PlaceholderInterface from './Expr/PlaceholderInterface.js';
+import Select from './Stmt/Select.js';
+import SelectInterface from './Stmt/SelectInterface.js';
 import Table from './Expr/Table.js';
 import TableInterface from './Expr/TableInterface.js';
-import Union from './Expr/Union.js';
-import UnionInterface from './Expr/UnionInterface.js';
-import Update from './Expr/Update.js';
-import UpdateInterface from './Expr/UpdateInterface.js';
+import Union from './Stmt/Union.js';
+import UnionInterface from './Stmt/UnionInterface.js';
+import Update from './Stmt/Update.js';
+import UpdateInterface from './Stmt/UpdateInterface.js';
 import Window from './Expr/Window.js';
 import WindowInterface from './Expr/WindowInterface.js';
 
@@ -85,6 +87,7 @@ Rql.grammars = {
 	Void: Void,					// null|undefined
 	Aggr: Aggr,					// MIN() OVER()
 	Call: Call,					// COUNT()
+	Placeholder: Placeholder,	// ? :var
 	Reference: Reference,		// field1
 };
 
@@ -112,6 +115,7 @@ export {
 	Math,
 	Num,
 	OrderBy,
+	Placeholder,
 	Reference,
 	Select,
 	Str,
@@ -138,6 +142,7 @@ export {
 	MathInterface,
 	NumInterface,
 	OrderByInterface,
+	PlaceholderInterface,
 	ReferenceInterface,
 	SelectInterface,
 	StrInterface,

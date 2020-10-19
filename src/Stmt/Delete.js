@@ -2,10 +2,10 @@
 /**
  * @imports
  */
-import _mixin from '@web-native-js/commons/js/mixin.js';
-import _isArray from '@web-native-js/commons/js/isArray.js';
-import Stmt from './Stmt.js';
+import _mixin from '@onephrase/util/js/mixin.js';
+import _isArray from '@onephrase/util/js/isArray.js';
 import DeleteInterface from './DeleteInterface.js';
+import Stmt from './Stmt.js';
 
 /**
  * ---------------------------
@@ -28,13 +28,13 @@ export default class Delete extends _mixin(Stmt, DeleteInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	eval(database, params = {}) {
+	async eval(database, params = {}) {
 		// ---------------------------
 		// INITIALIZE DATASOURCES WITH JOIN ALGORITHIMS APPLIED
 		// ---------------------------
 		this.base = this.getBase(database, params);
 		var rowComposition, count = 0;
-		while(rowComposition = this.base.fetch()) {
+		while(rowComposition = await this.base.fetch()) {
 			Object.keys(rowComposition).forEach(alias => {
 				var sourceTable;
 				if (alias === this.base.table.alias) {
@@ -56,8 +56,15 @@ export default class Delete extends _mixin(Stmt, DeleteInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	toString(context = null) {
-		return this.getToString(context);
+	toString() {
+		return this.stringify();
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
+		return this.getToString(params);
 	}
 	
 	/**
@@ -70,7 +77,7 @@ export default class Delete extends _mixin(Stmt, DeleteInterface) {
 				withUac = true;
 				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
 			}
-			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback);
+			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback, params);
 			return new this(stmtParse.exprs, stmtParse.clauses, withUac);
 		}
 	}

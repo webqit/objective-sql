@@ -2,10 +2,10 @@
 /**
  * @imports
  */
-import _inherit from '@web-native-js/commons/obj/inherit.js';
-import _copy from '@web-native-js/commons/obj/copy.js';
-import _after from '@web-native-js/commons/str/after.js';
-import Lexer from '@web-native-js/commons/str/Lexer.js';
+import _inherit from '@onephrase/util/obj/inherit.js';
+import _copy from '@onephrase/util/obj/copy.js';
+import _after from '@onephrase/util/str/after.js';
+import Lexer from '@onephrase/util/str/Lexer.js';
 import GroupByInterface from './GroupByInterface.js';
 import Row from '../Base/Row.js';
 
@@ -41,7 +41,7 @@ export default class GroupBy extends GroupByInterface {
 					try {
 						var _for = by[0].eval(row, params);
 					} catch(e) {
-						throw new Error('["' + this.toString() + '" in group by clause]: ' + e.message);
+						throw new Error('["' + this.stringify() + '" in group by clause]: ' + e.message);
 					}
 					grouping[_for] = grouping[_for] || [];
 					grouping[_for].push(row);
@@ -56,7 +56,7 @@ export default class GroupBy extends GroupByInterface {
 				summaryRow.AGGR.isRollup = by.length && this.withRollup;
 				if (summaryRow.AGGR.isRollup) {
 					by.forEach(b => {
-						b = b.toString().indexOf('.') > -1 ? _after(b.toString(), '.') : b.toString();
+						b = b.stringify().indexOf('.') > -1 ? _after(b.stringify(), '.') : b.stringify();
 						if (b in summaryRow.$) {
 							summaryRow.$[b] = null;
 						}
@@ -74,13 +74,20 @@ export default class GroupBy extends GroupByInterface {
 	/**
 	 * @inheritdoc
 	 */
-	toString(context = null) {
-		var str = [this.columns.map(c => c.toString(context)).join(', ')];
+	toString() {
+		return this.stringify();
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
+		var str = [this.columns.map(c => c.stringify(params)).join(', ')];
 		if (this.withRollup) {
 			str.push('WITH ROLLUP');
 		}
 		if (this.having) {
-			str.push('HAVING ' + this.having.toString(context));
+			str.push('HAVING ' + this.having.stringify(params));
 		}
 		return str.join(' ');
 	}

@@ -2,12 +2,12 @@
 /**
  * imports
  */
-import Schema from '../Schema.js';
-import _isBoolean from '@web-native-js/commons/js/isBoolean.js';
-import _isObject from '@web-native-js/commons/js/isObject.js';
-import _isEmpty from '@web-native-js/commons/js/isEmpty.js';
-import _arrFrom from '@web-native-js/commons/arr/from.js';
-import _each from '@web-native-js/commons/obj/each.js';
+import Schema from '../Base/Schema.js';
+import _isBoolean from '@onephrase/util/js/isBoolean.js';
+import _isObject from '@onephrase/util/js/isObject.js';
+import _isEmpty from '@onephrase/util/js/isEmpty.js';
+import _arrFrom from '@onephrase/util/arr/from.js';
+import _each from '@onephrase/util/obj/each.js';
 
 /**
  * Requires the following tables: uac, uac_token (optional), account
@@ -25,6 +25,10 @@ export default class Query {
 	 * @return object
 	 */
 	constructor(USER, tableName, byRow) {
+		var tableNameSplit = tableName.split('.');
+		var tableName = tableNameSplit.pop(),
+            databaseName = tableNameSplit[0] || 'default',
+            SCHEMAS = Schema.schemas[databaseName];
         this.USER = USER || {
             id: 0,
             parent: 0,
@@ -34,7 +38,7 @@ export default class Query {
         // ---------------
         // MAIN QUERY
         // ---------------
-		this.table = Schema.tables[tableName];
+		this.table = SCHEMAS[tableName];
         this.alias = 'MAIN';
         this.select = [];
         this.where = [];
@@ -42,7 +46,7 @@ export default class Query {
         // RULES
         // ---------------
         // JOIN: Table-wide rules most-specific to the guest
-        if (Schema.tables.uac) {
+        if (SCHEMAS.uac) {
             this.EXPLICIT_TABLE_ACCESS_QUERY = {
                 query: Query.getExplicitRulesQuery(this.USER, this.table.name),
                 alias: 'EXPLICIT_TABLE_ACCESS',
@@ -50,7 +54,7 @@ export default class Query {
             };
         }
         if (byRow) {
-            if (Schema.tables.uac) {
+            if (SCHEMAS.uac) {
                 // JOIN: Row-wide rules most-specific to the guest
                 this.EXPLICIT_ROW_ACCESS_QUERY = {
                     query: Query.getExplicitRulesQuery(this.USER, this.table.name),
@@ -62,7 +66,7 @@ export default class Query {
             // RIGHTS
             // ---------------
             // JOIN: The guest's organic rights towards the owner
-            if (this.table.attributionKey && Schema.tables.account) {
+            if (this.table.attributionKey && SCHEMAS.account) {
                 var ownerGuestRelationshipQuery = Query.getOwnerGuestRelationshipQuery(this.USER, false/* groupConcat */);
                 this.AUTHOR_USER_RELATIONSHIP_QUERY = {
                     query: ownerGuestRelationshipQuery,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
@@ -109,9 +113,13 @@ export default class Query {
 	 * @return object
 	 */
 	static getExplicitRulesQuery(USER, tableName) {
+		var tableNameSplit = tableName.split('.');
+		var tableName = tableNameSplit.pop(),
+            databaseName = tableNameSplit[0] || 'default',
+            SCHEMAS = Schema.schemas[databaseName];
 		var targetInLineageQuery = 'FIND_IN_SET(target, "' + USER.lineage.replace('/', ',') + '")';
         return {
-            table: Schema.tables.uac,
+            table: SCHEMAS.uac,
             select: ['*', targetInLineageQuery + ' AS `lineage.target`'],
             where: [
                 'table_name = ' + tableName,
