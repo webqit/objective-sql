@@ -31,14 +31,18 @@ export default class ODBStore extends _Store {
 	 * @return Cursor
 	 */
 	getCursor() {
-		return new ODBCursor((this.store || []).filter(row => row));
+		return new ODBCursor(
+			// IMPORTANT: Deep copy... that is... copy each row
+			(this.store || []).reduce((_store, row) => _store.concat(row ? {...row} : undefined), []).filter(row => row)
+		);
 	}
 	 
 	/**
 	 * @inheritdoc
 	 */
 	async getAll() {
-		return this.store;
+		// IMPORTANT: Deep copy... that is... copy each row
+		return (this.store || []).reduce((_store, row) => _store.concat(row ? {...row} : undefined), []);
 	}
 	 
 	/**
