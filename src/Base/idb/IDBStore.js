@@ -3,6 +3,7 @@
  * @imports
  */
 import _isArray from '@onephrase/util/js/isArray.js';
+import _isNumeric from '@onephrase/util/js/isNumeric.js';
 import _arrFrom from '@onephrase/util/arr/from.js';
 import DuplicateKeyViolationError from '../DuplicateKeyViolationError.js';
 import _Store from '../_Store.js';
@@ -49,11 +50,24 @@ export default class IDBStore extends _Store {
 	/**
 	 * @inheritdoc
 	 */
-	get(rowID) {
+	get(primaryKey) {
 		return new Promise(async (resolve, reject) => {
-			var getRequest = (this.tx_store || this.store('readonly')).get(rowID);
+			// Now this is very important
+			primaryKey = _isNumeric(primaryKey) ? parseInt(primaryKey) : primaryKey;
+			var getRequest = (this.tx_store || this.store('readonly')).get(primaryKey);
 			getRequest.onsuccess = e => resolve(e.target.result);
 			getRequest.onerror = e => reject(e.target.error);
+		});
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	count(...query) {
+		return new Promise(async (resolve, reject) => {
+			var countRequest = this.store().count(...query);
+			countRequest.onsuccess = e => resolve(e.target.result);
+			countRequest.onerror = e => reject(e.target.error);
 		});
 	}
 	
@@ -105,7 +119,7 @@ export default class IDBStore extends _Store {
 	/**
 	 * @inheritdoc
 	 */
-	deleteAll(rowID) {
+	deleteAll(primaryKey) {
 		this.tx_store = this.store();
 		return super.deleteAll(...arguments);
 	}
@@ -113,16 +127,18 @@ export default class IDBStore extends _Store {
 	/**
 	 * @inheritdoc
 	 */
-	delete(rowID) {
-		if (_isArray(rowID)) {
-			if (rowID.length > 1) {
+	delete(primaryKey) {
+		if (_isArray(primaryKey)) {
+			if (primaryKey.length > 1) {
 				throw new Error('IDB does not support Composite Primary Keys');
 			}
-			rowID = rowID[0];
+			primaryKey = primaryKey[0];
 		}
+		// Now this is very important
+		primaryKey = _isNumeric(primaryKey) ? parseInt(primaryKey) : primaryKey;
 		return new Promise(async (resolve, reject) => {
-			var delRequest = (this.tx_store || this.store()).delete(rowID);
-			delRequest.onsuccess = e => resolve(rowID);
+			var delRequest = (this.tx_store || this.store()).delete(primaryKey);
+			delRequest.onsuccess = e => resolve(primaryKey);
 			delRequest.onerror = e => reject(e.target.error);
 		});
 	}

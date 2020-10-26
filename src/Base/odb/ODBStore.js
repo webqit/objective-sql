@@ -4,6 +4,7 @@
  */
 import _arrFrom from '@onephrase/util/arr/from.js';
 import _merge from '@onephrase/util/obj/merge.js';
+import _each from '@onephrase/util/obj/each.js';
 import DuplicateKeyViolationError from '../DuplicateKeyViolationError.js';
 import _Store from '../_Store.js';
 import ODBCursor from './ODBCursor.js';
@@ -52,33 +53,73 @@ export default class ODBStore extends _Store {
 		if (this.schema.autoIncrement) {
 			return store[rowID - 1] ? {...store[rowID - 1]} : undefined;
 		}
-		var result, primaryKey;
-		store.forEach((rowObj, i) => {
-			if (!result && (primaryKey = readKeyPath(rowObj, this.schema.primaryKey)) === rowID) {
-				result = {...rowObj};
-			}
-		});
-
-		return result;
+		return store[rowID] ? {...store[rowID]} : undefined;
+	}
+		 
+	/**
+	 * @inheritdoc
+	 */
+	async count() {
+		var store = this.store;
+		return store.length;
 	}
 
 	/**
 	 * @inheritdoc
 	 */
-	add(rowObj, ignoreValidate = false) {
+	shouldMatchInput(rowObj) {
+		return this.schema.primaryKey || super.shouldMatchInput(rowObj);
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	async beforeAdd(rowObj, match) {
+		if (match) {
+			throw new DuplicateKeyViolationError('Inserting duplicate values on unique key constraint: ' + match.matchingKey);
+		} else {
+			var store = this.store;
+			processPrimaryKey(store, rowObj, this.schema.primaryKey, this.schema.autoIncrement);
+		}
+
+		await super.beforeAdd(rowObj, match);
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	add(rowObj) {
 		this.ongoingWrite = new Promise(async (resolve, reject) => {
 			try { await this.ongoingWrite; } catch(e) {}
-			var duplicate, store = this.store;
-			if (!ignoreValidate && (duplicate = await this.match(rowObj))) {
-				return reject(new DuplicateKeyViolationError('Inserting duplicate values on unique key constraint: ' + duplicate.matchingKey));
+			var store = this.store;
+			var primaryKey = readKeyPath(rowObj, this.schema.primaryKey);
+			if (this.schema.autoIncrement) {
+				store[primaryKey - 1] = rowObj;
+			} else {
+				store[primaryKey] = rowObj;
 			}
-			var _rowObj = {...rowObj};
-			var primaryKey = processPrimaryKey(store, _rowObj, this.schema.primaryKey, this.schema.autoIncrement)
-			store.push(_rowObj);
 			resolve(primaryKey);
 		});
 
 		return this.ongoingWrite;
+	}
+		
+	/**
+	 * @inheritdoc
+	 */
+	async beforePut(rowObj, match) {
+		if (match) {
+			_each(match.row, (key, value) => {
+				if (!(key in rowObj)) {
+					rowObj[key] = value;
+				}
+			});
+		} else {
+			var store = this.store;
+			processPrimaryKey(store, rowObj, this.schema.primaryKey, this.schema.autoIncrement);
+		}
+
+		await super.beforePut(rowObj, match);
 	}
 	 
 	/**
@@ -87,23 +128,12 @@ export default class ODBStore extends _Store {
 	put(rowObj) {
 		this.ongoingWrite = new Promise(async resolve => {
 			try { await this.ongoingWrite; } catch(e) {}
-			var primaryKey, match, store = this.store;
-			if (match = await this.match(rowObj)) {
-				primaryKey = match.primaryKey;
-				var updatedRowObj = _merge(match.row, rowObj);
-				if (this.schema.autoIncrement) {
-					store[primaryKey - 1] = updatedRowObj;
-				} else {
-					store.forEach((rowObj, i) => {
-						if (readKeyPath(rowObj, this.schema.primaryKey) === primaryKey) {
-							store[i] = updatedRowObj;
-						}
-					});
-				}
+			var store = this.store,
+				primaryKey = readKeyPath(rowObj, this.schema.primaryKey);
+			if (this.schema.autoIncrement) {
+				store[primaryKey - 1] = rowObj;
 			} else {
-				var _rowObj = {...rowObj};
-				primaryKey = processPrimaryKey(store, _rowObj, this.schema.primaryKey, this.schema.autoIncrement)
-				store.push(_rowObj);
+				store[primaryKey] = rowObj;
 			}
 			resolve(primaryKey);
 		});
@@ -118,15 +148,16 @@ export default class ODBStore extends _Store {
 		this.ongoingWrite = new Promise(async (resolve, reject) => {
 			try { await this.ongoingWrite; } catch(e) {}
 			var primaryKey, store = this.store;
-			if (this.schema.autoIncrement && store[rowID - 1]) {
-				delete store[rowID - 1];
-				primaryKey = rowID;
+			if (this.schema.autoIncrement) {
+				if (store[rowID - 1]) {
+					delete store[rowID - 1];
+					primaryKey = rowID;
+				}
 			} else {
-				store.forEach((rowObj, i) => {
-					if (!primaryKey && (primaryKey = readKeyPath(rowObj, this.schema.primaryKey)) === rowID) {
-						delete store[i];
-					}
-				});
+				if (store[rowID]) {
+					delete store[rowID];
+					primaryKey = rowID;
+				}
 			}
 			if (!primaryKey && assertExisting) {
 				return reject(new Error('The given row (with ' + _arrFrom(this.schema.primaryKey).join(',') + ' = ' + primaryKey + ') does not exist in the store.'));
@@ -158,10 +189,11 @@ var readKeyPath = (rowObj, keyPath) => {
 /**
  * @AutoIncremen
  */
-var processPrimaryKey = (store, rowObj, primaryKey, canAutoIncrement) => {
+export function processPrimaryKey(store, rowObj, primaryKey, canAutoIncrement) {
 	if (!primaryKey) {
 		return;
 	}
+	
 	var primaryKeyVal = readKeyPath(rowObj, primaryKey);
 	if (!primaryKeyVal && canAutoIncrement) {
 		var primaryKeyPath = _arrFrom(primaryKey);
@@ -171,5 +203,6 @@ var processPrimaryKey = (store, rowObj, primaryKey, canAutoIncrement) => {
 		primaryKeyVal = store.length + 1;
 		rowObj[primaryKeyPath[0]] = primaryKeyVal;
 	}
+
 	return primaryKeyVal;
 };

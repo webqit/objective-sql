@@ -2,11 +2,18 @@
 /**
  * @imports
  */
+import _isTypeObject from '@onephrase/util/js/isTypeObject.js';
 import _isObject from '@onephrase/util/js/isObject.js';
 import _isEmpty from '@onephrase/util/js/isEmpty.js';
+import _isNull from '@onephrase/util/js/isNull.js';
+import _isString from '@onephrase/util/js/isString.js';
+import _isNumeric from '@onephrase/util/js/isNumeric.js';
+import _isUndefined from '@onephrase/util/js/isUndefined.js';
 import _arrFrom from '@onephrase/util/arr/from.js';
 import _intersect from '@onephrase/util/arr/intersect.js';
+import _all from '@onephrase/util/arr/all.js';
 import _each from '@onephrase/util/obj/each.js';
+import _wrapped from '@onephrase/util/str/wrapped.js';
 
 /**
  * ---------------------------
@@ -67,7 +74,6 @@ export default class _Store {
 					return;
 				}
 				_each(this.schema.uniqueKeys, (constraintName, keyPath) => {
-					if (existingRow)
 					if (existingRow && readKeyPath(rowObj, keyPath) === readKeyPath(existingRow, keyPath)) {
 						match = {
 							matchingKey: constraintName,
@@ -81,80 +87,66 @@ export default class _Store {
 
 		return match;
 	}
+	
+	/**
+	 * -------------------------------
+	 */
 
 	/**
 	 * @inheritdoc
 	 */
-	async addAll(multiValues, columns = [], duplicateKeyCallback = null) {
+	async addAll(multiValues, columns = [], duplicateKeyCallback = null, forceAutoIncrement = false) {
 
-		var forUpdates = [];
 		var ongoingAdd;
+		var forUpdates = [];
 
 		var inserts = await Promise.all(multiValues.map(async (values, line) => {
 
-			// -------------
-			var _columns = columns, _values = values;
-			if (_isObject(values)) {
-				_columns = Object.keys(values);
-				_values = Object.values(values);
-			}
-			// -------------
-
-			if (_columns.length && _columns.length !== _values.length) {
-				throw new Error('Column/values count mismatch at line ' + line + '!');
-			}
 
 			var rowObj = {};
-			if (this.schema.fields) {
-				var schemaColumns = Object.keys(this.schema.fields);
-				if (_columns.length) {
-					var unknownFields = _columns.filter(col => schemaColumns.indexOf(col) === -1);
-					if (unknownFields.length) {
-						throw new Error('Unknown column: ' + unknownFields[0]);
-					}
-				} else {
-					_columns = schemaColumns;
-				}
-				schemaColumns.forEach(schemaColumnName => {
-					// Unspecified column? Then default value...
-					var keyColumnPosition = _columns.indexOf(schemaColumnName);
-					if (keyColumnPosition === -1) {
-						if (!_intersect(_arrFrom(schemaColumnName), _arrFrom(this.schema.primaryKey)).length) {
-							rowObj[schemaColumnName] = this.schema.fields && _isObject(this.schema.fields[schemaColumnName]) 
-								? this.schema.fields[schemaColumnName].default 
-								: null;
-						}
-					} else {
-						// Specified column! Specified value!
-						rowObj[schemaColumnName] = _values[keyColumnPosition];
-					}
-				});
+			if (_isObject(values)) {
+				rowObj = values;
 			} else {
+				var _columns = columns.length ? columns : Object.keys(this.schema.fields);
+				if (_columns.length && _columns.length !== values.length) {
+					throw new Error('Column/values count mismatch at line ' + line + '!');
+				}
 				_columns.forEach((columnName, i) => {
-					rowObj[columnName] = _values[i];
+					rowObj[columnName] = values[i];
 				});
 			}
 
-			if (duplicateKeyCallback) {
-				ongoingAdd = new Promise(async resolve => {
-					await ongoingAdd;
+			// -------------
+			this.handleInput(rowObj, true);					
+			// -------------
 
-					var duplicate;
-					if (duplicate = await this.match(rowObj)) {
-						var duplicateRow = {...duplicate.row};
-						if (duplicateKeyCallback(duplicateRow)) {
+			if (this.shouldMatchInput(rowObj) || duplicateKeyCallback) {
+				ongoingAdd/* next iteration should wait */ = new Promise(async resolve => {
+					await ongoingAdd;/* wait prev iteration */
+
+					var match = await this.match(rowObj);
+					if (match && duplicateKeyCallback) {
+						var duplicateRow = {...match.row};
+						if (duplicateKeyCallback(duplicateRow, rowObj)) {
 							forUpdates.push(duplicateRow);
-							return resolve(0);
 						}
+						// The duplicate situation had been handled
+						// ...positive or negative
+						return resolve(0);
 					}
 
-					resolve(this.add(rowObj, false));
+					// We're finally going to add!
+					// We must not do this earlier...
+					// as "onupdate" rows will erronously take on a new timestamp on this column
+					await this.beforeAdd(rowObj, match);
+					resolve(this.add(rowObj));
 				});
 
 				return ongoingAdd;
 			}
 
-			return await this.add(rowObj);
+			await this.beforeAdd(rowObj);
+			return this.add(rowObj);
 		}));
 
 		// OnDuplicateKey updates
@@ -164,33 +156,145 @@ export default class _Store {
 
 		return inserts;
 	}
+		
+	/**
+	 * @inheritdoc
+	 */
+	async beforeAdd(rowObj, match) {
+		var timestamp = (new Date).toLocaleString('en-CA', {hour12: false});
+		_each(this.schema.fields || {}, (name, field) => {
+			if ((field.type === 'datetime' || field.type === 'timestamp') && field.default === 'CURRENT_TIMESTAMP') {
+				rowObj[name] = timestamp;
+			}
+		});
+	}
 	 
 	/**
 	 * @inheritdoc
 	 */
 	async putAll(multiRows) {
-		var updates = await Promise.all(multiRows.map(rowObj => {
+		var ongoingPut;
+		var updates = await Promise.all(multiRows.map(async rowObj => {
+
+			// -------------
+			this.handleInput(rowObj);					
+			// -------------
+			if (this.shouldMatchInput(rowObj)) {
+				ongoingPut/* next iteration should wait */ = new Promise(async resolve => {
+					await ongoingPut;/* wait prev iteration */
+
+					await this.beforePut(rowObj, await this.match(rowObj));
+					resolve(this.put(rowObj));
+
+				});
+
+				return ongoingPut;
+			}
+
+			await this.beforePut(rowObj);
 			return this.put(rowObj);
 		}));
 
 		return updates;
+	}
+		
+	/**
+	 * @inheritdoc
+	 */
+	async beforePut(rowObj, match) {
+		if (match && !_all(Object.keys(rowObj), key => rowObj[key] === match.row[key])) {
+			var timestamp = (new Date).toLocaleString('en-CA', {hour12: false});
+			_each(this.schema.fields || {}, (name, field) => {
+				if ((field.type === 'datetime' || field.type === 'timestamp') && field.onupdate === 'CURRENT_TIMESTAMP') {
+					rowObj[name] = timestamp;
+				}
+			});
+		}
 	}
 	 
 	/**
 	 * @inheritdoc
 	 */
 	async deleteAll(multiIDs) {
-		var deletes = await Promise.all(multiIDs.map(rowID => {
-			return this.delete(rowID);
+		var deletes = await Promise.all(multiIDs.map(async primaryKey => {
+			return this.delete(await this.beforeDelete(primaryKey));
 		}));
 
 		return deletes;
+	}
+		
+	/**
+	 * @inheritdoc
+	 */
+	async beforeDelete(primaryKey) {	
+		return primaryKey;
+	}
+	
+	/**
+	 * -------------------------------
+	 */
+
+	/**
+	 * @inheritdoc
+	 */
+	handleInput(rowObj, applyDefaults = false) {
+		var rowObjColumns = Object.keys(rowObj);
+		var schemaColumns = Object.keys(this.schema.fields);
+		// ------------------
+		var unknownFields = rowObjColumns.filter(col => schemaColumns.indexOf(col) === -1);
+		if (unknownFields.length) {
+			throw new Error('Unknown column: ' + unknownFields[0]);
+		}
+		// ------------------
+		schemaColumns.forEach(columnName => {
+			var value = rowObj[columnName];
+			var field = _isObject(this.schema.fields[columnName]) ? this.schema.fields[columnName] : {};
+			if (rowObjColumns.includes(columnName)) {
+				// TODO: Validate supplied value
+				if (field.type === 'json') {
+					if (!_isTypeObject(_value) && (!_isString(value) || (!_wrapped(value, '[', ']') && !_wrapped(value, '{', '}')))) {
+					}
+				} else if (['char', 'tinytext', 'smalltext', 'text', 'bigtext', 'varchar'].includes(field.type)) {
+					if (!_isString(value)) {
+					}
+				} else if (['bit', 'tinyint', 'smallint', 'int', 'bigint', 'decimal', 'number', 'float', 'real'].includes(field.type)) {
+					if (!_isNumeric(value)) {
+					}
+				} else if (['enum', 'set'].includes(field.type)) {
+					if (!_isNumeric(value)) {
+					}
+				} else if (['date', 'datetime', 'timestamp'].includes(field.type)) {
+					if (!_isString(value)) {
+					}
+				}
+			} else if (applyDefaults && !_intersect(_arrFrom(columnName), _arrFrom(this.schema.primaryKey)).length) {
+				// DONE: Apply defaults...
+				rowObj[columnName] = ('default' in field) && !(['date', 'datetime', 'timestamp'].includes(field.type) && field.default === 'CURRENT_TIMESTAMP') 
+					? field.default 
+					: null;
+			}
+			// Non-nullable
+			if (field.nullable === false && (_isNull(rowObj[columnName]) || _isUndefined(rowObj[columnName]))) {
+				throw new Error('Inserting NULL on non-nullable column: ' + columnName);
+			}
+		});
+	}
+		
+	/**
+	 * @inheritdoc
+	 */
+	shouldMatchInput(rowObj) {
+		return Object.keys(this.schema.fields).filter(name => {
+			var field = this.schema.fields[name];
+			return ['datetime', 'timestamp'].includes(field.type) 
+				&& (field.default === 'CURRENT_TIMESTAMP' || field.onupdate === 'CURRENT_TIMESTAMP')
+		}).length;
 	}
 };
 
 /**
  * @AutoIncremen
  */
-var readKeyPath = (rowObj, keyPath) => {
+const readKeyPath = (rowObj, keyPath) => {
 	return _arrFrom(keyPath).map(key => rowObj[key]).filter(v => v).join('-');
 };

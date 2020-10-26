@@ -20,12 +20,13 @@ export default class Insert extends InsertInterface {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(TABLE_REFERENCES, COLUMNS_LIST, VALUES_LIST, WITH_UAC, INSERT_TYPE, UPDATE_CLAUSE) {
+	constructor(TABLE_REFERENCES, COLUMNS_LIST, VALUES_LIST, WITH_UAC, IGNORE, INSERT_TYPE, UPDATE_CLAUSE) {
 		super();
 		this.TABLE_REFERENCES = TABLE_REFERENCES;
 		this.COLUMNS_LIST = COLUMNS_LIST;
 		this.VALUES_LIST = VALUES_LIST;
 		this.WITH_UAC = WITH_UAC;
+		this.IGNORE = IGNORE;
 		this.INSERT_TYPE = INSERT_TYPE;
 		this.UPDATE_CLAUSE = UPDATE_CLAUSE;
 	}
@@ -41,6 +42,7 @@ export default class Insert extends InsertInterface {
 		// ---------------------------
 		var values = this.VALUES_LIST;
 		var insertType = this.INSERT_TYPE.toUpperCase();
+		var forceAutoIncrement = insertType === 'TABLE';
 		if (insertType === 'SET') {
 			var columns = values.map(assignment => assignment.reference.name);
 			values = [values.map(assignment => assignment.val.eval({}, params))];
@@ -60,12 +62,11 @@ export default class Insert extends InsertInterface {
 		}
 		columns = columns.map(c => c + '');
 
-		var keys = await tableBase.addAll(values, columns, newRow => {
-			if (this.UPDATE_CLAUSE) {
-				this.UPDATE_CLAUSE.forEach(assignment => assignment.eval({$: newRow}, params));
-				return true
-			}
-		});
+		var duplicateKeyCallback = this.UPDATE_CLAUSE ? newRow => {
+			this.UPDATE_CLAUSE.forEach(assignment => assignment.eval({$: newRow}, params));
+			return true
+		} : (this.IGNORE ? () => false : null);
+		var keys = await tableBase.addAll(values, columns, duplicateKeyCallback, forceAutoIncrement);
 
 		return {
 			table: tableBase.name,
@@ -107,18 +108,22 @@ export default class Insert extends InsertInterface {
 		if (this.UPDATE_CLAUSE) {
 			str.push(_t() + 'ON DUPLICATE KEY UPDATE ' + this.UPDATE_CLAUSE.map(assignment => assignment.stringify(_params)).join(', '));
 		}
-		return 'INSERT INTO ' + str.join(' ');
+		return 'INSERT ' + (this.IGNORE ? 'IGNORE ' : '') + 'INTO ' + str.join(' ');
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
 	static parse(expr, parseCallback, params = {}) {
-		if (expr.trim().match(/^INSERT([ ]+WITH[ ]+UAC)?([ ]+INTO)?/, 'i')) {
-			var withUac = false;
+		if (expr.trim().match(/^INSERT([ ]+WITH[ ]+UAC)?([ ]+IGNORE)?([ ]+INTO)?/, 'i')) {
+			var withUac = false, ignore = false;
 			if (expr.match(/INSERT[ ]+WITH[ ]+UAC/i)) {
 				withUac = true;
 				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
+			}
+			if (expr.match(/INSERT[ ]+IGNORE/i)) {
+				ignore = true;
+				expr = expr.replace(/[ ]+IGNORE/i, '');
 			}
 			var parse = Lexer.lex(expr, Object.values(Insert.clauses), {useRegex:'i'});
 			parse.tokens.shift();
@@ -152,7 +157,7 @@ export default class Insert extends InsertInterface {
 				onDuplicateKeyUpdate = Lexer.split(onDuplicateKeyUpdate.trim(), [','])
 					.map(assignment => parseCallback(assignment.trim(), [Assignment]));
 			}
-			var instance = new this(table, columns, values, withUac, insertType, onDuplicateKeyUpdate);
+			var instance = new this(table, columns, values, withUac, ignore, insertType, onDuplicateKeyUpdate);
 			instance.parseCallback = parseCallback;
 			return instance;
 		}
@@ -163,7 +168,7 @@ export default class Insert extends InsertInterface {
  * @prop object
  */
 Insert.clauses = {
-	TABLE_REFERENCES: 'INSERT([ ]+INTO)?',
+	TABLE_REFERENCES: 'INSERT([ ]+IGNORE)?([ ]+INTO)?',
 	VALUES_LIST: '(VALUES|VALUE|SET|SELECT)',
 	UPDATE_CLAUSE: 'ON[ ]+DUPLICATE[ ]+KEY[ ]+UPDATE',
 };
