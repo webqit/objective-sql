@@ -3,26 +3,28 @@
  * @imports
  */
 import {
+	Abstraction,
 	AbstractionInterface,
 	ReferenceInterface,
 } from '../index.js';
 import _isFunction from '@onephrase/util/js/isFunction.js';
+import _instanceof from '@onephrase/util/js/instanceof.js';
 import _isArray from '@onephrase/util/js/isArray.js';
 import _isObject from '@onephrase/util/js/isObject.js';
+import _isEmpty from '@onephrase/util/js/isEmpty.js';
 import _promise from '@onephrase/util/js/promise.js';
 import _arrFrom from '@onephrase/util/arr/from.js';
 import _objFrom from '@onephrase/util/obj/from.js';
-import _copy from '@onephrase/util/obj/copy.js';
+import _objFirst from '@onephrase/util/obj/first.js';
 import _each from '@onephrase/util/obj/each.js';
 import Lexer from '@onephrase/util/str/Lexer.js';
-import SelectInterface from '../Stmt/SelectInterface.js';
-import UnionInterface from '../Stmt/UnionInterface.js';
-import DerivedTableBase from '../Base/DerivedTable.js';
-import TableBase from '../Base/Table.js';
-import IDBTableBase from '../Base/IDBTable.js';
-import Schema from '../Base/Schema.js';
-import UACClient from '../Uac/Client.js';
+import LiteralInterface from '../Expr/LiteralInterface.js';
+import Literal from '../Expr/Literal.js';
 import TableInterface from './TableInterface.js';
+import View from '../Base/View.js';
+import _Factory, { factoryGetSchema } from '../Base/_Factory.js';
+import _Database from '../Base/_Database.js';
+import { DB } from '../../.tests/install.js';
 
 /**
  * ---------------------------
@@ -35,12 +37,14 @@ export default class Table extends TableInterface {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(expr, alias, claused = false) {
+	constructor(expr, alias, claused = false, schema = null) {
 		super();
-		// ReferenceInterface or AbstractionInterface
+		// LiteralInterface or AbstractionInterface
 		this.expr = expr;
 		this.alias = alias;
 		this.claused = claused;
+		this.schema = schema;
+		this.associatedReferences = [];
 	}
 	
 	/**
@@ -59,9 +63,20 @@ export default class Table extends TableInterface {
 	/**
 	 * @inheritdoc
 	 */
+	getDatabaseName() {
+		return (this.expr + "").split('.').slice(0, -1)[0] || '';
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
 	getName() {
+		// Ask down the line?
+		if (this.isDerivedQuery()) {
+			return _arrFrom(this.getDerivedQuery().getTable(), false)[0].getName();
+		}
 		// Without backticks
-		return this.expr.name || '';
+		return (this.expr + "").split('.').pop();
 	}
 
 	/**
@@ -70,141 +85,155 @@ export default class Table extends TableInterface {
 	getAlias() {
 		return this.alias || this.getName();
 	}
-	
+
 	/**
-	 * @inheritdoc
+	 * Tells if this is a derived query
+	 * 
+	 * @return Bool
 	 */
-	getDatabaseName(params = {}) {
-		return this.expr.context ? this.expr.context.name : params.defaultDB || 'default';
+	isDerivedQuery() {
+		return this.expr instanceof AbstractionInterface;
 	}
-	
+
 	/**
-	 * @inheritdoc
+	 * Returns the derived query
+	 * 
+	 * @return Bool
 	 */
-	getEngine(params = {}) {
-		return params.engine || this.getSchema(params).engine;
+	getDerivedQuery() {
+		return this.expr/*ABS*/.expr/*SELECT*/;
 	}
-	
+
+	/**
+	 * Associates a Reference
+	 * 
+	 * @param Object reference
+	 * 
+	 * @return void
+	 */
+	associateReference(reference) {
+		return this.associatedReferences.push(reference);
+	}
+
+	/**
+	 * Returns the associated References
+	 * 
+	 * @return Array
+	 */
+	getAssociateReferences() {
+		return this.associatedReferences;
+	}
+
 	/**
 	 * @inheritdoc
 	 */
-	getSchema(params = {}) {
-
-		if (this._schema) {
-			return this._schema;
-		}
-
-		if (this.expr instanceof AbstractionInterface) {
-
-			var derivedQuery = this.expr/*ABS*/.expr/*SELECT*/;
-			var derivedTable = derivedQuery.getTable();
-			var derivedTableSchema = (_isArray(derivedTable) ? derivedTable[0] : derivedTable).getSchema(params);
-			this._schema = {
-				fields: {},
-				uniqueKeys: {},
-			};
-
-			var getAliasOfField = fieldName => derivedQuery.getFields().reduce((alias, field) => alias || (fieldName === field.getName() ? field.getAlias() : null), null) || fieldName;
-
-			// FIELD NAME
-			this._schema.name = this.getAlias();
-
-			// PRIMARY KEY
-			this._schema.primaryKey = _isArray(derivedTableSchema.primaryKey) 
-				? derivedTableSchema.primaryKey.map(fieldName => getAliasOfField(fieldName))
-				: getAliasOfField(derivedTableSchema.primaryKey);
-			this._schema.autoIncrement = derivedTableSchema.autoIncrement;
-
-			// RUNTIME FIELDS
+	getSchema() {
+		if (!this.schema && this.isDerivedQuery()) {
+			var derivedName = this.getAlias();
+			var derivedQuery = this.getDerivedQuery();
+			var derivedQuerySources = derivedQuery.getSources(true/* resolve */);
+			var getAliasOfField = fieldName => derivedQuery.getFields().reduce((alias, field) => alias || (fieldName === field.getName() ? field.getAlias() : null), null);
+			// ---------------------
+			// Sources schemas
+			var ALL_SCHEMAS = {};
+			derivedQuerySources.forEach(source => {
+				ALL_SCHEMAS[source.getAlias()] = source.getSchema();
+			});
+			var MAIN_SCHEMA = _objFirst(ALL_SCHEMAS);
+			// ---------------------
+			// Fields schemas
+			var derivedSchema = { name: derivedName, fields: {}, uniqueKeys: {}, derived: true, };
 			derivedQuery.getFields().forEach(field => {
-				this._schema.fields[field.getAlias()] = derivedTableSchema.fields[field.getName()];
-			});
-			// The rest of the fields...
-			_each(derivedTableSchema.fields, (name, field) => {
-				if (!this._schema.fields[name]) {
-					this._schema.fields[name] = field;
+				if (_instanceof(field.expr, ReferenceInterface)) {
+					if (field.getName() === '*') {
+						field.expr.interpreted.forEach(ref => {
+							derivedSchema.fields[ref.name] = ((ALL_SCHEMAS[ref.context.name] || {}).fields || {})[name] || {type: 'any', derived: true};
+						});
+					} else {
+						var name = field.getName(), context = field.getContextName();
+						derivedSchema.fields[field.getAlias()] = (((context ? ALL_SCHEMAS[context] : MAIN_SCHEMA) || {}).fields || {})[name] || {type: 'any', derived: true};
+					}
+				} else {
+					derivedSchema.fields[field.getAlias()] = {type: 'any', derived: true};
 				}
 			});
-
+			// ---------------------
+			// PRIMARY KEY
+			derivedSchema.primaryKey = _isArray(MAIN_SCHEMA.primaryKey) 
+				? MAIN_SCHEMA.primaryKey.map(fieldName => getAliasOfField(fieldName))
+				: getAliasOfField(MAIN_SCHEMA.primaryKey);
+			derivedSchema.autoIncrement = MAIN_SCHEMA.autoIncrement;
+			if (_isEmpty(derivedSchema.primaryKey)) {
+				delete derivedSchema.primaryKey;
+				delete derivedSchema.autoIncrement;
+			}
+			// ---------------------
 			// RUNTIME UNIQUE
-			_each(derivedTableSchema.uniqueKeys || {}, (name, keyPath) => {
+			_each(MAIN_SCHEMA.uniqueKeys || {}, (name, keyPath) => {
 				var keyPathAliased = _arrFrom(keyPath).map(fieldName => getAliasOfField(fieldName));
-				this._schema.uniqueKeys[name] = !_isArray(keyPath) ? keyPathAliased[0] : keyPathAliased;
+				derivedSchema.uniqueKeys[name] = !_isArray(keyPath) ? keyPathAliased[0] : keyPathAliased;
+				if (_isEmpty(derivedSchema.uniqueKeys[name])) {
+					delete derivedSchema.uniqueKeys[name];
+				}
 			});
-
+			// ---------------------
 			// ENGINE
-			this._schema.engine = derivedTableSchema.engine;
+			derivedSchema.engine = MAIN_SCHEMA.engine;
 
-		} else {
-
-			var databaseName = this.getDatabaseName(params), tableName = this.getName();
-			this._schema = Schema.schemas[databaseName] && Schema.schemas[databaseName][tableName] ? Schema.schemas[databaseName][tableName] : {
-				name: tableName,
-				primaryKey: '',
-				fields: {},
-				uniqueKeys: {},
-			};
-
+			// Cache
+			this.schema = derivedSchema;
 		}
 
-		return this._schema;
+		return this.schema;
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	eval(databases = null, params = {}) {
-		// Derived table???
-		if (this.expr instanceof AbstractionInterface) {
-			var _params = _copy(params);
-			_params.fieldsByReference = true;
-			return new DerivedTableBase(this.expr/*ABS*/.expr/*SELECT*/.eval(databases, _params), null, this.alias, this.getSchema(params));
+	eval(DB_FACTORY = null, params = {}) {
+
+		if (this.interpreted) {
+			return this.interpreted.eval(DB_FACTORY, params);
 		}
 
-		if (this.expr instanceof ReferenceInterface) {
-			// We accept promises
-			var databaseName = this.getDatabaseName(), engine = (this.getEngine(params) || '').toUpperCase();
-			var DB = _promise(resolve => {
-				resolve(databases);
-			}).then(databases => {
-				// ------------------
-				// Obtain store
-				// ------------------
-				// We support IndexedDB natively
-				if (engine === 'IDB') {
-					var storeName = this.getName();
-					if (!databases || isIndexedDB(databases)) {
-						return getIDBDatabase(databases, databaseName);
-					}
-					if (isIDBDatabase(databases)) {
-						if (this.expr.context) {
-							throw new Error('The implied database object must be an IDBFactory in order to resolve the qualified IndexedDB store name "' + this.expr + '".');
-						}
-						return databases;
-					}
-					if (_isObject(databases)) {
-						if (!isIDBDatabase(databases[databaseName])) {
-							throw new Error('The implied database object must be an instance of IDBDatabase in order to resolve the IndexedDB store name "' + this.expr + '".');
-						}
-						return databases[databaseName];
-					}
-				}
-				// ------------------
-				if (!databases) {
-					databases = Schema.databases;
-				}
-				if (!_isObject(databases[databaseName])) {
-					throw new Error('The implied database must be an object in order to resolve the table name "' + this.expr + '".');
-				}
-				return databases[databaseName];
+		// --------------------------
+
+		if (!DB_FACTORY) {
+			throw new Error('Context must be provided!');
+		}
+
+		// --------------------------
+
+		// Derived table???
+		if (this.isDerivedQuery()) {
+
+			var derivedName = this.getAlias(),
+				derivedQuery = this.getDerivedQuery(),
+				derivedSchema = this.getSchema(DB_FACTORY);
+			return derivedQuery.eval(DB_FACTORY, params).then(derivedStore => {
+				var _params = {...params};
+				_params.alias = derivedName;
+				return new View(derivedQuery, derivedStore, derivedName, derivedSchema, _params);
 			});
 
-			if (engine === 'IDB') {
-				return new IDBTableBase(DB, this.getName(), this.getAlias(), this.getSchema(params));
-			}
-
-			return new TableBase(DB, this.getName(), this.getAlias(), this.getSchema(params));
 		}
+
+		return Promise.resolve().then(() => {
+			var databaseName = this.getDatabaseName();
+			if (DB_FACTORY.prototype instanceof _Factory) {
+				return databaseName ? DB_FACTORY.open(databaseName) : DB_FACTORY.open();
+			}
+			if (databaseName) {
+				throw new Error('[' + this.expr + ']: For tables that are fully-qualified with a database name, a database factory must be provided as context.');
+			}
+			return DB_FACTORY;
+		}).then(database => {
+			if (!(database instanceof _Database)) {
+				throw new Error('[' + this.expr + ']: The provided context could not be resolved to a valid database instance.');
+			}
+			return database.open(this.getName(), params.mode, {alias: this.getAlias()});
+		});
+
 	}
 	
 	/**
@@ -218,6 +247,11 @@ export default class Table extends TableInterface {
 	 * @inheritdoc
 	 */
 	stringify(params = {}) {
+		// --------------------------
+		if (this.interpreted && params.interpreted) {
+			return this.interpreted.stringify(params);
+		}
+		// --------------------------
 		return [this.expr.stringify(params), this.claused ? 'AS' : '', this.alias].filter(a => a).join(' ');
 	}
 	
@@ -227,38 +261,36 @@ export default class Table extends TableInterface {
 	static parse(expr, parseCallback, params = {}) {
 		var parse = Lexer.lex(expr, [' (as )?'], {useRegex:'i'});
 		if (parse.tokens.length < 3) {
-			var tableParse = parseCallback(parse.tokens[0]);
-			if (tableParse instanceof ReferenceInterface) {
-				if (params.withUac) {
-					tableParse = parseCallback('(' + UACClient.select(null, tableParse.stringify()) + ')', null, {withUac: false});
+			var SCHEMA;
+			var tableParse = parseCallback(parse.tokens[0], [Abstraction, Literal]);
+			var alias = (parse.tokens[1] || '').trim(), 
+				claused = (parse.matches[0] || '').trim();
+
+			// -------------------
+			// OBTAIN OR CREATE TABLE SCHEMA
+			// -------------------
+
+			if (tableParse instanceof LiteralInterface) {
+				var DB_SCHEMA = {},
+					fullTableName = tableParse.toString().split('.'),
+					tableName = fullTableName.pop(),
+					databaseName = fullTableName.pop();
+					DB_SCHEMA = factoryGetSchema(params.DB_FACTORY, databaseName);
+				// -----------
+				if (DB_SCHEMA && DB_SCHEMA[tableName]) {
+					SCHEMA = DB_SCHEMA[tableName];
 				} else {
-					tableParse.isTableName = true;
+					if (params.validation !== false && params.assertTableValidity !== false) {
+						// Throw "Table unknown!"
+						throw new Error('Unknown table: ' + tableName + '.');
+					}
+					SCHEMA = { name: tableName, fields: {}, derived: true, };
 				}
-			} else if (!(tableParse instanceof AbstractionInterface && (tableParse.expr instanceof SelectInterface || tableParse.expr instanceof UnionInterface))) {
-				throw new Error('Table expression must be either a plain reference or a (derived) query!');
+			} else {
+
 			}
-			return new this(
-				tableParse, 
-				(parse.tokens[1] || '').trim(), 
-				(parse.matches[0] || '').trim()
-			);
+
+			return new this(tableParse, alias, claused, SCHEMA);
 		}
 	}
-};
-
-/**
- * -----------------
- * @IndexedDB Helpers
- * -----------------
- */
-
-const isIndexedDB = object => typeof indexedDB !== 'undefined' ? (object instanceof indexedDB) : _isFunction(object.open);
-const isIDBDatabase = object => typeof IDBDatabase !== 'undefined' ? (object instanceof IDBDatabase) : _isFunction(object.transaction);
-const getIDBDatabase = (_indexedDB, databaseName) => {
-	return new Promise(resolve => {
-		var dbOpenRequest = (_indexedDB || indexedDB).open(databaseName);
-		dbOpenRequest.onsuccess = e => {
-			resolve(e.target.result);
-		};
-	});
 };

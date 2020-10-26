@@ -1,19 +1,20 @@
 
-
 /**
  * ---------------------------
- * Cursor class
+ * IDBProgressiveCursor class
  * ---------------------------
  */				
 
-export default class IDBCursor {
+export default class IDBProgressiveCursor {
 	 
 	/**
 	 * @inheritdoc
 	 */
 	constructor(store) {
+		// ---------------
 		this._store = store;
-		this._rows = [];
+		// ---------------
+		this.cache = [];
 		this.key = 0;
 		this._onfinish = [];
 		this.flags = {};
@@ -34,7 +35,7 @@ export default class IDBCursor {
 			}
 			this.key ++;
 		} else {
-			if (!this._rows.length || this.key === this._rows.length - 1) {
+			if (!this.cache.length || this.key === this.cache.length - 1) {
 				this._onfinish.forEach(callback => callback());
 				this.key = 0;
 				return;
@@ -47,25 +48,26 @@ export default class IDBCursor {
 	 * @inheritdoc
 	 */
 	eof() {
-		// The store must reach eof before we can be correct with this._rows.length
-		return this._eof && (!this._rows.length || this.key === this._rows.length - 1);
+		// The store must reach eof before we can be correct with this.cache.length
+		return this._eof && (!this.cache.length || this.key === this.cache.length - 1);
 	}
 	 
 	/**
 	 * @inheritdoc
 	 */
-	fetch() {
+	async fetch() {
+		var store = await this._store;
 		return new Promise(resolve => {
-			// After having filled this._rows from store
-			if (this._eof || this.key < this._rows.length) {
-				resolve(this._rows[this.key]);
+			// After having filled this.cache from store
+			if (this._eof || this.key < this.cache.length) {
+				resolve(this.cache[this.key]);
 			} else {
 				if (!this._countRequest) {
 					// First time reading from store
-					this._countRequest = this._store.count();
+					this._countRequest = store.count();
 					this._countRequest.onsuccess = e => {
 						this._count = e.target.result;
-						this._cursorRequest = this._store.openCursor();
+						this._cursorRequest = store.openCursor();
 						this._handleCursorFetch(resolve);
 						this._continueCursor = () => this._cursor.continue();
 					};
@@ -89,8 +91,8 @@ export default class IDBCursor {
 			this._cursor = e.target.result;
 			if (this._cursor) {
 				var value = this._cursor.value;
-				this._rows.push(value);
-				if (this._rows.length === this._count) {
+				this.cache.push(value);
+				if (this.cache.length === this._count) {
 					this._eof = true;
 				}
 				resolve(value);
@@ -98,7 +100,6 @@ export default class IDBCursor {
 				this._eof = true;
 				resolve();
 			}
-			console.log(this._store.name, this._rows.length, this._count);
 		}
 	}
 };

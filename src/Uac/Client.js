@@ -2,34 +2,31 @@
 /**
  * imports
  */
-import Schema from '../Base/Schema.js';
-import _arrFrom from '@onephrase/util/arr/from.js';
 import _each from '@onephrase/util/obj/each.js';
-import Query from './Query.js';
+import _arrFrom from '@onephrase/util/arr/from.js';
+import Query, { createParams, getOwnerGuestRelationshipQuery } from './Query.js';
 
 export default class Client {
 	
 	/**
 	 * Creates the UAC logic that sets the value of each field conditionally.
 	 *
-	 * @param object            USER
-	 * @param string            tableName
+	 * @param object            params
+	 * @param array				tableXSchema
+	 * @param object            user
 	 * @param array				columns
 	 *
 	 * @return Query
 	 */
-	static select(USER, tableName, columns) {
-		var tableNameSplit = tableName.split('.');
-		var tableName = tableNameSplit.pop(),
-			databaseName = tableNameSplit[0] || 'default';
+	static select(params, tableXSchema, user, columns = []) {
 		columns = _arrFrom(columns);
 		if (!columns.length || columns[0] === '*') {
-			columns = Object.keys(Schema.schemas[databaseName][tableName].fields);
+			columns = Object.keys(tableXSchema.fields);
 		}
         // ---------------
         // OBJECT_QUERY
         // ---------------
-        var OBJECT_QUERY = new Query(USER, tableName, true);
+        var OBJECT_QUERY = new Query(params, tableXSchema, user);
 		// The UAC fields control
 		if (0) {
 			_each(OBJECT_QUERY.deriveFieldsAccess(columns, 'view'), (field, accessPassExpression) => {
@@ -44,23 +41,26 @@ export default class Client {
 	/**
 	 * Returns the list of all accounts that the given rights can be applied to.
 	 *
-	 * @param object            USER
+	 * @param object            params
+	 * @param object            user
 	 * @param array	 			organicRights
 	 * @param array	 			priorityAccounts
 	 *
 	 * @return Query
 	 */
-	static getRelatedAccounts(USER, organicRights, priorityAccounts = []) {
-		var accountSchema = Schema.schemas[this.databaseName || 'default'].account;
+	static getRelatedAccounts(params, user, organicRights, priorityAccounts = []) {
+		// ---------------------
+        var UAC_PARAMS = createParams(params, ['uac', 'account']);
+        // ---------------------
 		var ACCOUNT_QUERY = {
-			table: accountSchema,
+			schema: UAC_PARAMS.SCHEMAS.account,
 			alias: 'ACCOUNT',
 			select: [],
 			where: [],
 			orderBy: [],
 			toString() {
 				return 'SELECT ' + this.select.join(', ')
-				+ ' FROM ' + this.table.name + ' AS ' + this.alias
+				+ ' FROM ' + this.schema.name + ' AS ' + this.alias
 				+ ' RIGHT JOIN (' + this.AUTHOR_USER_RELATIONSHIP_QUERY.query + ') AS ' + this.AUTHOR_USER_RELATIONSHIP_QUERY.alias + ' ON ' + this.AUTHOR_USER_RELATIONSHIP_QUERY.on.join(' AND ')
                 + ' WHERE ' + this.where.join(' AND ') 
                 + (this.orderBy.length ? ' ORDER BY ' + this.orderBy : '');
@@ -68,16 +68,16 @@ export default class Client {
 		}
 		// RIGHT JOIN
 		ACCOUNT_QUERY.AUTHOR_USER_RELATIONSHIP_QUERY = {
-			query: Query.getAuthorUserRelationshipQuery(USER, false/* groupConcat */),
+			query: getOwnerGuestRelationshipQuery(UAC_PARAMS, user, false/* groupConcat */),
 			alias: 'AUTHOR_USER_RELATIONSHIP',
 			on: [
-				ACCOUNT_QUERY.alias + '.' + accountSchema.primaryKey + ' = AUTHOR_USER_RELATIONSHIP.' + accountSchema.primaryKey,
+				ACCOUNT_QUERY.alias + '.' + UAC_PARAMS.SCHEMAS.account.primaryKey + ' = AUTHOR_USER_RELATIONSHIP.' + UAC_PARAMS.SCHEMAS.account.primaryKey,
 				'NOT ISNULL(AUTHOR_USER_RELATIONSHIP.relationship)',
 			],
 		};
 		if (priorityAccounts) {
 			// But ensure that the following accounts are listed first, if actually in list
-			ACCOUNT_QUERY.select.push('FIND_IN_SET(' + ACCOUNT_QUERY.alias + '.' + accountSchema.primaryKey + ', "' + priorityAccounts.join(',') + '") AS priority');
+			ACCOUNT_QUERY.select.push('FIND_IN_SET(' + ACCOUNT_QUERY.alias + '.' + UAC_PARAMS.SCHEMAS.account.primaryKey + ', "' + priorityAccounts.join(',') + '") AS priority');
 			ACCOUNT_QUERY.orderBy.push('priority DESC');
 		}
 		if (organicRights) {
@@ -90,7 +90,8 @@ export default class Client {
 	 * Makes the Query that finds descreet access types
 	 * for the current user on this table (or, table row).
 	 *
-	 * @param object            USER
+	 * @param object            params
+	 * @param object            user
 	 * @param string|array		accesses
 	 * @param string|int		overObject			The ID of the subject object.
 	 *												(The object author will be basis for organic relationship.)
@@ -101,7 +102,7 @@ export default class Client {
 	 *
 	 * @return Query
 	 */
-	static getAccessesDoc(USER, accesses, overObject = null, orAsRelatedTo = null, withFields = false, withActingRights = false) {
+	static getAccessesDoc(params, user, accesses, overObject = null, orAsRelatedTo = null, withFields = false, withActingRights = false) {
         // Either of the following two arguments are accepted. Not both
 		if (overObject && orAsRelatedTo) {
 			throw new Error('UAC queries must be either over an object and its author (argument #2), or as related to a specific user (argument #3). But not both!');
@@ -109,18 +110,18 @@ export default class Client {
         // ---------------
         // OBJECT_QUERY
         // ---------------
-        var OBJECT_QUERY = new Query(USER, tableName, objectId || orAsRelatedTo);
+        var OBJECT_QUERY = new Query(params, tableName, user);
         // JOIN: The user's organic rights towards the author
         if (OBJECT_QUERY.AUTHOR_USER_RELATIONSHIP_QUERY) {
             OBJECT_QUERY.AUTHOR_USER_RELATIONSHIP_QUERY.on.push('NOT ISNULL(AUTHOR_USER_RELATIONSHIP.relationship)');
 		}
 		if (overObject) {
 			// The author of the object at the given row in _TABLE
-            OBJECT_QUERY.where.push(OBJECT_QUERY.table.primaryKey + ' = ' + overObject);
-		} else if (OBJECT_QUERY.table.attributionKey && orAsRelatedTo) {
+            OBJECT_QUERY.where.push(OBJECT_QUERY.schema.primaryKey + ' = ' + overObject);
+		} else if (OBJECT_QUERY.schema.attributionKey && orAsRelatedTo) {
 			// The author specified in orAsRelatedTo or all possible relationships.
 			// Whichever the case, _TABLE gets to play no role in this query...
-            OBJECT_QUERY.where.push(OBJECT_QUERY.table.attributionKey + ' = ' + orAsRelatedTo);
+            OBJECT_QUERY.where.push(OBJECT_QUERY.schema.attributionKey + ' = ' + orAsRelatedTo);
 			OBJECT_QUERY.limit = 1;
         }
         // ---------------
@@ -133,7 +134,7 @@ export default class Client {
         }
 		var entityJson = [],
 			fieldsJson = {},
-			fields = withFields ? Object.keys(OBJECT_QUERY.table.fields) : [];
+			fields = withFields ? Object.keys(OBJECT_QUERY.schema.fields) : [];
 		accesses.forEach(accessType => {
 			entityJson.push('JSON_OBJECT("' + accessType + '", COALESCE(' + Query.deriveEntityAccess(accessType, withActingRights) + '))');
 			_each(Query.deriveFieldsAccess(fields, accessType, withActingRights), (field, access) => {

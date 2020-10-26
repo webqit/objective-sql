@@ -38,11 +38,7 @@ export default class GroupBy extends GroupByInterface {
 				// Drilldown...
 				var grouping = {};
 				rows.forEach(row => {
-					try {
-						var _for = by[0].eval(row, params);
-					} catch(e) {
-						throw new Error('["' + this.stringify() + '" in group by clause]: ' + e.message);
-					}
+					var _for = by[0].eval(row, params);
 					grouping[_for] = grouping[_for] || [];
 					grouping[_for].push(row);
 				});

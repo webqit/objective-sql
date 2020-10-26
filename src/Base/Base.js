@@ -19,29 +19,44 @@ export default class Base {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(params, table, where, ...joins) {
-		this.params = params;
-		this.table = table;
-		this.where = where;
+	constructor(main, joins, where, params) {
+		// -------------------------
+		this.main = main;
 		this.joins = joins;
 		// -------------------------
-		this.tables = this.joins.concat(this.table);
+		this.mainCursor = main.then(m => m.getCursor());
+		this.joinCursors = joins.map(join => join.then(j => j.getCursor()));
+		// -------------------------
+		this.where = where;
+		this.params = params;
 		// -------------------------
 		this._onfinish = [];
-		this.cursors = Promise.all(this.tables.map(table => table.getCursor())).then(cursors => {
-			cursors.reduce((prev, current) => {
-				if (prev) {
-					prev.onfinish(current.next.bind(current));
+		Promise.all(this.joinCursors).then(joinCursors => {
+			// Advcance joins sequentially...
+			var lastJoinCursor = joinCursors.reduce((prevCursor, currentCursor) => {
+				if (prevCursor) {
+					prevCursor.onfinish(currentCursor.next.bind(currentCursor));
 				}
-				return current;
-			}, null).onfinish(() => {
-				this.eof = true;
-				this._onfinish.forEach(callback => callback());
+				return currentCursor;
+			}, null);
+			this.mainCursor.then(mainCursor => {
+				// Last join cursor should advance main cursor
+				if (lastJoinCursor) {
+					lastJoinCursor.onfinish(mainCursor.next.bind(mainCursor));
+				}
+				// Fire onfinish event from main cursor
+				mainCursor.onfinish(() => {
+					this.eof = true;
+					this._onfinish.forEach(callback => callback());
+				});
 			});
-			// ------------
-			return cursors;
 		});
 	}
+	 
+	/**
+	 * @inheritdoc
+	 */
+	onfinish(callback) {this._onfinish.push(callback);}
 
 	/**
 	 * @inheritdoc
@@ -51,83 +66,91 @@ export default class Base {
 			return;
 		}
 
-		var row = await this.cursors.then(async cursors => {
-			// Obtain rowBase and joinedRows
-			var rowCompositionRejection;
-			var baseCursor = _last(cursors),
-				baseRowData = await baseCursor.fetch(),
-				joinedCursors = cursors.slice(0, - 1);
-			var joinedRowData = await Promise.all(joinedCursors.map(async (joinCursor, i) => {
+		var rowComposition, rowCompositionRejection;
+		// -----------
+		let __main = await this.main,
+			__mainCursor = await this.mainCursor,
+			__mainFetch = await __mainCursor.fetch(),
+			__mainAlias = __main.params.alias || __main.name;
+		// -----------
+		let __joins = await Promise.all(this.joins),
+			__joinCursors = await Promise.all(this.joinCursors);
+		// -----------
+		let joinFetches = __joinCursors.map(async (__joinCursor, i) => {
 				if (rowCompositionRejection) {
 					return;
 				}
-				// ---------------------
-				var joinRow = await joinCursor.fetch();
-				try {
-					if (!this.tables[i].join || this.tables[i].join.type === 'full') {
-						joinCursor.flags[baseCursor.key] = true;
-						return joinRow;
-					} else if (this.tables[i].join.conditionClause.trim().toLowerCase() === 'using') {
-						// Join using "column name"...
-						var column = this.tables[i].join.condition.stringify();
-						if (joinRow[column] === baseRowData[column]) {
-							joinCursor.flags[baseCursor.key] = true;
-							return joinRow;
-						}
-					} else {
-						var conditionRowComposition = new Row(this.params);
-						conditionRowComposition[this.table.alias] = baseRowData;
-						conditionRowComposition[this.tables[i].alias] = joinRow;
-						if (this.tables[i].join.condition.eval(conditionRowComposition, this.params)) {
-							joinCursor.flags[baseCursor.key] = true;
-							return joinRow;
-						}						
+				var __joinFetch = await __joinCursor.fetch(),
+					__joinAlias = __joins[i].params.alias || __joins[i].name;
+				if (!__joins[i].join || __joins[i].join.type === 'full') {
+					__joinCursor.flags[__mainCursor.key] = true;
+					return __joinFetch;
+				} else if (__joins[i].join.conditionClause.trim().toLowerCase() === 'using') {
+					// Join using "column name"...
+					var column = __joins[i].join.condition.stringify();
+					if (__joinFetch[column] === __mainFetch[column]) {
+						__joinCursor.flags[__mainCursor.key] = true;
+						return __joinFetch;
 					}
-				} catch(e) {
-					throw new Error('["' + this.tables[i].join.condition.stringify() + '" in JOIN clause]: ' + e.message);
+				} else {
+					var conditionRowComposition = new Row(this.params);
+					conditionRowComposition[__mainAlias] = __mainFetch;
+					conditionRowComposition[__joinAlias] = __joinFetch;
+					if (__joins[i].join.condition.eval(conditionRowComposition, this.params)) {
+						__joinCursor.flags[__mainCursor.key] = true;
+						return __joinFetch;
+					}						
 				}
 				// ---------------------
 				// Left/Right Join 
 				// ---------------------
-				if (!joinCursor.flags[baseCursor.key]) {
-					if (joinCursor.eof() && this.tables[i].join.type === 'left') {
+				if (!__joinCursor.flags[__mainCursor.key]) {
+					if (__joinCursor.eof() && __joins[i].join.type.toLowerCase() === 'left') {
 						return {};
-					} else if (baseCursor.eof() && this.tables[i].join.type === 'right') {
-						baseRowData = {};
-						return joinRow;
+					} else if (__mainCursor.eof() && __joins[i].join.type.toLowerCase() === 'right') {
+						__mainFetch = {};
+						return null;
 					}
 				}
 				rowCompositionRejection = true;
-			}));
-			// -------------------------
-			// Advance cursor
-			cursors[0].next();
-			// -------------------------
-			// Filter by join status
-			if (joinedRowData.filter(t => t).length === joinedCursors.length) {
-				var rowComposition = new Row(this.params);
-				rowComposition[this.table.alias] = baseRowData;
-				joinedRowData.forEach((rowMember, i) => {
-					rowComposition[this.tables[i].alias] = rowMember;
-				});
-				return rowComposition;
-			}
 		});
+		let __joinFetches = await Promise.all(joinFetches);
+		// -------------------------
+		// Advance cursor.
+		// IMPORTANT: AFTER HAVING WAITED FOR joinFetches
+		(__joinCursors[0] || __mainCursor).next();
+		// -------------------------
+		// Filter by join status
+		if (__joinFetches.filter(t => t).length === joinFetches.length) {
+			var _rowComposition = new Row(this.params);
+			_rowComposition[__mainAlias] = __mainFetch;
+			__joinFetches.forEach((rowMember, i) => {
+				var __joinAlias = __joins[i].params.alias || __joins[i].name;
+				_rowComposition[__joinAlias] = rowMember;
+			});
+			rowComposition = _rowComposition;
+		}
 		// ----------
 		// Apply where
 		// ----------
 		try {
-			if (!row || (this.where && !this.where.eval(row, this.params))) {
+			if (!rowComposition || (this.where && !this.where.eval(rowComposition, this.params))) {
 				return await this.fetch();
 			}
 		} catch(e) {
 			throw new Error('["' + this.where.stringify() + '" in WHERE clause]: ' + e.message);
 		}
-		return row;
+		return rowComposition;
 	}
-	 
+
 	/**
 	 * @inheritdoc
 	 */
-	onfinish(callback) {this._onfinish.push(callback);}
+	async syncCursors() {
+		var __tables = await Promise.all(this.joins.concat(this.main));
+		var __cursors = await Promise.all(this.joinCursors.concat(this.mainCursor));
+		return Promise.all(__cursors.map((cursor, i) => {
+			return __tables[i].syncCursor(cursor);
+		}));
+	}
 };

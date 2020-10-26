@@ -2,14 +2,33 @@
 /**
  * @imports
  */
-import Schema from './Base/Schema.js';
+import _mixin from '@onephrase/util/js/mixin.js';
 import _before from '@onephrase/util/str/before.js';
 import _after from '@onephrase/util/str/after.js';
 import _isString from '@onephrase/util/js/isString.js';
 import _isObject from '@onephrase/util/js/isObject.js';
+import ArrowReferenceInterface from './ArrowReferenceInterface.js';
+import Reference from './Reference.js';
+import _Factory from '../Base/_Factory.js';
 
-export default class ArrowReference {
-	
+/**
+ * ---------------------------
+ * ArrowReference class
+ * ---------------------------
+ */				
+export default class ArrowReference extends _mixin(ArrowReferenceInterface, Reference) {
+
+	/**
+	 * @inheritdoc
+	 */
+	static parse(expr, parseCallback, params = {}) {
+		if (this.isReference(expr)) {
+			var parse = super.parse(expr, parseCallback, params);
+			parse.backticks = true;
+			return parse;
+		}
+	}
+
 	/**
 	 * Tells if a column is a reference.
 	 *
@@ -59,20 +78,20 @@ export default class ArrowReference {
 	 * Gets the immediate target in a reference path.
 	 * 
 	 * @param {String} databaseName 
-	 * @param {Object} baseSchema
+	 * @param {Object} baseTable
 	 * @param {String} reference 
 	 * 
 	 * @return {Object}
 	 */
-    static eval(databaseName, baseSchema, reference) {
-		var SCHEMAS = Schema.schemas[databaseName], table1, table2;
+    static process(databaseName, baseTable, reference) {
+		var SCHEMAS = _Factory.schema[databaseName || _Factory.defaultDB], table1, table2;
 		if (this.isIncoming(reference)) {
 			// reference === actingKey<-...
 			var actingKey = _before(reference, this.arrLeft),
 				sourceTable = _after(reference, this.arrLeft);
 			if (this.isIncoming(sourceTable)) {
 				// reference === actingKey<-actingKey2<-table->?...
-				table2 = this.eval(databaseName, '', sourceTable).a.table;
+				table2 = this.process(databaseName, '', sourceTable).a.table;
 				var select = sourceTable;
 			} else {
 				// reference === actingKey<-table->?...
@@ -82,7 +101,7 @@ export default class ArrowReference {
 					throw new Error('[' + reference + ']: The implied table "' + _sourceTable + '" is not defined.');
 				}
 			}
-			if (!baseSchema) {
+			if (!baseTable) {
 				// --------------------------
 				// Now get table1 from table2
 				// --------------------------
@@ -90,10 +109,10 @@ export default class ArrowReference {
 					throw new Error('[' + reference + ']: The "' + table2.name + '" table does not define the implied foreign key "' + actingKey + '".');
 				}
 				table1 = SCHEMAS[table1.name];
-			} else if (_isString(baseSchema)) {
-				table1 = SCHEMAS[baseSchema];
-			} else if (_isObject(baseSchema)) {
-				table1 = baseSchema;
+			} else if (_isString(baseTable)) {
+				table1 = SCHEMAS[baseTable];
+			} else if (_isObject(baseTable)) {
+				table1 = baseTable;
 			}
 			return {
 				a: {table: table1, actingKey: table1.primaryKey,},
@@ -102,11 +121,11 @@ export default class ArrowReference {
 		}
 
 		// reference === foreignKey->...
-		if (_isString(baseSchema)) {
-			table1 = SCHEMAS[baseSchema];
-		} else if (_isObject(baseSchema)) {
-			table1 = baseSchema;
-			baseSchema = table1.name;
+		if (_isString(baseTable)) {
+			table1 = SCHEMAS[baseTable];
+		} else if (_isObject(baseTable)) {
+			table1 = baseTable;
+			baseTable = table1.name;
 		}
 		// --------------------------
 		// Now get table2 from table1
@@ -114,7 +133,10 @@ export default class ArrowReference {
 		var foreignKey = _before(reference, this.arrRight)
 			select = _after(reference, this.arrRight);
 		if (!table1.fields[foreignKey] || !(table2 = table1.fields[foreignKey].referencedEntity)) {
-			throw new Error('[' + baseSchema + this.arrRight + reference + ']: The "' + baseSchema + '" table does not define the implied foreign key "' + foreignKey + '".');
+			throw new Error('[' + baseTable + this.arrRight + reference + ']: The "' + baseTable + '" table does not define the implied foreign key "' + foreignKey + '".');
+		}
+		if (!SCHEMAS) {
+			console.log('============================', databaseName, table2.name)
 		}
 		table2 = SCHEMAS[table2.name];
 		return {

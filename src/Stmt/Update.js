@@ -34,13 +34,19 @@ export default class Update extends _mixin(Stmt, UpdateInterface) {
 		// ---------------------------
 		// INITIALIZE DATASOURCES WITH JOIN ALGORITHIMS APPLIED
 		// ---------------------------
-		this.base = this.getBase(database, params);
-		var rowComposition, count = 0;
+		var _params = {...params};
+		_params.mode = 'readwrite';
+		this.base = this.getBase(database, _params);
+		var rowComposition;
 		while(rowComposition = await this.base.fetch()) {
-			this.exprs.assignments.forEach(assignment => assignment.eval(rowComposition, params));
-			count ++;
+			this.exprs.ASSIGNMENT_LIST.forEach(assignment => assignment.eval(rowComposition, params));
 		}
-		return count;
+		var __keys = await this.base.syncCursors();
+		var __tables = await Promise.all(this.base.joins.concat(this.base.main)).then(list => list.map(t => t.name));
+		return {
+			tables: __tables,
+			keys: __keys,
+		};
 	}
 	
 	/**
@@ -54,9 +60,9 @@ export default class Update extends _mixin(Stmt, UpdateInterface) {
 	 * @inheritdoc
 	 */
 	stringify(params = {}) {
-		return this.getToString(params, (clauseType, expr, clause) => {
-			if (clauseType === 'assignments') {
-				return clause + ' ' + expr.map(assignment => assignment.stringify(params)).join(', ');
+		return this.getToString(params, (clauseType, expr, clause, _params, _t) => {
+			if (clauseType === 'ASSIGNMENT_LIST') {
+				return clause + ' ' + expr.map(assignment => assignment.stringify(_params)).join(', ');
 			}
 		});
 	}
@@ -72,7 +78,7 @@ export default class Update extends _mixin(Stmt, UpdateInterface) {
 				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
 			}
 			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback, params, (clauseType, _expr) => {
-				if (clauseType === 'assignments') {
+				if (clauseType === 'ASSIGNMENT_LIST') {
 					return Lexer.split(_expr, [','])
 						.map(assignment => parseCallback(assignment.trim(), [Assignment]));
 				}
@@ -86,9 +92,9 @@ export default class Update extends _mixin(Stmt, UpdateInterface) {
  * @prop object
  */
 Update.clauses = {
-	table: 'UPDATE',
-	assignments: 'SET',
-	where: 'WHERE',
+	TABLE_REFERENCES: 'UPDATE',
+	ASSIGNMENT_LIST: 'SET',
+	WHERE_CLAUSE: 'WHERE',
 	// inner join, cross join, {left|right} [outer] join
-	joins: '(INNER[ ]+|CROSS[ ]+|(LEFT|RIGHT)([ ]+OUTER)?[ ]+)?JOIN',
+	JOIN_CLAUSE: '(INNER[ ]+|CROSS[ ]+|(LEFT|RIGHT)([ ]+OUTER)?[ ]+)?JOIN',
 };

@@ -20,33 +20,35 @@ export default class Insert extends InsertInterface {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(table, columns, values, withUac, insertType, onDuplicateKeyUpdate) {
+	constructor(TABLE_REFERENCES, COLUMNS_LIST, VALUES_LIST, WITH_UAC, INSERT_TYPE, UPDATE_CLAUSE) {
 		super();
-		this.table = table;
-		this.columns = columns;
-		this.values = values;
-		this.withUac = withUac;
-		this.insertType = insertType;
-		this.onDuplicateKeyUpdate = onDuplicateKeyUpdate;
+		this.TABLE_REFERENCES = TABLE_REFERENCES;
+		this.COLUMNS_LIST = COLUMNS_LIST;
+		this.VALUES_LIST = VALUES_LIST;
+		this.WITH_UAC = WITH_UAC;
+		this.INSERT_TYPE = INSERT_TYPE;
+		this.UPDATE_CLAUSE = UPDATE_CLAUSE;
 	}
 	 
 	/**
 	 * @inheritdoc
 	 */
-	async eval(database, params = {}) {
-		var tableBase = this.table.eval(database, params);
-		var tableSchema = this.table.getSchema();
+	async eval(context, params = {}) {
+		var _params = {...params};
+		_params.mode = 'readwrite';
+		var tableBase = await this.TABLE_REFERENCES.eval(context, _params);
+		var tableSchema = tableBase.schema;
 		// ---------------------------
-		var values = this.values;
-		var insertType = this.insertType.toUpperCase();
+		var values = this.VALUES_LIST;
+		var insertType = this.INSERT_TYPE.toUpperCase();
 		if (insertType === 'SET') {
 			var columns = values.map(assignment => assignment.reference.name);
 			values = [values.map(assignment => assignment.val.eval({}, params))];
 		} else {
-			var columns = this.columns || (tableSchema.fields ? Object.keys(tableSchema.fields) : []);
+			var columns = this.COLUMNS_LIST || (tableSchema.fields ? Object.keys(tableSchema.fields) : []);
 			if (insertType === 'SELECT') {
 				try {
-					values = (await values.eval(database, params)).map(row => Object.values(row));
+					values = (await values.eval(context, params)).map(row => Object.values(row));
 				} catch(e) {
 					throw new Error('["' + values.stringify() + '" in SELECT clause]: ' + e.message);
 				}
@@ -57,13 +59,18 @@ export default class Insert extends InsertInterface {
 			}
 		}
 		columns = columns.map(c => c + '');
-		await tableBase.insert(values, columns, newRow => {
-			if (this.onDuplicateKeyUpdate) {
-				this.onDuplicateKeyUpdate.forEach(assignment => assignment.eval({$: newRow}, params));
+
+		var keys = await tableBase.addAll(values, columns, newRow => {
+			if (this.UPDATE_CLAUSE) {
+				this.UPDATE_CLAUSE.forEach(assignment => assignment.eval({$: newRow}, params));
 				return true
 			}
 		});
-		return values.length;
+
+		return {
+			table: tableBase.name,
+			keys,
+		};
 	}
 	
 	/**
@@ -77,25 +84,28 @@ export default class Insert extends InsertInterface {
 	 * @inheritdoc
 	 */
 	stringify(params = {}) {
-		var str = [this.table.stringify(params)];
-		if (this.insertType.toUpperCase() === 'SET') {
-			str.push('SET ' + this.values.map(assignment => assignment.stringify(params)).join(', '));
+		// ---------------------
+		var t = params.t || 0, _t = (n = 0) => "\r\n" + ("\t".repeat(Math.max(0, t + n))), _params = {...params}; _params.t = t + 1;
+		// ---------------------
+		var str = [this.TABLE_REFERENCES.stringify(_params)];
+		if (this.INSERT_TYPE.toUpperCase() === 'SET') {
+			str.push(_t(1) + 'SET ' + this.VALUES_LIST.map(assignment => assignment.stringify(_params)).join(', '));
 		} else {
-			if (this.columns) {
-				str.push('(' + this.columns.join(', ') + ')');
+			if (this.COLUMNS_LIST.length) {
+				str.push('(' + this.COLUMNS_LIST.join(', ') + ')');
 			}
-			if (this.insertType.toUpperCase() === 'SELECT') {
-				str.push(this.values.stringify(params));
+			if (this.INSERT_TYPE.toUpperCase() === 'SELECT') {
+				str.push(this.VALUES_LIST.stringify(_params));
 			} else {
-				str.push('VALUES (' + this.values.map(
+				str.push(_t() + 'VALUES ' + _t(1) + '(' + this.VALUES_LIST.map(
 					row => row.map(
-						val => val.stringify(params)
+						val => val.stringify(_params)
 					).join(', ')
-				).join('), (') + ')');
+				).join('),' + _t(1) + '(') + ')');
 			}
 		}
-		if (this.onDuplicateKeyUpdate) {
-			str.push('ON DUPLICATE KEY UPDATE ' + this.onDuplicateKeyUpdate.map(assignment => assignment.stringify(params)).join(', '));
+		if (this.UPDATE_CLAUSE) {
+			str.push(_t() + 'ON DUPLICATE KEY UPDATE ' + this.UPDATE_CLAUSE.map(assignment => assignment.stringify(_params)).join(', '));
 		}
 		return 'INSERT INTO ' + str.join(' ');
 	}
@@ -153,7 +163,7 @@ export default class Insert extends InsertInterface {
  * @prop object
  */
 Insert.clauses = {
-	table: 'INSERT([ ]+INTO)?',
-	values: '(VALUES|VALUE|SET|SELECT)',
-	update: 'ON[ ]+DUPLICATE[ ]+KEY[ ]+UPDATE',
+	TABLE_REFERENCES: 'INSERT([ ]+INTO)?',
+	VALUES_LIST: '(VALUES|VALUE|SET|SELECT)',
+	UPDATE_CLAUSE: 'ON[ ]+DUPLICATE[ ]+KEY[ ]+UPDATE',
 };

@@ -3,10 +3,12 @@
  * @imports
  */
 import { Call } from '@web-native-js/jsen';
+import _instanceof from '@onephrase/util/js/instanceof.js';
 import _mixin from '@onephrase/util/js/mixin.js';
 import _flatten from '@onephrase/util/arr/flatten.js';
 import _find from '@onephrase/util/obj/find.js';
 import _before from '@onephrase/util/str/before.js';
+import _after from '@onephrase/util/str/after.js';
 import Lexer from '@onephrase/util/str/Lexer.js';
 import AggrInterface from './AggrInterface.js';
 import Window from './Window.js';
@@ -32,7 +34,7 @@ export default class Aggr extends _mixin(Call, AggrInterface) {
 	 */
 	eval(context, params = {}) {
 		var args = this.args.list.slice();
-		args.unshift(this.window ? context.WINDOWS[this.window.stringify()] : context.AGGR.rows);
+		args.unshift(this.window ? context.WINDOWS[this.window.stringify()] : context.AGGR.rows, this.aggrFlag);
 		return this.reference.getEval(context, params).exec(args);
 	}
 	
@@ -47,17 +49,26 @@ export default class Aggr extends _mixin(Call, AggrInterface) {
 	 * @inheritdoc
 	 */
 	stringify(params = {}) {
-		return super.stringify(params) + (this.window ? ' OVER ' + this.window.stringify(params) : '');
+		var str = super.stringify(params);
+		if (this.aggrFlag) {
+			str = str.replace('(', '(' + this.aggrFlag + ' ');
+		}
+		return str + (this.window ? ' OVER ' + this.window.stringify(params) : '');
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
 	static parse(expr, parseCallback, params = {}) {
-		var aggrMatch = null;
+		var aggrMatch, funcFlagMatch, aggrFlag = '';
 		var aggrMatchRegex = _flatten(this.funcs).join("\\(|") + "\\(";
 		if (aggrMatch = expr.trim().match(new RegExp('^(' + aggrMatchRegex + ')', 'i'))) {
 			var funcName = _before(aggrMatch[0], '(').toUpperCase();
+			var funcFlagStart = _after(expr, funcName + '(');
+			if (funcFlagMatch = funcFlagStart.match(new RegExp('^(([ ]+)?' + ['ALL', 'DISTINCT'].join('[ ]+|([ ]+)?') + '[ ]+)', 'i'))) {
+				aggrFlag = funcFlagMatch[0];
+				expr = expr.replace(aggrFlag, '');
+			}
 			var funcCategory = _find(this.funcs, val => val === funcName, true)[0];
 			var splits = Lexer.split(expr, ['OVER'], {ci:true});
 			if (funcCategory === 'explicitOver' && splits.length === 1) {
@@ -65,6 +76,7 @@ export default class Aggr extends _mixin(Call, AggrInterface) {
 			}
 			var instance = super.parse(splits.shift().trim(), parseCallback, params);
 			instance.funcCategory = funcCategory;
+			instance.aggrFlag = aggrFlag.trim();
 			if (splits.length) {
 				instance.window = parseCallback(splits.pop().trim(), [Window]);
 			}

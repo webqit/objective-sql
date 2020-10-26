@@ -4,6 +4,9 @@
  */
 import _mixin from '@onephrase/util/js/mixin.js';
 import _isArray from '@onephrase/util/js/isArray.js';
+import _arrFrom from '@onephrase/util/arr/from.js';
+import _all from '@onephrase/util/arr/all.js';
+import _before from '@onephrase/util/str/before.js';
 import DeleteInterface from './DeleteInterface.js';
 import Stmt from './Stmt.js';
 
@@ -29,28 +32,71 @@ export default class Delete extends _mixin(Stmt, DeleteInterface) {
 	 * @inheritdoc
 	 */
 	async eval(database, params = {}) {
-		// ---------------------------
+
+		// --------------------
+		// RESOLVE DELETION SOURCES AND TARGETS
+		// --------------------
+		var targetTableNames,
+			mainTable = this.exprs.TABLE_REFERENCES;
+		if (this.exprs.DELETE_LIST.length) {
+			targetTableNames = this.exprs.DELETE_LIST.map(t => t.endsWith('.*') ? _before(t, '.*') : t);
+		} else if (this.exprs.USING_CLAUSE) {
+			targetTableNames = _arrFrom(this.exprs.TABLE_REFERENCES, false).map(t => t.getAlias());
+			mainTable = this.exprs.USING_CLAUSE;
+		} else {
+			// IMPORTANT: only first table in here
+			targetTableNames = [(_isArray(mainTable) ? mainTable[0] : mainTable).getAlias()];
+		}
+
+		// --------------------
 		// INITIALIZE DATASOURCES WITH JOIN ALGORITHIMS APPLIED
-		// ---------------------------
-		this.base = this.getBase(database, params);
-		var rowComposition, count = 0;
+		// --------------------
+		var _params = {...params};
+		_params.mode = 'readwrite';
+		this.base = this.getBase(database, _params, _arrFrom(mainTable, false));
+
+		// --------------------
+		// Finds named tables
+		// --------------------
+		var targetTables = {},
+			deletionIDs = {},
+			tables = await Promise.all(this.base.joins.concat(this.base.main));
+		targetTableNames.forEach(alias => {
+			targetTables[alias] = tables.filter(table => (table.params.alias || table.name) === alias)[0];
+			if (!targetTables[alias]) {
+				throw new Error('"' + alias + '" in table list is not found in main query.');
+			}
+		});
+
+		// --------------------
+		// Mine IDs
+		// --------------------
+		var rowComposition;
 		while(rowComposition = await this.base.fetch()) {
-			Object.keys(rowComposition).forEach(alias => {
-				var sourceTable;
-				if (alias === this.base.table.alias) {
-					sourceTable = this.base.table;
-				} else {
-					sourceTable = this.base.joins.filter(join => join.alias === alias)[0];
+			targetTableNames.forEach(alias => {
+				if (!deletionIDs[alias]) {
+					deletionIDs[alias] = [];
 				}
-				sourceTable.rows.forEach((row, i) => {
-					if (row === rowComposition[alias]) {
-						delete sourceTable.rows[i];
-						count ++;
-					}
-				});
+				var rowID = _arrFrom(targetTables[alias].schema.primaryKey).map(key => rowComposition[alias][key]);
+				if (!deletionIDs[alias].filter(_rowID => _all(_rowID, (id, i) => id === rowID[i])).length) {
+					deletionIDs[alias].push(rowID);
+				}
 			});
 		}
-		return count;
+
+		// --------------------
+		// Delete now
+		// --------------------
+		var keys = await Promise.all(targetTableNames.map(alias => {
+			if (deletionIDs[alias].length) {
+				return targetTables[alias].deleteAll(deletionIDs[alias]);
+			}
+		}));
+
+		return {
+			tables: tables.map(t => t.name),
+			keys,
+		};;
 	}
 	
 	/**
@@ -71,13 +117,20 @@ export default class Delete extends _mixin(Stmt, DeleteInterface) {
 	 * @inheritdoc
 	 */
 	static parse(expr, parseCallback, params = {}) {
-		if (expr.trim().match(/^DELETE[ ]+FROM/, 'i')) {
+		if (expr.trim().substr(0, 6).toLowerCase() === 'delete') {
 			var withUac = false;
 			if (expr.match(/DELETE[ ]+WITH[ ]+UAC/i)) {
 				withUac = true;
 				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
 			}
-			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback, params);
+			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback, params, (clauseType, _expr) => {
+				if (clauseType === 'DELETE_LIST') {
+					return _expr.split(',').map(t => t.trim()).filter(t => t);
+				}
+			});
+			if (stmtParse.exprs.DELETE_LIST.length && stmtParse.exprs.USING_CLAUSE) {
+				throw new Error('The "using" keyword cannot be used in a query with explicitly-listed tables.');
+			}
 			return new this(stmtParse.exprs, stmtParse.clauses, withUac);
 		}
 	}
@@ -87,8 +140,10 @@ export default class Delete extends _mixin(Stmt, DeleteInterface) {
  * @prop object
  */
 Delete.clauses = {
-	table: 'DELETE[ ]+FROM',
-	where: 'WHERE',
+	DELETE_LIST: 'DELETE',
+	TABLE_REFERENCES: 'FROM',
+	USING_CLAUSE: 'USING',
+	WHERE_CLAUSE: 'WHERE',
 	// inner join, cross join, {left|right} [outer] join
-	joins: '(INNER[ ]+|CROSS[ ]+|(LEFT|RIGHT)([ ]+OUTER)?[ ]+)?JOIN',
+	JOIN_CLAUSE: '(INNER[ ]+|CROSS[ ]+|(LEFT|RIGHT)([ ]+OUTER)?[ ]+)?JOIN',
 };

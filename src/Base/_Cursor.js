@@ -2,17 +2,17 @@
 
 /**
  * ---------------------------
- * Cursor class
+ * _Cursor class
  * ---------------------------
  */				
 
-export default class Cursor {
+export default class _Cursor {
 	 
 	/**
 	 * @inheritdoc
 	 */
 	constructor(rows) {
-		this._rows = rows;
+		this.cache = rows;
 		this.key = 0;
 		this.flags = {};
 		this._onfinish = [];
@@ -27,7 +27,8 @@ export default class Cursor {
 	 * @inheritdoc
 	 */
 	next() {
-		if (!this._rows.length || this.key === this._rows.length - 1) {
+		if (!this.cache.length || this.key === this.cache.length - 1) {
+			this.__eof = true;
 			this._onfinish.forEach(callback => callback());
 			this.key = 0;
 			return;
@@ -39,15 +40,15 @@ export default class Cursor {
 	 * @inheritdoc
 	 */
 	eof() {
-		return !this._rows.length || this.key === this._rows.length - 1;
+		return !this.cache.length || this.key === this.cache.length - 1;
 	}
 	 
 	/**
 	 * @inheritdoc
 	 */
 	async fetch() {
-		if (this.key < this._rows.length) {
-			return this._rows[this.key];
+		if (this.key < this.cache.length) {
+			return this.cache[this.key];
 		}
 	}
 };

@@ -5,11 +5,16 @@
 import {
 	AbstractionInterface,
 	ReferenceInterface,
+	CallInterface,
 } from '../index.js';
+import _instanceof from '@onephrase/util/js/instanceof.js';
+import _isArray from '@onephrase/util/js/isArray.js';
 import _wrapped from '@onephrase/util/str/wrapped.js';
 import _objFrom from '@onephrase/util/obj/from.js';
+import _each from '@onephrase/util/obj/each.js';
 import Lexer from '@onephrase/util/str/Lexer.js';
 import FieldInterface from './FieldInterface.js';
+import AggrInterface from './AggrInterface.js';
 
 /**
  * ---------------------------
@@ -45,6 +50,20 @@ export default class Field extends FieldInterface {
 	/**
 	 * @inheritdoc
 	 */
+	getContextName() {
+		if (this.expr.interpreted) {
+			// .interpreted is always fully qualified.
+			return _isArray(this.expr.interpreted) 
+				? this.expr.interpreted[0].context.name 
+				: this.expr.interpreted.context.name;
+		}
+		// May or may not b qualified
+		return this.expr.context ? (this.expr.context.name || '').replace(/`/g, '') : '';
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
 	getName() {
 		// Without backticks
 		return (this.expr.name || '').replace(/`/g, '');
@@ -60,45 +79,86 @@ export default class Field extends FieldInterface {
 	/**
 	 * @inheritdoc
 	 */
-	eval(tempRow, database, params = {}) {
-		var alias = this.getAlias();
-		if (params.fieldsByReference && this.expr instanceof ReferenceInterface) {
-			var reference = this.expr.getEval(tempRow, params);
-			return {
-				get [alias] () {
-					return reference.get();
-				},
-				set [alias] (val) {
-					reference.set(val);
-					return true;
-				},
-			};
-		} else {
-			var value;
-			if (this.expr instanceof AbstractionInterface) {
-				value = this.expr.eval(database, params);
-			} else {
-				value = this.expr.eval(tempRow, params);
-			}
-			if (params.fieldsByReference) {
-				return {
-					get [alias] () {
-						return value;
-					},
-					set [alias] (val) {
-						throw new Error('"' + alias + '" cannot be modified; not a reference!');
-					},
-				};
-			}
-			return _objFrom(alias, value);
-		}
+	getCallExprs() {
+		return this.expr.meta.vars.slice().concat([this.expr]).filter(x => x instanceof CallInterface)
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	stringify(tempRow = {}) {
-		return [this.expr.stringify(tempRow), this.claused ? 'AS' : '', this.alias].filter(a => a).join(' ');
+	getAggrExprs() {
+		return this.expr.meta.vars.slice().concat([this.expr]).filter(x => x instanceof AggrInterface)
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	eval(tempRow, database, params = {}) {
+		
+		var alias = this.getAlias();
+		if (_instanceof(this.expr, ReferenceInterface)) {
+
+			if (this.getName() === '*') {
+				var multiple = this.expr.getEval(tempRow, params);
+				_each(multiple, (name, ref) => {
+					if (params.mode === 'readwrite') {
+						Object.defineProperty(multiple, name, {
+							get() {
+								return ref.get();
+							},
+							set (val) {
+								ref.set(val);
+								return true;
+							},
+							enumerable: true,
+						});
+					} else {
+						multiple[name] = ref.get();
+					}
+				});
+				return multiple;
+			}
+
+			var reference = this.expr.getEval(tempRow, params);
+			if (params.mode === 'readwrite') {
+				return {
+					get [alias] () {
+						return reference.get();
+					},
+					set [alias] (val) {
+						reference.set(val);
+						return true;
+					},
+				};
+			}
+			return _objFrom(alias, reference.get());
+		}
+
+		var value;
+		if (this.expr instanceof AbstractionInterface) {
+			value = this.expr.eval(database, params);
+		} else {
+			value = this.expr.eval(tempRow, params);
+		}
+		if (params.mode === 'readwrite') {
+			return {
+				get [alias] () {
+					return value;
+				},
+				set [alias] (val) {
+					throw new Error('"' + alias + '" cannot be modified; not a reference!');
+				},
+			};
+		}
+		return _objFrom(alias, value);
+
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify(params = {}) {
+		return [this.expr.stringify(params), this.claused ? 'AS' : '', this.alias].filter(a => a).join(' ');
 	}
 	
 	/**

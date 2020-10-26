@@ -44,12 +44,7 @@ export default class OrderBy extends OrderByInterface {
 			});
 			return result;
 		};
-		try {
-			var ordering = order(tempRows, this.columns);
-		} catch(e) {
-			throw new Error('["' + this.stringify() + '" in order by clause]: ' + e.message);
-		}
-		return ordering;
+		return order(tempRows, this.columns);
 	}
 	
 	/**

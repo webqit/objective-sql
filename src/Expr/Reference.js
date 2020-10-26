@@ -5,14 +5,8 @@
 import {
 	Scope,
 	Reference as _Reference,
-	ExprInterface,
 } from '@web-native-js/jsen';
-import _each from '@onephrase/util/obj/each.js';
-import _isString from '@onephrase/util/js/isString.js';
-import _isEmpty from '@onephrase/util/js/isEmpty.js';
-import _isUndefined from '@onephrase/util/js/isUndefined.js';
-import _remove from '@onephrase/util/arr/remove.js';
-import ArrowReference from '../ArrowReference.js';
+import _isArray from '@onephrase/util/js/isArray.js';
 
 /**
  * ---------------------------
@@ -20,49 +14,46 @@ import ArrowReference from '../ArrowReference.js';
  * ---------------------------
  */				
 export default class Reference extends _Reference {
-
+		
 	/**
 	 * @inheritdoc
 	 */
-	constructor(context, name, backticks = false) {
-		var isArrowReference = _isString(name) && ArrowReference.isReference(name);
-		if (isArrowReference && !backticks) {
-			backticks = true;
+	stringify(params = {}) {
+		if (this.interpreted && params.interpreted) {
+			if (_isArray(this.interpreted)) {
+				return this.interpreted.map(ref => ref.stringify(params)).join(', ');
+			}
+			return this.interpreted.stringify(params);
 		}
-		super(context, name, backticks);
-		this.isArrowReference = isArrowReference;
+		// -----------
+		return super.stringify(params);
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
 	getEval(tempRow, params = {}) {
+		// ------------
+		// For those calling getEval() directly
+		if (this.interpreted) {
+			if (_isArray(this.interpreted)) {
+				return this.interpreted.reduce((map, ref) => {
+					map[ref.name] = ref.getEval(tempRow, params);
+					return map;
+				}, {});
+			}
+			return this.interpreted.getEval(tempRow, params);
+		}
+		// -----------
 		// Lets find the table that contains the column
 		var sourceContext = tempRow, name = this.name;
-		if (!this.isContext && !this.isTableName) {
-			var contexts = Reference.findContexts(tempRow, this.name);
-			if (this.isFieldName) {
-				_remove(contexts, '$');
+		if (this.context) {
+			sourceContext = this.context.eval(tempRow, params);
+		} else if (!(this.role === 'CONTEXT' || this.role === 'CALL_SPECIFIER')) {
+			if (!tempRow.$) {
+				throw new Error('"' + this + '" is undefined!');
 			}
-			if (!contexts.length) {
-				//throw new Error('"' + this.stringify() + '" is unknown!');
-			}
-			if (this.arrowContext) {
-				sourceContext = tempRow[this.arrowContext];
-			} else if (!this.context) {
-				if (contexts.indexOf('$') === -1 && contexts.length > 1) {
-					throw new Error('"' + this.name + '" is ambiguous!');
-				}
-				if (contexts.length) {
-					var context = contexts.reduce((_c, c) => _c === '$' ? _c : c, '');
-					sourceContext = tempRow[context];
-				}
-			} else {
-				if (name instanceof ExprInterface) {
-					name = name.eval(tempRow, params);
-				}
-				sourceContext = this.context.eval(tempRow, params);
-			}
+			sourceContext = tempRow.$;
 		}
 		return {
 			get() {
@@ -82,30 +73,24 @@ export default class Reference extends _Reference {
 			},
 		};
 	}
-		
+	
 	/**
 	 * @inheritdoc
 	 */
 	eval(tempRow, params = {}) {
-		var val = super.eval(tempRow, params);
-		// Table unknown?
-		if (this.isContext && _isUndefined(val)) {
-			throw new Error('Table "' + this.name + '" is unknown!');
+		if (this.interpreted) {
+			if (_isArray(this.interpreted)) {
+				return this.interpreted.map(ref => ref.eval(tempRow, params))
+			}
+			return this.interpreted.eval(tempRow, params);
 		}
-		return val;
+		return this.getEval(tempRow, params).get();
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	static findContexts(tempRow, name) {
-		var contexts = [];
-		// We ask from schema first
-		Object.keys(tempRow).forEach(tableName => {
-			if (tempRow[tableName] && name in tempRow[tableName]) {
-				contexts.push(tableName);
-			}
-		});
-		return contexts;
+	static parse(expr, ...args) {
+		return super.parse(expr, ...args);
 	}
 };

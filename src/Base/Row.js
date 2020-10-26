@@ -7,7 +7,10 @@ import _unique from '@onephrase/util/arr/unique.js';
 import _max from '@onephrase/util/arr/max.js';
 import _min from '@onephrase/util/arr/min.js';
 import _sum from '@onephrase/util/arr/sum.js';
+import _first from '@onephrase/util/arr/first.js';
+import _last from '@onephrase/util/arr/last.js';
 import _rand from '@onephrase/util/arr/rand.js';
+import _isArray from '@onephrase/util/js/isArray.js';
 import _isNull from '@onephrase/util/js/isNull.js';
 import _after from '@onephrase/util/str/after.js';
 import _objFrom from '@onephrase/util/obj/from.js';
@@ -70,58 +73,54 @@ export default class Row {
 	/**
 	 * @inheritdoc
 	 */
-	COUNT(rows, column) {
+	COUNT(rows, flag, column) {
 		if (column.stringify() === '*') {
+			// NULLs accepted
 			return rows.length;
 		}
-		if (arguments.length === 3 && column.stringify().toUpperCase() === 'DISTINCT') {
-			var vals = _unique(this.COLUMN(rows, arguments[2]));
-		} else {
-			var vals = this.COLUMN(rows, column);
-		}
-		return vals.filter(v => !_isNull(v)).length;
+		return this.COLUMN(rows, flag, column).length;
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	GROUP_CONCAT(rows, column) {
-		return this.COLUMN(rows, column).join('');
+	GROUP_CONCAT(rows, flag, column) {
+		return this.COLUMN(rows, flag, column).join('');
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	GROUP_CONCAT_WS(rows, separator, column) {
-		return this.COLUMN(rows, column).join(separator.eval(this, this['.params']));
+	GROUP_CONCAT_WS(rows, flag, separator, column) {
+		return this.COLUMN(rows, flag, column).join(separator.eval(this, this['.params']));
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	AVG(rows, column) {
-		return _avg(this.COLUMN(rows, column));
+	AVG(rows, flag, column) {
+		return _avg(this.COLUMN(rows, flag, column));
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	MAX(rows, column) {
-		return _max(this.COLUMN(rows, column));
+	MAX(rows, flag, column) {
+		return _max(this.COLUMN(rows, flag, column));
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	MIN(rows, column) {
-		return _min(this.COLUMN(rows, column));
+	MIN(rows, flag, column) {
+		return _min(this.COLUMN(rows, flag, column));
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	SUM(rows, column) {
-		return _sum(this.COLUMN(rows, column));
+	SUM(rows, flag, column) {
+		return _sum(this.COLUMN(rows, flag, column));
 	}
 
 	/**
@@ -133,14 +132,30 @@ export default class Row {
 	/**
 	 * @inheritdoc
 	 */
-	ANY_VALUE(rows, column) {
-		return _rand(this.COLUMN(rows, column));
+	FIRST(rows, flag, column) {
+		// NULLs accepted
+		return column.eval(_first(rows) || {}, this['.params']);
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	GROUPING(rows, ...onColumns) {
+	LAST(rows, flag, column) {
+		// NULLs accepted
+		return column.eval(_last(rows) || {}, this['.params']);
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	ANY_VALUE(rows, flag, column) {
+		return _rand(this.COLUMN(rows, flag, column));
+	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	GROUPING(rows, flag, ...onColumns) {
 		if (!this.AGGR || !this.AGGR.isRollup) {
 			return 0;
 		}
@@ -160,15 +175,32 @@ export default class Row {
 	/**
 	 * @inheritdoc
 	 */
-	COLUMN(rows, arg) {
-		return rows.map(row => arg.eval(row, this['.params']));
+	COLUMN(rows, flag, arg) {
+		var result = rows.map(row => arg.eval(row, this['.params']));
+		// COALESCE?
+		if (_isArray(result[0])) {
+			var width = result[0].length;
+			result = result.filter(values => {
+				if (!_isArray(values) || values.length !== width) {
+					throw new Error('Aggregate column list not even!');
+				}
+				return values.reduce((_v, v) => !_isNull(_v) ? _v : v, null);
+			});
+		}
+		// NO NULLS!
+		result = result.filter(v => !_isNull(v));
+		// DISTINCT?
+		if (flag.toUpperCase() === 'DISTINCT') {
+			result = _unique(result);
+		}
+		return result;
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	COLUMNS(rows, args) {
-		return args.map(arg => this.COLUMN(rows, arg));
+	COLUMNS(rows, flag, args) {
+		return args.map(arg => this.COLUMN(rows, flag, arg));
 	}
 	
 	/**

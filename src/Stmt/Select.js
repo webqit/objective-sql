@@ -11,7 +11,6 @@ import _find from '@onephrase/util/obj/find.js';
 import Lexer from '@onephrase/util/str/Lexer.js';
 import SelectInterface from './SelectInterface.js';
 import AggrInterface from '../Expr/AggrInterface.js';
-import JoinInterface from '../Expr/JoinInterface.js';
 import Field from '../Expr/Field.js';
 import Window from '../Expr/Window.js';
 import GroupBy from '../Expr/GroupBy.js';
@@ -29,12 +28,13 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(exprs, clauses, withUac = false, flags = [], references = []) {
+	constructor(exprs, clauses, withUac = false, flags = [], vars = []) {
 		super();
 		this.exprs = exprs;
 		this.clauses = clauses;
 		this.withUac = withUac;
 		this.flags = flags;
+		this.vars = vars;
 	}
 
 	/**
@@ -42,8 +42,8 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	 * 
 	 * @return array
 	 */
-	getFields() {
-		return this.exprs.fields;
+	getFields(resolve = false) {
+		return this.exprs.SELECT_LIST;
 	}
 
 	/**
@@ -52,7 +52,19 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	 * @return Object|array
 	 */
 	getTable() {
-		return this.exprs.table;
+		return this.exprs.TABLE_REFERENCES;
+	}
+
+	/**
+	 * Return the SELECT STMT's Table and Join components
+	 * 
+	 * @params Bool resolve
+	 * 
+	 * @return array
+	 */
+	getSources(resolve = false) {
+		var joins = this.getJoins() || [];
+		return _arrFrom(this.exprs.TABLE_REFERENCES, false).concat(resolve ? joins.map(j => j.table) : joins);
 	}
 
 	/**
@@ -61,7 +73,7 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	 * @return Object
 	 */
 	getWhere() {
-		return this.exprs.where;
+		return this.exprs.WHERE_CLAUSE;
 	}
 
 	/**
@@ -70,7 +82,7 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	 * @return array
 	 */
 	getJoins() {
-		return this.exprs.joins;
+		return this.exprs.JOIN_CLAUSE;
 	}
 
 	/**
@@ -79,7 +91,7 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	 * @return array
 	 */
 	getGroupBy() {
-		return this.exprs.groupBy;
+		return this.exprs.GROUP_BY_CLAUSE;
 	}
 
 	/**
@@ -88,7 +100,7 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	 * @return array
 	 */
 	getWindows() {
-		return this.exprs.windows;
+		return this.exprs.WINDOWS_CLAUSE;
 	}
 
 	/**
@@ -97,7 +109,7 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	 * @return array
 	 */
 	getOrderBy() {
-		return this.exprs.orderBy;
+		return this.exprs.ORDER_BY_CLAUSE;
 	}
 
 	/**
@@ -106,7 +118,7 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	 * @return string
 	 */
 	getOffset() {
-		return this.exprs.offset;
+		return this.exprs.OFFSET_CLAUSE;
 	}
 
 	/**
@@ -115,21 +127,21 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	 * @return string
 	 */
 	getLimit() {
-		return this.exprs.limit;
+		return this.exprs.LIMIT_CLAUSE;
 	}
 
 	/**
 	 * @inheritdoc
 	 */
-	async eval(database, params = {}) {
+	async eval(context, params = {}) {
 		
 		// ---------------------------
 		// INITIALIZE DATASOURCES WITH JOIN ALGORITHIMS APPLIED
 		// ---------------------------
-		this.base = this.getBase(database, params);
+		this.base = this.getBase(context, params);
 		// BUILD (TEMP) ROWS, WHERE
 		var tempRows = [], tempRow;
-		while ((tempRow = await this.base.fetch())) {
+		while (tempRow = await this.base.fetch()) {
 			tempRows.push(tempRow);
 		}
 
@@ -147,7 +159,7 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 				fields.forEach(field => {
 					if (collectAggrs) {
 						// This build will ignore AGGR columns for nowthis.
-						var aggrs = field.expr.meta.vars.slice().concat([field.expr]).filter(x => x instanceof AggrInterface);
+						var aggrs = field.getAggrExprs();
 						if (aggrs.length) {
 							_pushUnique(aggrs.filter(x => x.window).length ? collectAggrs.win : collectAggrs.aggr, field);
 							// But we'll set them to UNDEFINED (not NULL), to secure their slots
@@ -157,13 +169,10 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 							return;
 						}
 					}
-					try {
-						var fieldValObject = field.eval(tempRow, database, params);
-						var key = field.getAlias();
+					var fieldValObject = field.eval(tempRow, context, params);
+					Object.keys(fieldValObject).forEach(key => {
 						Object.defineProperty(tempRow.$, key, Object.getOwnPropertyDescriptor(fieldValObject, key));
-					} catch(e) {
-						throw new Error('["' + field.stringify() + '" in field list]: ' + e.message);
-					}
+					});
 				});
 			});
 			return collectAggrs;
@@ -173,41 +182,20 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 		// UNDERSTAND AGGREGATIONS
 		// ---------------------------
 		var aggrExprs = {aggr:[], win:[]};
-		this.meta.vars.forEach(x => {
+		this.vars.forEach(x => {
 			//if (_instanceof(x, AggrInterface)) {
-			if (x instanceof AggrInterface) {
+			if (_instanceof(x, AggrInterface)) {
 				_pushUnique(x.window ? aggrExprs.win : aggrExprs.aggr, x);
 			}
 		});
 		// BUILD FIELDS
-		var fields = [], _fields, _schema;
-		this.exprs.fields.forEach(field => {
-			if (field.getName() === '*') {
-				tables.forEach(table => {
-					if (table instanceof JoinInterface) {
-						table = table.table;
-					}
-					if (!(_schema = table.getSchema())) {
-						throw new Error('Can\'t resolve *; schema not found for table "' + table.getName() + '".');
-					}
-					if (!(_fields = Object.keys(_schema.fields)).length) {
-						throw new Error('Can\'t resolve *; fields not defined for table "' + table.getName() + '".');
-					}
-					_fields.forEach(_field => {
-						fields.push(Mql.parse(_field, [Field]));
-					});
-				});
-			} else {
-				fields.push(field);
-			}
-		});
-		var aggrFields = applyFields(tempRows, fields, true/*collectAggrs*/);
+		var aggrFields = applyFields(tempRows, this.getFields(), true/*collectAggrs*/);
 
 		// ---------------------------
 		// GROUP BY?
 		// ---------------------------
-		if (this.exprs.groupBy || aggrExprs.aggr.length) {
-			var groupBy = this.exprs.groupBy || new GroupBy([]);
+		if (this.exprs.GROUP_BY_CLAUSE || aggrExprs.aggr.length) {
+			var groupBy = this.exprs.GROUP_BY_CLAUSE || new GroupBy([]);
 			tempRows = groupBy.eval(tempRows, params);
 			// REVISIT RESPONSE ROWS and apply AGGR columns
 			applyFields(tempRows, aggrFields.aggr);
@@ -216,12 +204,12 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 		// ---------------------------
 		// WINDOWING
 		// ---------------------------
-		if (this.exprs.windows || aggrExprs.win.length) {
+		if (this.exprs.WINDOWS_CLAUSE || aggrExprs.win.length) {
 			var completed = [];
 			aggrExprs.win.forEach(expr => {
 				var uuid = expr.window.stringify();
 				if (completed.indexOf(uuid) === -1) {
-					expr.window.eval(tempRows, this.exprs.windows, params);
+					expr.window.eval(tempRows, this.exprs.WINDOWS_CLAUSE, params);
 					completed.push(uuid);
 				}
 			});
@@ -232,8 +220,8 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 		// ---------------------------
 		// ORDER BY
 		// ---------------------------
-		if (this.exprs.orderBy) {
-			tempRows = this.exprs.orderBy.eval(tempRows, params);
+		if (this.exprs.ORDER_BY_CLAUSE) {
+			tempRows = this.exprs.ORDER_BY_CLAUSE.eval(tempRows, params);
 		}
 
 		// ---------------------------
@@ -246,9 +234,9 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 		// ---------------------------
 		// LIMIT
 		// ---------------------------
-		if (this.exprs.offset || this.exprs.limit) {
-			var limit = this.exprs.limit ? this.exprs.limit.slice() : [];
-			var offset = this.exprs.offset || (limit.length === 2 ? limit.shift() : 0);
+		if (this.exprs.OFFSET_CLAUSE || this.exprs.LIMIT_CLAUSE) {
+			var limit = this.exprs.LIMIT_CLAUSE ? this.exprs.LIMIT_CLAUSE.slice() : [];
+			var offset = this.exprs.OFFSET_CLAUSE || (limit.length === 2 ? limit.shift() : 0);
 			tempRows = limit.length 
 				? tempRows.slice(offset, offset + limit[0]) 
 				: tempRows.slice(offset);
@@ -271,16 +259,16 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	 * @inheritdoc
 	 */
 	stringify(params = {}) {
-		return this.getToString(params, (clauseType, expr, clause) => {
-			if (clauseType === 'fields') {
-				return clause + ' ' + (this.flags.length ? ' ' + this.flags.join(' ') : '') + expr.map(x => x.stringify(params)).join(', ');
-			} else if (clauseType === 'windows') {
+		return this.getToString(params, (clauseType, expr, clause, _params) => {
+			if (clauseType === 'SELECT_LIST') {
+				return clause + ' ' + (this.flags.length ? ' ' + this.flags.join(' ') : '') + expr.map(x => x.stringify(_params)).join(', ');
+			} else if (clauseType === 'WINDOWS_CLAUSE') {
 				return clause + ' ' + Object.keys(expr).map(
-					windowName => windowName + ' AS ' + expr[windowName].stringify(params)
+					windowName => windowName + ' AS ' + expr[windowName].stringify(_params)
 				).join(', ');
-			} else if (clauseType === 'groupBy' || clauseType === 'orderBy') {
-				return clause + ' ' + expr.stringify(params);
-			} else if (clauseType === 'limit') {
+			} else if (clauseType === 'GROUP_BY_CLAUSE' || clauseType === 'ORDER_BY_CLAUSE') {
+				return clause + ' ' + expr.stringify(_params);
+			} else if (clauseType === 'LIMIT_CLAUSE') {
 				return clause + ' ' + expr.join(', ');
 			}
 		});
@@ -290,18 +278,22 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 	 * @inheritdoc
 	 */
 	static parse(expr, parseCallback, params = {}) {
+
 		if (expr.trim().substr(0, 6).toLowerCase() === 'select') {
 			var withUac = false;
 			if (expr.match(/SELECT[ ]+WITH[ ]+UAC/i)) {
 				withUac = true;
 				expr = expr.replace(/[ ]+WITH[ ]+UAC/i, '');
 			}
+			var aliases = [];
 			var stmtParse = super.getParse(expr, withUac, this.clauses, parseCallback, params, (clauseType, _expr) => {
-				if (clauseType === 'fields') {
-					return Lexer.split(_expr, [',']).map(
-						field => parseCallback(field.trim(), [Field])
-					);
-				} else if (clauseType === 'windows') {
+				if (clauseType === 'SELECT_LIST') {
+					return Lexer.split(_expr, [',']).map(field => {
+						var field = parseCallback(field.trim(), [Field]);
+						aliases.push(field.getAlias());
+						return field;
+					});
+				} else if (clauseType === 'WINDOWS_CLAUSE') {
 					var windowsByName = {};
 					Lexer.split(_expr, [',']).forEach(window => {
 						// WINDOW w AS (PARTITION BY country ORDER BY city ASC, state DESC), u AS (...)
@@ -310,20 +302,21 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 						windowsByName[windowSplit[0].trim()] = parseCallback(windowSplit[1].trim(), [Window]);
 					});
 					return windowsByName;
-				} else if (clauseType === 'groupBy') {
+				} else if (clauseType === 'GROUP_BY_CLAUSE') {
 					return parseCallback(_expr, [GroupBy]);
-				} else if (clauseType === 'orderBy') {
+				} else if (clauseType === 'ORDER_BY_CLAUSE') {
 					return parseCallback(_expr, [OrderBy]);
-				} else if (clauseType === 'limit') {
+				} else if (clauseType === 'LIMIT_CLAUSE') {
 					return _expr.split(',').map(n => parseInt(n));
 				}
-			});
+			}, (literal, clauseType) => (clauseType === 'ORDER_BY_CLAUSE' || clauseType === 'GROUP_BY_CLAUSE') && aliases.includes(literal));
+
 			return new this(
 				stmtParse.exprs, 
 				stmtParse.clauses, 
 				withUac,
-				stmtParse.clauses.fields.replace(/SELECT/i, '').split(' ').filter(flag => flag),
-				stmtParse.references,
+				stmtParse.clauses.SELECT_LIST.replace(/SELECT/i, '').split(' ').filter(flag => flag),
+				stmtParse.vars,
 			);
 		}
 	}
@@ -333,14 +326,14 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
  * @prop object
  */
 Select.clauses = {
-	fields: 'SELECT([ ]+(ALL|DISTINCT))?',
-	table: 'FROM',
-	where: 'WHERE',
+	SELECT_LIST: 'SELECT([ ]+(ALL|DISTINCT))?',
+	TABLE_REFERENCES: 'FROM',
+	WHERE_CLAUSE: 'WHERE',
 	// INNER JOIN, CROSS JOIN, {LEFT|RIGHT} [OUTER] JOIN
-	joins: '(INNER[ ]+|CROSS[ ]+|(LEFT|RIGHT)([ ]+OUTER)?[ ]+)?JOIN',
-	groupBy: 'GROUP[ ]+BY',
-	windows: 'WINDOW',
-	orderBy: 'ORDER[ ]+BY',
-	offset: 'OFFSET',
-	limit: 'LIMIT',
+	JOIN_CLAUSE: '(INNER[ ]+|CROSS[ ]+|(LEFT|RIGHT)([ ]+OUTER)?[ ]+)?JOIN',
+	GROUP_BY_CLAUSE: 'GROUP[ ]+BY',
+	WINDOWS_CLAUSE: 'WINDOW',
+	ORDER_BY_CLAUSE: 'ORDER[ ]+BY',
+	OFFSET_CLAUSE: 'OFFSET',
+	LIMIT_CLAUSE: 'LIMIT',
 };
