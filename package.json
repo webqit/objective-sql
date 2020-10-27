@@ -5,7 +5,7 @@
   "keywords": [],
   "homepage": "https://www.web-native.dev",
   "icon": "https://www.web-native.dev/icon.svg",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -25,8 +25,8 @@
     "build": "webpack --config ./webpack.config.cjs"
   },
   "dependencies": {
-    "@onephrase/util": "file:../../onephrase/util",
-    "@web-native-js/jsen": "file:../jsen"
+    "@onephrase/util": "^0.6.3",
+    "@web-native-js/jsen": "^0.6.7"
   },
   "devDependencies": {
     "webpack": "^4.44.2",

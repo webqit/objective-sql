@@ -4,6 +4,7 @@
  * @imports
  */
 import _max from '@onephrase/util/arr/max.js';
+import _arrFrom from '@onephrase/util/arr/from.js';
 import _each from '@onephrase/util/obj/each.js';
 import _Database from '../_Database.js';
 import IDBStore from './IDBStore.js';
@@ -22,7 +23,7 @@ export default class IDBDatabase extends _Database {
      * @return void
      */
     list() {
-        return this.database.objectStoreNames;
+        return _arrFrom(this.database.objectStoreNames);
     }
 	 
 	/**

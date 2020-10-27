@@ -6,6 +6,7 @@
 import _Factory from '../_Factory.js';
 import _arrFrom from '@onephrase/util/arr/from.js';
 import IDBDatabase, { databaseCreateStores } from './IDBDatabase.js';
+import Rql from '../../index.js';
 
 /**
  * ---------------------------
@@ -17,7 +18,21 @@ export default class IDBFactory extends _Factory {
 
     /**
      * ---------
-     * APP
+     * QUERY
+     * ---------
+     */
+	 
+	/**
+     * @inheritdoc
+	 */
+	static async _query(query, params = {}) {
+        params.DB_FACTORY = this;
+        return Rql.parse(query, null, params).eval(this);
+    }
+
+    /**
+     * ---------
+     * API
      * ---------
      */
 
@@ -57,14 +72,14 @@ export default class IDBFactory extends _Factory {
      * 
      * @inheritdoc
      */
-    static _create(databaseName, tables, replace = false) {
+    static _create(databaseName, schema, replace = false) {
         assertIndexedDBSupport();
         return new Promise(resolve => {
             var dbOpenRequest = indexedDB.open(databaseName);
-            // Define tables?
-            if ((tables || []).length) {
+            // Define schema?
+            if ((schema || []).length) {
                 dbOpenRequest.onupgradeneeded = e => {
-                    databaseCreateStores(e.target.result, tables);
+                    databaseCreateStores(e.target.result, schema);
                 };
             }
             // Catch success
