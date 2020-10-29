@@ -8,7 +8,7 @@ import _isEmpty from '@onephrase/util/js/isEmpty.js';
 import _arrFrom from '@onephrase/util/arr/from.js';
 import _each from '@onephrase/util/obj/each.js';
 import _merge from '@onephrase/util/obj/merge.js';
-import { factoryGetSchema } from '../Base/_Factory.js';
+import { factoryGetSchema } from '../database/_Factory.js';
 
 /**
  * Requires the following tables: uac, uac_token (optional), account
