@@ -4,7 +4,6 @@
  */
 import Parser from './Parser.js';
 import grammar from './grammar.js';
-import IDB from './database/idb/IDBFactory.js';
 import ODB from './database/odb/ODBFactory.js';
 
 /**
@@ -17,6 +16,5 @@ Parser.grammar = grammar;
  */
 export default Parser;
 export {
-	IDB,
 	ODB,
 };

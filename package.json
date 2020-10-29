@@ -1,11 +1,20 @@
 {
   "name": "@web-native-js/objective-sql",
   "title": "Objective-SQL",
-  "description": "Succinct, fullstack SQL for modern web apps.",
-  "keywords": [],
+  "description": "The Succinct, fullstack SQL for modern web apps.",
+  "keywords": [
+    "Objective SQL",
+    "Arrow Joins",
+    "User Access Control (UAC)",
+    "IndexedDB",
+    "In-memory DB",
+    "MySQL",
+    "SQL parser",
+    "SQL runner"
+  ],
   "homepage": "https://www.web-native.dev",
   "icon": "https://www.web-native.dev/icon.svg",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,7 +26,7 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "_install": "node ./.tests/index.js",
+    "install": "node ./.tests/index.js",
     "insert": "node ./.tests/insert.js",
     "select": "node ./.tests/select.js",
     "update": "node ./.tests/update.js",
@@ -26,7 +35,7 @@
   },
   "dependencies": {
     "@onephrase/util": "^0.6.3",
-    "@web-native-js/subscript": "file:../subscript"
+    "@web-native-js/subscript": "^0.6.8"
   },
   "devDependencies": {
     "webpack": "^4.44.2",
