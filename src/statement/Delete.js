@@ -2,11 +2,11 @@
 /**
  * @imports
  */
-import _mixin from '@onephrase/util/js/mixin.js';
-import _isArray from '@onephrase/util/js/isArray.js';
-import _arrFrom from '@onephrase/util/arr/from.js';
-import _all from '@onephrase/util/arr/all.js';
-import _before from '@onephrase/util/str/before.js';
+import _mixin from '@webqit/util/js/mixin.js';
+import _isArray from '@webqit/util/js/isArray.js';
+import _arrFrom from '@webqit/util/arr/from.js';
+import _all from '@webqit/util/arr/all.js';
+import _before from '@webqit/util/str/before.js';
 import DeleteInterface from './DeleteInterface.js';
 import Stmt from './Stmt.js';
 

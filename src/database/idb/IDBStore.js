@@ -2,9 +2,9 @@
 /**
  * @imports
  */
-import _isArray from '@onephrase/util/js/isArray.js';
-import _isNumeric from '@onephrase/util/js/isNumeric.js';
-import _arrFrom from '@onephrase/util/arr/from.js';
+import _isArray from '@webqit/util/js/isArray.js';
+import _isNumeric from '@webqit/util/js/isNumeric.js';
+import _arrFrom from '@webqit/util/arr/from.js';
 import DuplicateKeyViolationError from '../DuplicateKeyViolationError.js';
 import _Store from '../_Store.js';
 import IDBCursor from './IDBCursor.js';

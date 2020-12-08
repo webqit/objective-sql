@@ -4,7 +4,7 @@
  * @imports
  */
 import _Factory from '../_Factory.js';
-import _arrFrom from '@onephrase/util/arr/from.js';
+import _arrFrom from '@webqit/util/arr/from.js';
 import IDBDatabase, { databaseCreateSchema } from './IDBDatabase.js';
 import Rql from '../../index.js';
 

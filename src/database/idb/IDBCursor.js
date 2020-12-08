@@ -2,7 +2,7 @@
 /**
  * @imports
  */
-import _arrFrom from '@onephrase/util/arr/from.js';
+import _arrFrom from '@webqit/util/arr/from.js';
 import _Cursor from '../_Cursor.js';
 
 

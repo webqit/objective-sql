@@ -2,10 +2,10 @@
 /**
  * @imports
  */
-import _inherit from '@onephrase/util/obj/inherit.js';
-import _wrapped from '@onephrase/util/str/wrapped.js';
-import _unwrap from '@onephrase/util/str/unwrap.js';
-import Lexer from '@onephrase/util/str/Lexer.js';
+import _inherit from '@webqit/util/obj/inherit.js';
+import _wrapped from '@webqit/util/str/wrapped.js';
+import _unwrap from '@webqit/util/str/unwrap.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 import WindowInterface from './WindowInterface.js';
 import OrderBy from './OrderBy.js';
 

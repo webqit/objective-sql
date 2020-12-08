@@ -5,14 +5,13 @@
 import {
 	CallInterface,
 } from '../grammar.js';
-import _instanceof from '@onephrase/util/js/instanceof.js';
-import _isString from '@onephrase/util/js/isString.js';
-import _isArray from '@onephrase/util/js/isArray.js';
-import _each from '@onephrase/util/obj/each.js';
-import _unique from '@onephrase/util/arr/unique.js';
-import _arrFrom from '@onephrase/util/arr/from.js';
-import _find from '@onephrase/util/obj/find.js';
-import Lexer from '@onephrase/util/str/Lexer.js';
+import _isString from '@webqit/util/js/isString.js';
+import _isArray from '@webqit/util/js/isArray.js';
+import _each from '@webqit/util/obj/each.js';
+import _unique from '@webqit/util/arr/unique.js';
+import _arrFrom from '@webqit/util/arr/from.js';
+import _find from '@webqit/util/obj/find.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 import ArrowReferenceInterface from '../grammar/ArrowReferenceInterface.js';
 import ArrowReference from '../grammar/ArrowReference.js';
 import Reference from '../grammar/Reference.js';
@@ -151,12 +150,12 @@ export default class Stmt {
 					if (!(_var.role === 'CONTEXT')) {
 						VARS.push(_var);
 					}
-					if (_var.role === 'CONTEXT' || _instanceof(_var, CallInterface)) {
+					if (_var.role === 'CONTEXT' || (_var instanceof CallInterface)) {
 						return;
 					}
 					// --------------
 					var ref_name, ref_context;
-					if (_instanceof(_var, ArrowReferenceInterface)) {
+					if (_var instanceof ArrowReferenceInterface) {
 						if (ArrowReference.isIncoming(_var + '')) {
 							if (_var.context) {
 								TABLES[_var.context + ''].associateReference(_var);
@@ -237,10 +236,10 @@ export default class Stmt {
 				}
 				// -----------
 				var arrowReferences;
-				if ((arrowReferences = table.getAssociateReferences().filter(ref => _instanceof(ref, ArrowReferenceInterface))).length) {
+				if ((arrowReferences = table.getAssociateReferences().filter(ref => ref instanceof ArrowReferenceInterface)).length) {
 					var joins = {},
 						_joins = [],
-						_select = table.getAssociateReferences().filter(ref => !_instanceof(ref, ArrowReferenceInterface)).map(ref => tableName + '.' + ref.name);
+						_select = table.getAssociateReferences().filter(ref => !(ref instanceof ArrowReferenceInterface)).map(ref => tableName + '.' + ref.name);
 					// ----------
 					arrowReferences.forEach(ref => {
 						var join = ref.process(SCHEMAS[alias], params.DB_FACTORY);

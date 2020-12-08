@@ -2,12 +2,12 @@
 /**
  * imports
  */
-import _isBoolean from '@onephrase/util/js/isBoolean.js';
-import _isObject from '@onephrase/util/js/isObject.js';
-import _isEmpty from '@onephrase/util/js/isEmpty.js';
-import _arrFrom from '@onephrase/util/arr/from.js';
-import _each from '@onephrase/util/obj/each.js';
-import _merge from '@onephrase/util/obj/merge.js';
+import _isBoolean from '@webqit/util/js/isBoolean.js';
+import _isObject from '@webqit/util/js/isObject.js';
+import _isEmpty from '@webqit/util/js/isEmpty.js';
+import _arrFrom from '@webqit/util/arr/from.js';
+import _each from '@webqit/util/obj/each.js';
+import _merge from '@webqit/util/obj/merge.js';
 import { factoryGetSchema } from '../database/_Factory.js';
 
 /**

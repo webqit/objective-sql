@@ -2,10 +2,10 @@
 /**
  * @imports
  */
-import _isArray from '@onephrase/util/js/isArray.js';
-import _isObject from '@onephrase/util/js/isObject.js';
-import _arrFrom from '@onephrase/util/arr/from.js';
-import _each from '@onephrase/util/obj/each.js';
+import _isArray from '@webqit/util/js/isArray.js';
+import _isObject from '@webqit/util/js/isObject.js';
+import _arrFrom from '@webqit/util/arr/from.js';
+import _each from '@webqit/util/obj/each.js';
 import { schemaCreateStores } from './_Database.js';
 
 /**

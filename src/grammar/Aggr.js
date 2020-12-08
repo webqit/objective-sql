@@ -3,13 +3,12 @@
  * @imports
  */
 import { Call } from '@web-native-js/subscript/src/grammar.js';
-import _instanceof from '@onephrase/util/js/instanceof.js';
-import _mixin from '@onephrase/util/js/mixin.js';
-import _flatten from '@onephrase/util/arr/flatten.js';
-import _find from '@onephrase/util/obj/find.js';
-import _before from '@onephrase/util/str/before.js';
-import _after from '@onephrase/util/str/after.js';
-import Lexer from '@onephrase/util/str/Lexer.js';
+import _mixin from '@webqit/util/js/mixin.js';
+import _flatten from '@webqit/util/arr/flatten.js';
+import _find from '@webqit/util/obj/find.js';
+import _before from '@webqit/util/str/before.js';
+import _after from '@webqit/util/str/after.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 import AggrInterface from './AggrInterface.js';
 import Window from './Window.js';
 

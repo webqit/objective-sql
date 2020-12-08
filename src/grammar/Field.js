@@ -7,12 +7,11 @@ import {
 	ReferenceInterface,
 	CallInterface,
 } from '../grammar.js';
-import _instanceof from '@onephrase/util/js/instanceof.js';
-import _isArray from '@onephrase/util/js/isArray.js';
-import _wrapped from '@onephrase/util/str/wrapped.js';
-import _objFrom from '@onephrase/util/obj/from.js';
-import _each from '@onephrase/util/obj/each.js';
-import Lexer from '@onephrase/util/str/Lexer.js';
+import _isArray from '@webqit/util/js/isArray.js';
+import _wrapped from '@webqit/util/str/wrapped.js';
+import _objFrom from '@webqit/util/obj/from.js';
+import _each from '@webqit/util/obj/each.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 import FieldInterface from './FieldInterface.js';
 import AggrInterface from './AggrInterface.js';
 
@@ -96,7 +95,7 @@ export default class Field extends FieldInterface {
 	eval(tempRow, database, params = {}) {
 		
 		var alias = this.getAlias();
-		if (_instanceof(this.expr, ReferenceInterface)) {
+		if (this.expr instanceof ReferenceInterface) {
 
 			if (this.getName() === '*') {
 				var multiple = this.expr.getEval(tempRow, params);

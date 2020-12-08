@@ -2,10 +2,10 @@
 /**
  * @imports
  */
-import _inherit from '@onephrase/util/obj/inherit.js';
-import _copy from '@onephrase/util/obj/copy.js';
-import _after from '@onephrase/util/str/after.js';
-import Lexer from '@onephrase/util/str/Lexer.js';
+import _inherit from '@webqit/util/obj/inherit.js';
+import _copy from '@webqit/util/obj/copy.js';
+import _after from '@webqit/util/str/after.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 import GroupByInterface from './GroupByInterface.js';
 import Row from '../database/Row.js';
 

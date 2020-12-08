@@ -7,17 +7,16 @@ import {
 	AbstractionInterface,
 	ReferenceInterface,
 } from '../grammar.js';
-import _isFunction from '@onephrase/util/js/isFunction.js';
-import _instanceof from '@onephrase/util/js/instanceof.js';
-import _isArray from '@onephrase/util/js/isArray.js';
-import _isObject from '@onephrase/util/js/isObject.js';
-import _isEmpty from '@onephrase/util/js/isEmpty.js';
-import _promise from '@onephrase/util/js/promise.js';
-import _arrFrom from '@onephrase/util/arr/from.js';
-import _objFrom from '@onephrase/util/obj/from.js';
-import _objFirst from '@onephrase/util/obj/first.js';
-import _each from '@onephrase/util/obj/each.js';
-import Lexer from '@onephrase/util/str/Lexer.js';
+import _isFunction from '@webqit/util/js/isFunction.js';
+import _isArray from '@webqit/util/js/isArray.js';
+import _isObject from '@webqit/util/js/isObject.js';
+import _isEmpty from '@webqit/util/js/isEmpty.js';
+import _promise from '@webqit/util/js/promise.js';
+import _arrFrom from '@webqit/util/arr/from.js';
+import _objFrom from '@webqit/util/obj/from.js';
+import _objFirst from '@webqit/util/obj/first.js';
+import _each from '@webqit/util/obj/each.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 import LiteralInterface from '../grammar/LiteralInterface.js';
 import Literal from '../grammar/Literal.js';
 import TableInterface from './TableInterface.js';
@@ -144,7 +143,7 @@ export default class Table extends TableInterface {
 			// Fields schemas
 			var derivedSchema = { name: derivedName, fields: {}, uniqueKeys: {}, derived: true, };
 			derivedQuery.getFields().forEach(field => {
-				if (_instanceof(field.expr, ReferenceInterface)) {
+				if (field.expr instanceof ReferenceInterface) {
 					if (field.getName() === '*') {
 						field.expr.interpreted.forEach(ref => {
 							derivedSchema.fields[ref.name] = ((ALL_SCHEMAS[ref.context.name] || {}).fields || {})[name] || {type: 'any', derived: true};

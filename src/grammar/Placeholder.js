@@ -2,7 +2,7 @@
 /**
  * @imports
  */
-import _isNumeric from '@onephrase/util/js/isNumeric.js';
+import _isNumeric from '@webqit/util/js/isNumeric.js';
 import PlaceholderInterface from './PlaceholderInterface.js';
 
 /**

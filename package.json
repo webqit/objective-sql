@@ -1,5 +1,5 @@
 {
-  "name": "@web-native-js/objective-sql",
+  "name": "@webqit/objective-sql",
   "title": "Objective-SQL",
   "description": "The Succinct, fullstack SQL for modern web apps.",
   "keywords": [
@@ -12,16 +12,16 @@
     "SQL parser",
     "SQL runner"
   ],
-  "homepage": "https://www.web-native.dev",
-  "icon": "https://www.web-native.dev/icon.svg",
+  "homepage": "https://www.webqit.dev/tooling/objective-sql",
+  "icon": "https://www.webqit.dev/icon.svg",
   "version": "0.2.2",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/web-native/objective-sql.git"
+    "url": "git+https://github.com/webqit/objective-sql.git"
   },
   "bugs": {
-    "url": "https://github.com/web-native/objective-sql/issues"
+    "url": "https://github.com/webqit/objective-sql/issues"
   },
   "type": "module",
   "main": "src/index.js",
@@ -34,8 +34,8 @@
     "build": "webpack --config ./webpack.config.cjs"
   },
   "dependencies": {
-    "@onephrase/util": "^0.6.3",
-    "@web-native-js/subscript": "^0.6.8"
+    "@web-native-js/subscript": "file:../../web-native/subscript",
+    "@webqit/util": "file:../util"
   },
   "devDependencies": {
     "webpack": "^4.44.2",
@@ -58,10 +58,10 @@
     ],
     "config": {
       "patreonUsername": "ox_harris",
-      "githubUsername": "web-native",
+      "githubUsername": "webqit",
       "githubRepository": "objective-sql",
-      "githubSlug": "web-native/objective-sql",
-      "npmPackageName": "@web-native-js/objective-sql"
+      "githubSlug": "webqit/objective-sql",
+      "npmPackageName": "@webqit/objective-sql"
     }
   }
 }

@@ -2,13 +2,12 @@
 /**
  * @imports
  */
-import _mixin from '@onephrase/util/js/mixin.js';
-import _isArray from '@onephrase/util/js/isArray.js';
-import _instanceof from '@onephrase/util/js/instanceof.js';
-import _arrFrom from '@onephrase/util/arr/from.js';
-import _pushUnique from '@onephrase/util/arr/pushUnique.js';
-import _find from '@onephrase/util/obj/find.js';
-import Lexer from '@onephrase/util/str/Lexer.js';
+import _mixin from '@webqit/util/js/mixin.js';
+import _isArray from '@webqit/util/js/isArray.js';
+import _arrFrom from '@webqit/util/arr/from.js';
+import _pushUnique from '@webqit/util/arr/pushUnique.js';
+import _find from '@webqit/util/obj/find.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 import SelectInterface from './SelectInterface.js';
 import AggrInterface from '../grammar/AggrInterface.js';
 import Field from '../grammar/Field.js';
@@ -183,8 +182,8 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 		// ---------------------------
 		var aggrExprs = {aggr:[], win:[]};
 		this.vars.forEach(x => {
-			//if (_instanceof(x, AggrInterface)) {
-			if (_instanceof(x, AggrInterface)) {
+			//if (x instanceof AggrInterface) {
+			if (x instanceof AggrInterface) {
 				_pushUnique(x.window ? aggrExprs.win : aggrExprs.aggr, x);
 			}
 		});

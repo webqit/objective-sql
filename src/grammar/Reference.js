@@ -5,7 +5,7 @@
 import { Scope } from '@web-native-js/subscript';
 import { Reference as _Reference } from '@web-native-js/subscript/src/grammar.js';
 
-import _isArray from '@onephrase/util/js/isArray.js';
+import _isArray from '@webqit/util/js/isArray.js';
 
 /**
  * ---------------------------

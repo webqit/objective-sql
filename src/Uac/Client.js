@@ -2,8 +2,8 @@
 /**
  * imports
  */
-import _each from '@onephrase/util/obj/each.js';
-import _arrFrom from '@onephrase/util/arr/from.js';
+import _each from '@webqit/util/obj/each.js';
+import _arrFrom from '@webqit/util/arr/from.js';
 import Query, { createParams, getOwnerGuestRelationshipQuery } from './Query.js';
 
 export default class Client {

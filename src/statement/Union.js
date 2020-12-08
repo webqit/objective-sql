@@ -2,7 +2,7 @@
 /**
  * @imports
  */
-import Lexer from '@onephrase/util/str/Lexer.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 import OrderBy from '../grammar/OrderBy.js';
 import UnionInterface from './UnionInterface.js';
 

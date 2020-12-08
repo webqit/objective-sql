@@ -2,9 +2,9 @@
 /**
  * @imports
  */
-import _arrFrom from '@onephrase/util/arr/from.js';
-import _merge from '@onephrase/util/obj/merge.js';
-import _each from '@onephrase/util/obj/each.js';
+import _arrFrom from '@webqit/util/arr/from.js';
+import _merge from '@webqit/util/obj/merge.js';
+import _each from '@webqit/util/obj/each.js';
 import DuplicateKeyViolationError from '../DuplicateKeyViolationError.js';
 import _Store from '../_Store.js';
 import ODBCursor from './ODBCursor.js';

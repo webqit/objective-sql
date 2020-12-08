@@ -2,10 +2,10 @@
 /**
  * @imports
  */
-import _last from '@onephrase/util/arr/last.js';
-import _remove from '@onephrase/util/arr/remove.js';
-import _merge from '@onephrase/util/obj/merge.js';
-import _objFrom from '@onephrase/util/obj/from.js';
+import _last from '@webqit/util/arr/last.js';
+import _remove from '@webqit/util/arr/remove.js';
+import _merge from '@webqit/util/obj/merge.js';
+import _objFrom from '@webqit/util/obj/from.js';
 import Row from './Row.js';
 
 /**

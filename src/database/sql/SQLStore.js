@@ -2,9 +2,9 @@
 /**
  * @imports
  */
-import _isObject from '@onephrase/util/js/isObject.js';
-import _isNull from '@onephrase/util/js/isNull.js';
-import _isNumeric from '@onephrase/util/js/isNumeric.js';
+import _isObject from '@webqit/util/js/isObject.js';
+import _isNull from '@webqit/util/js/isNull.js';
+import _isNumeric from '@webqit/util/js/isNumeric.js';
 import _Store from '../_Store.js';
 import SQLCursor from './SQLCursor.js';
 

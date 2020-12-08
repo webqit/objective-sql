@@ -2,12 +2,12 @@
 /**
  * @imports
  */
-import _mixin from '@onephrase/util/js/mixin.js';
-import _before from '@onephrase/util/str/before.js';
-import _after from '@onephrase/util/str/after.js';
-import _isString from '@onephrase/util/js/isString.js';
-import _isObject from '@onephrase/util/js/isObject.js';
-import _objFirst from '@onephrase/util/obj/first.js';
+import _mixin from '@webqit/util/js/mixin.js';
+import _before from '@webqit/util/str/before.js';
+import _after from '@webqit/util/str/after.js';
+import _isString from '@webqit/util/js/isString.js';
+import _isObject from '@webqit/util/js/isObject.js';
+import _objFirst from '@webqit/util/obj/first.js';
 import ArrowReferenceInterface from './ArrowReferenceInterface.js';
 import { factoryGetSchema } from '../database/_Factory.js';
 

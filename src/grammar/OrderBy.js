@@ -2,10 +2,10 @@
 /**
  * @imports
  */
-import _sort from '@onephrase/util/arr/sort.js';
-import _before from '@onephrase/util/str/before.js';
-import _beforeLast from '@onephrase/util/str/beforeLast.js';
-import Lexer from '@onephrase/util/str/Lexer.js';
+import _sort from '@webqit/util/arr/sort.js';
+import _before from '@webqit/util/str/before.js';
+import _beforeLast from '@webqit/util/str/beforeLast.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 import OrderByInterface from './OrderByInterface.js';
 
 /**

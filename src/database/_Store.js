@@ -2,18 +2,18 @@
 /**
  * @imports
  */
-import _isTypeObject from '@onephrase/util/js/isTypeObject.js';
-import _isObject from '@onephrase/util/js/isObject.js';
-import _isEmpty from '@onephrase/util/js/isEmpty.js';
-import _isNull from '@onephrase/util/js/isNull.js';
-import _isString from '@onephrase/util/js/isString.js';
-import _isNumeric from '@onephrase/util/js/isNumeric.js';
-import _isUndefined from '@onephrase/util/js/isUndefined.js';
-import _arrFrom from '@onephrase/util/arr/from.js';
-import _intersect from '@onephrase/util/arr/intersect.js';
-import _all from '@onephrase/util/arr/all.js';
-import _each from '@onephrase/util/obj/each.js';
-import _wrapped from '@onephrase/util/str/wrapped.js';
+import _isTypeObject from '@webqit/util/js/isTypeObject.js';
+import _isObject from '@webqit/util/js/isObject.js';
+import _isEmpty from '@webqit/util/js/isEmpty.js';
+import _isNull from '@webqit/util/js/isNull.js';
+import _isString from '@webqit/util/js/isString.js';
+import _isNumeric from '@webqit/util/js/isNumeric.js';
+import _isUndefined from '@webqit/util/js/isUndefined.js';
+import _arrFrom from '@webqit/util/arr/from.js';
+import _intersect from '@webqit/util/arr/intersect.js';
+import _all from '@webqit/util/arr/all.js';
+import _each from '@webqit/util/obj/each.js';
+import _wrapped from '@webqit/util/str/wrapped.js';
 
 /**
  * ---------------------------

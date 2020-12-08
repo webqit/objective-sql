@@ -2,9 +2,9 @@
 /**
  * @imports
  */
-import _mixin from '@onephrase/util/js/mixin.js';
-import _isArray from '@onephrase/util/js/isArray.js';
-import Lexer from '@onephrase/util/str/Lexer.js';
+import _mixin from '@webqit/util/js/mixin.js';
+import _isArray from '@webqit/util/js/isArray.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 import UpdateInterface from './UpdateInterface.js';
 import { Assignment } from '@web-native-js/subscript/src/grammar.js';
 import Stmt from './Stmt.js';

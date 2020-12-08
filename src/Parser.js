@@ -3,7 +3,7 @@
  * @imports
  */
 import _Parser from '@web-native-js/subscript';
-import Lexer from '@onephrase/util/str/Lexer.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 
 /**
  * ---------------------------

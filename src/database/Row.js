@@ -2,20 +2,20 @@
 /**
  * @imports
  */
-import _avg from '@onephrase/util/arr/avg.js';
-import _unique from '@onephrase/util/arr/unique.js';
-import _max from '@onephrase/util/arr/max.js';
-import _min from '@onephrase/util/arr/min.js';
-import _sum from '@onephrase/util/arr/sum.js';
-import _first from '@onephrase/util/arr/first.js';
-import _last from '@onephrase/util/arr/last.js';
-import _rand from '@onephrase/util/arr/rand.js';
-import _isArray from '@onephrase/util/js/isArray.js';
-import _isNull from '@onephrase/util/js/isNull.js';
-import _after from '@onephrase/util/str/after.js';
-import _objFrom from '@onephrase/util/obj/from.js';
-import _merge from '@onephrase/util/obj/merge.js';
-import _get from '@onephrase/util/obj/get.js';
+import _avg from '@webqit/util/arr/avg.js';
+import _unique from '@webqit/util/arr/unique.js';
+import _max from '@webqit/util/arr/max.js';
+import _min from '@webqit/util/arr/min.js';
+import _sum from '@webqit/util/arr/sum.js';
+import _first from '@webqit/util/arr/first.js';
+import _last from '@webqit/util/arr/last.js';
+import _rand from '@webqit/util/arr/rand.js';
+import _isArray from '@webqit/util/js/isArray.js';
+import _isNull from '@webqit/util/js/isNull.js';
+import _after from '@webqit/util/str/after.js';
+import _objFrom from '@webqit/util/obj/from.js';
+import _merge from '@webqit/util/obj/merge.js';
+import _get from '@webqit/util/obj/get.js';
 
 /**
  * ---------------------------

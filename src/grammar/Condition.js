@@ -5,8 +5,8 @@
 import {
 	Condition as _Condition
 } from '@web-native-js/subscript/src/grammar.js';
-import Lexer from '@onephrase/util/str/Lexer.js';
-import _unwrap from '@onephrase/util/str/unwrap.js';
+import Lexer from '@webqit/util/str/Lexer.js';
+import _unwrap from '@webqit/util/str/unwrap.js';
 
 /**
  * ---------------------------

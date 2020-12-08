@@ -3,7 +3,7 @@
  * @imports
  */
 import JoinInterface from './JoinInterface.js';
-import Lexer from '@onephrase/util/str/Lexer.js';
+import Lexer from '@webqit/util/str/Lexer.js';
 import Literal from './Literal.js';
 import Table from './Table.js';
 
