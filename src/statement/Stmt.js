@@ -150,7 +150,7 @@ export default class Stmt {
 					if (!(_var.role === 'CONTEXT')) {
 						VARS.push(_var);
 					}
-					if (_var.role === 'CONTEXT' || (_var instanceof CallInterface)) {
+					if (_var.role === 'CONTEXT' || _var.role === 'CALL_SPECIFIER' || (_var instanceof CallInterface)) {
 						return;
 					}
 					// --------------

@@ -2,7 +2,7 @@
 /**
  * @imports
  */
-import { Call } from '@web-native-js/subscript/src/grammar.js';
+import { Call } from '@webqit/subscript/src/grammar.js';
 import _mixin from '@webqit/util/js/mixin.js';
 import _flatten from '@webqit/util/arr/flatten.js';
 import _find from '@webqit/util/obj/find.js';
@@ -18,15 +18,6 @@ import Window from './Window.js';
  * ---------------------------
  */				
 export default class Aggr extends _mixin(Call, AggrInterface) {
-
-	/**
-	 * @inheritdoc
-	 */
-	constructor(reference, args) {
-		super();
-		this.reference = reference;
-		this.args = args;
-	}
 	 
 	/**
 	 * @inheritdoc

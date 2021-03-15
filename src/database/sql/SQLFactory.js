@@ -3,11 +3,9 @@
 /**
  * @imports
  */
-//import MySQL from 'mysql';
-import MySQL from '../../../../site/node_modules/mysql/index.js';
 import _Factory from '../_Factory.js';
 import SQLDatabase, { databaseCreateSchema } from './SQLDatabase.js';
-import Rql from '../../index.js';
+import ObjSQL from '../../index.js';
 
 /**
  * ---------------------------
@@ -24,14 +22,16 @@ export default class SQLFactory extends _Factory {
      */
 	 
 	/**
-     * Establishes a MySQL connection.
+     * Establishes a SQL connection.
      * 
+     * @param String sqlClient
      * @param Object params
      * 
      * @return Promise
 	 */
-	static connect(params) {
-        var conn = MySQL.createConnection({
+	static async connect(sqlClient, params) {
+        const SqlClient = await import(sqlClient);
+        var conn = SqlClient.createConnection({
             host: params.host,
             user: params.user,
             password: params.password,
@@ -42,10 +42,11 @@ export default class SQLFactory extends _Factory {
                 resolve(conn);
             });
         });
+        return this.conn;
     }
 
     /**
-     * Returns the active MySQL connection.
+     * Returns the active SQL connection.
      * 
      * @return Promise
 	 */
@@ -68,7 +69,7 @@ export default class SQLFactory extends _Factory {
 	static async _query(query, params = {}) {
         var conn = await this.getConnection();
         params.DB_FACTORY = this;
-        var sql = Rql.parse(query, null, params).stringify({interpreted: true});
+        var sql = ObjSQL.parse(query, null, params).stringify({interpreted: true});
         return new Promise((resolve, reject) => {
             conn.query(sql, (err, result) => {
                 if (err) return reject(err);

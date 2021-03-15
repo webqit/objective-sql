@@ -2,7 +2,7 @@
 /**
  * @imports
  */
-import { IndependentExprInterface } from '@web-native-js/subscript/src/grammar.js';
+import { IndependentExprInterface } from '@webqit/subscript/src/grammar.js';
 
 /**
  * ---------------------------

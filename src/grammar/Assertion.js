@@ -4,7 +4,7 @@
  */
 import {
 	Assertion as _Assertion
-} from '@web-native-js/subscript/src/grammar.js';
+} from '@webqit/subscript/src/grammar.js';
 
 /**
  * @extends

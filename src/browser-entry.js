@@ -2,14 +2,14 @@
 /**
  * @imports
  */
-import Rql from './index.js';
+import ODB from './database/odb/ODBFactory.js';
+import IDB from './database/idb/IDBFactory.js';
 
 // As globals
-if (!window.WN) {
-	window.WN = {};
+if (!window.WQ) {
+	window.WQ = {};
 }
-window.WN.Rql = Rql;
-if (!window.WebNative) {
-	window.WebNative = {};
-}
-window.WebNative.Rql = Rql;
+window.WQ.ObjectiveSQL = {
+	ODB,
+	IDB
+};

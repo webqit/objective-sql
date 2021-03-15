@@ -79,14 +79,14 @@ export default class Field extends FieldInterface {
 	 * @inheritdoc
 	 */
 	getCallExprs() {
-		return this.expr.meta.vars.slice().concat([this.expr]).filter(x => x instanceof CallInterface)
+		return this.expr.meta.vars.concat(this.expr.meta.varsUnlodged).concat([this.expr]).filter(x => x instanceof CallInterface)
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
 	getAggrExprs() {
-		return this.expr.meta.vars.slice().concat([this.expr]).filter(x => x instanceof AggrInterface)
+		return this.expr.meta.vars.concat(this.expr.meta.varsUnlodged).concat([this.expr]).filter(x => x instanceof AggrInterface)
 	}
 	
 	/**

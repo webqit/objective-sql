@@ -4,7 +4,7 @@
  */
 import {
 	Comparison as _Comparison
-} from '@web-native-js/subscript/src/grammar.js';
+} from '@webqit/subscript/src/grammar.js';
 
 
 /**

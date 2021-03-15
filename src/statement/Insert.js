@@ -6,7 +6,7 @@ import _wrapped from '@webqit/util/str/wrapped.js';
 import _unwrap from '@webqit/util/str/unwrap.js';
 import Lexer from '@webqit/util/str/Lexer.js';
 import InsertInterface from './InsertInterface.js';
-import { Assignment } from '@web-native-js/subscript/src/grammar.js';
+import { Assignment } from '@webqit/subscript/src/grammar.js';
 import Table from '../grammar/Table.js';
 
 /**

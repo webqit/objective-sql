@@ -13,7 +13,7 @@ import {
 	Num,
 	Str,
 	Void,
-} from '@web-native-js/subscript/src/grammar.js';
+} from '@webqit/subscript/src/grammar.js';
 import {
 	AbstractionInterface,
 	AssignmentInterface,
@@ -23,14 +23,14 @@ import {
 	NumInterface,
 	StrInterface,
 	VoidInterface,
-} from '@web-native-js/subscript/src/grammar.js';
+} from '@webqit/subscript/src/grammar.js';
 // Extended
 import {
 	AssertionInterface,
 	ComparisonInterface,
 	ConditionInterface,
 	ReferenceInterface,
-} from '@web-native-js/subscript/src/grammar.js';
+} from '@webqit/subscript/src/grammar.js';
 import Assertion from './grammar/Assertion.js';
 import Comparison from './grammar/Comparison.js';
 import Condition from './grammar/Condition.js';

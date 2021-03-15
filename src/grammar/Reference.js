@@ -2,8 +2,8 @@
 /**
  * @imports
  */
-import { Scope } from '@web-native-js/subscript';
-import { Reference as _Reference } from '@web-native-js/subscript/src/grammar.js';
+import { Scope } from '@webqit/subscript';
+import { Reference as _Reference } from '@webqit/subscript/src/grammar.js';
 
 import _isArray from '@webqit/util/js/isArray.js';
 

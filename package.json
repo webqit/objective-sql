@@ -12,9 +12,9 @@
     "SQL parser",
     "SQL runner"
   ],
-  "homepage": "https://www.webqit.dev/tooling/objective-sql",
-  "icon": "https://www.webqit.dev/icon.svg",
-  "version": "0.2.2",
+  "homepage": "https://webqit.io/tooling/objective-sql",
+  "icon": "https://webqit.io/icon.svg",
+  "version": "0.2.5",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -31,11 +31,12 @@
     "select": "node ./.tests/select.js",
     "update": "node ./.tests/update.js",
     "delete": "node ./.tests/delete.js",
-    "build": "webpack --config ./webpack.config.cjs"
+    "build": "webpack --config ./webpack.config.cjs",
+    "prepublish": "npm run build"
   },
   "dependencies": {
-    "@web-native-js/subscript": "file:../../web-native/subscript",
-    "@webqit/util": "file:../util"
+    "@webqit/subscript": "^1.0.4",
+    "@webqit/util": "^0.7.1"
   },
   "devDependencies": {
     "webpack": "^4.44.2",

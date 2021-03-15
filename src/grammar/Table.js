@@ -23,7 +23,6 @@ import TableInterface from './TableInterface.js';
 import View from '../database/View.js';
 import _Factory, { factoryGetSchema } from '../database/_Factory.js';
 import _Database from '../database/_Database.js';
-import { DB } from '../../.tests/install.js';
 
 /**
  * ---------------------------

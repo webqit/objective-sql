@@ -6,7 +6,7 @@
 import _Factory from '../_Factory.js';
 import _arrFrom from '@webqit/util/arr/from.js';
 import IDBDatabase, { databaseCreateSchema } from './IDBDatabase.js';
-import Rql from '../../index.js';
+import ObjSQL from '../../index.js';
 
 /**
  * ---------------------------
@@ -27,7 +27,7 @@ export default class IDBFactory extends _Factory {
 	 */
 	static async _query(query, params = {}) {
         params.DB_FACTORY = this;
-        return Rql.parse(query, null, params).eval(this);
+        return ObjSQL.parse(query, null, params).eval(this);
     }
 
     /**
