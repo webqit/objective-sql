@@ -14,7 +14,7 @@
   ],
   "homepage": "https://webqit.io/tooling/objective-sql",
   "icon": "https://webqit.io/icon.svg",
-  "version": "0.2.5",
+  "version": "0.2.51",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -26,7 +26,7 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "install": "node ./.tests/index.js",
+    "setup": "node ./.tests/index.js",
     "insert": "node ./.tests/insert.js",
     "select": "node ./.tests/select.js",
     "update": "node ./.tests/update.js",
