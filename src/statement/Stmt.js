@@ -45,7 +45,7 @@ export default class Stmt {
 	 */
 	getToString(params, callback) {
 		// ---------------------
-		var t = params.t || 0, _t = (n = 0, when = true) => !when ? '' : "\r\n" + ("\t".repeat(Math.max(0, t + n))), _params = {...params}; _params.t = t + 1;
+		var t = params.t || 0, _t = (n = 0, when = true) => !params.formatted ? '' : (!when ? '' : "\r\n" + ("\t".repeat(Math.max(0, t + n)))), _params = {...params}; _params.t = t + 1;
 		// ---------------------
 		var strArray = [];
 		_each(this.exprs, (clauseType, expr, i) => {
@@ -77,7 +77,7 @@ export default class Stmt {
 				strArray.push(_t() + str);
 			}
 		});
-		return strArray.join('') + _t(-1);
+		return strArray.join(' ') + _t(-1);
 	}
 	
 	/**
@@ -146,7 +146,8 @@ export default class Stmt {
 			// ------------------
 
 			_each(EXPRS, (clauseType, _exprParse) => {
-				_arrFrom(_exprParse, false/*castObjects*/).reduce((_VARS, __exprParse) => _VARS.concat(__exprParse.meta.vars).concat(__exprParse.meta.varsUnlodged), []).forEach(_var => {
+				var allRefs = _arrFrom(_exprParse, false/*castObjects*/).reduce((_VARS, __exprParse) => _VARS.concat(__exprParse.meta.reads).concat(__exprParse.meta.writes).concat(__exprParse.meta.calls), []);
+				allRefs.forEach(_var => {
 					if (!(_var.role === 'CONTEXT')) {
 						VARS.push(_var);
 					}

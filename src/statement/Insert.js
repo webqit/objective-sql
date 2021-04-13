@@ -71,8 +71,7 @@ export default class Insert extends InsertInterface {
 		var keys = await tableBase.addAll(values, columns, duplicateKeyCallback, forceAutoIncrement);
 
 		return {
-			table: tableBase.name,
-			keys,
+			[tableBase.name]: keys,
 		};
 	}
 	
@@ -88,7 +87,7 @@ export default class Insert extends InsertInterface {
 	 */
 	stringify(params = {}) {
 		// ---------------------
-		var t = params.t || 0, _t = (n = 0) => "\r\n" + ("\t".repeat(Math.max(0, t + n))), _params = {...params}; _params.t = t + 1;
+		var t = params.t || 0, _t = (n = 0) => !params.formatted ? '' : ("\r\n" + ("\t".repeat(Math.max(0, t + n)))), _params = {...params}; _params.t = t + 1;
 		// ---------------------
 		var str = [this.TABLE_REFERENCES.stringify(_params)];
 		if (this.INSERT_TYPE.toUpperCase() === 'SET') {
@@ -104,7 +103,7 @@ export default class Insert extends InsertInterface {
 					row => row.map(
 						val => val.stringify(_params)
 					).join(', ')
-				).join('),' + _t(1) + '(') + ')');
+				).join('), ' + _t(1) + '(') + ')');
 			}
 		}
 		if (this.UPDATE_CLAUSE) {

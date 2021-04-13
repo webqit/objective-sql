@@ -2,7 +2,7 @@
 /**
  * @imports
  */
-import _Parser from '@webqit/subscript';
+import { Parser as _Parser } from '@webqit/subscript';
 import Lexer from '@webqit/util/str/Lexer.js';
 
 /**

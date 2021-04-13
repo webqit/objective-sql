@@ -73,41 +73,11 @@ var DATA = {
 	],
 };
 
-export default async function() {
-
-	if (INSTALL_STYLE === 'import') {
-		console.log('');
-		console.log('---------------------------------------------');
-		console.log('database import -', await Client.import('db1', {schema: SCHEMA, data: DATA}, 'drop'/* onExists */));
-		console.log('---------------------------------------------');
-		console.log('');
-		setTimeout(async () => {
-			console.log('');
-			console.log('---------------------------------------------');
-			console.log('database export -', await Client.export('db1'));
-			console.log('database schema -', await Client.schema);
-			console.log('---------------------------------------------');
-			console.log('');
-		}, 4000);
-	} else {
-		var databases = await Client.create('db1', SCHEMA, 'drop'/* onExists */);
-		console.log('await Client.create() -', databases);
-		console.log('await Client.list() -', await Client.list());
-		console.log('await Client.exists() -', await Client.exists());
-		// ----------------
-		var table1 = await databases.open('table1', 'readwrite');
-		console.log('await table1.addAll() -', await table1.addAll(DATA.table1));
-		var table2 = await databases.open('table2', 'readwrite');
-		console.log('await table2.addAll() -', await table2.addAll(DATA.table2));
-		var table3 = await databases.open('table3', 'readwrite');
-		console.log('await table3.addAll() -', await table3.addAll(DATA.table3));
-	}
-
-};
-
 export {
 	Parser,
 	IDB,
 	ODB,
-	Client as DB,
+	Client,
+	SCHEMA,
+	DATA,
 };

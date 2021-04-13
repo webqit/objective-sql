@@ -87,16 +87,13 @@ export default class Delete extends _mixin(Stmt, DeleteInterface) {
 		// --------------------
 		// Delete now
 		// --------------------
-		var keys = await Promise.all(targetTableNames.map(alias => {
+		var result = await Promise.all(targetTableNames.map(async alias => {
 			if (deletionIDs[alias].length) {
-				return targetTables[alias].deleteAll(deletionIDs[alias]);
+				var affectedRows = await targetTables[alias].deleteAll(deletionIDs[alias]);
+				return {[alias]: affectedRows};
 			}
 		}));
-
-		return {
-			tables: tables.map(t => t.name),
-			keys,
-		};;
+		return result.reduce((result, currentResult) => ({...result, ...currentResult}), {});
 	}
 	
 	/**

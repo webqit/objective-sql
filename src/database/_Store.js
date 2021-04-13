@@ -132,7 +132,7 @@ export default class _Store {
 						}
 						// The duplicate situation had been handled
 						// ...positive or negative
-						return resolve(0);
+						return resolve('0');
 					}
 
 					// We're finally going to add!

@@ -42,11 +42,8 @@ export default class Update extends _mixin(Stmt, UpdateInterface) {
 			this.exprs.ASSIGNMENT_LIST.forEach(assignment => assignment.eval(rowComposition, params));
 		}
 		var __keys = await this.base.syncCursors();
-		var __tables = await Promise.all(this.base.joins.concat(this.base.main)).then(list => list.map(t => t.name));
-		return {
-			tables: __tables,
-			keys: __keys,
-		};
+		return Promise.all(this.base.joins.concat(this.base.main))
+			.then(list => list.reduce((result, t, i) => ({[t.name]: __keys[i], ...result}), {}));
 	}
 	
 	/**
