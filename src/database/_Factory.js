@@ -61,7 +61,7 @@ export default class _Factory {
     }
 
     /**
-     * Drops a database.
+     * Creates a database.
      * 
      * @param String databaseName
      * @param Array  tables
@@ -111,7 +111,7 @@ export default class _Factory {
         // ------------------
         delete this.schema[databaseName];
         // ------------------
-        return await this._drop(databaseName);;
+        return await this._drop(databaseName);
     }
     
     /**
@@ -121,7 +121,7 @@ export default class _Factory {
      */
 
     /**
-     * Drops a database.
+     * Imports into a database.
      * 
      * @param String databaseName
      * @param Object payload
@@ -138,7 +138,7 @@ export default class _Factory {
     }
 
     /**
-     * Drops a database.
+     * Exports from a database.
      * 
      * @param String databaseName
      * @param Array ...args
@@ -157,7 +157,7 @@ export default class _Factory {
         }));
         return _export;
     }
-};
+}
 
 /**
  * Databases definitions.

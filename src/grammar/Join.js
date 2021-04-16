@@ -89,7 +89,7 @@ export default class Join extends JoinInterface {
 			);
 		}
 	}
-};
+}
 
 /**
  * @prop object

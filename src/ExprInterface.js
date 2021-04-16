@@ -10,4 +10,4 @@ import { ExprInterface } from '@webqit/subscript/src/grammar.js';
  * ---------------------------
  */				
 
-export default class extends ExprInterface {};
+export default class extends ExprInterface {}

@@ -108,4 +108,4 @@ export default class GroupBy extends GroupByInterface {
 		});
 		return new this(columns, having, withRollup);
 	}
-};
+}

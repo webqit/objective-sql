@@ -59,4 +59,4 @@ export default class Placeholder extends PlaceholderInterface {
 			return new this(expr.substr(1), expr.substr(0, 1));
 		}
 	}
-};
+}

@@ -5,14 +5,14 @@
 import { expect } from 'chai';
 import { Client, SCHEMA, DATA, Parser } from './install.js';
 
-describe(`# INSERT QUERIES`, function() {
+describe(`INSERT QUERIES`, function() {
 
     before('Import into DB', async function() {
         await Client.import('db1', {schema: SCHEMA, data: DATA}, 'drop'/* onExists */);
     });
 
     var ast1, expr1 = `INSERT INTO table1 SET fname = "New name", age = 9000`;
-    describe(`## ${expr1}`, function() {
+    describe(`${expr1}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
             ast1 = Parser.parse(expr1, null, {DB_FACTORY: Client, explain: false});
@@ -28,7 +28,7 @@ describe(`# INSERT QUERIES`, function() {
     });
 
     var ast2, expr2 = `INSERT IGNORE INTO table3 (fname, lname, age) VALUES ("Jakes", "Robertson", 1000), ("Jakes", "Robertson", 1000) ON DUPLICATE KEY UPDATE fname = "Updated name", age = 7000`;
-    describe(`## ${expr2}`, function() {
+    describe(`${expr2}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
             ast2 = Parser.parse(expr2, null, {DB_FACTORY: Client, explain: false});
@@ -47,7 +47,7 @@ describe(`# INSERT QUERIES`, function() {
     });
 
     var ast3, expr3 = `INSERT INTO table4 SELECT * FROM table3`;
-    describe(`## ${expr3}`, function() {
+    describe(`${expr3}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
             ast3 = Parser.parse(expr3, null, {DB_FACTORY: Client, explain: false});

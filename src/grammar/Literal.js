@@ -46,4 +46,4 @@ export default class Literal extends LiteralInterface {
 	static parse(expr, parseCallback = null, params = {}) {
 		return new this(expr);
 	}
-};
+}

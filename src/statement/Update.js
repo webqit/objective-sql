@@ -83,7 +83,7 @@ export default class Update extends _mixin(Stmt, UpdateInterface) {
 			return new this(stmtParse.exprs, stmtParse.clauses, withUac);
 		}
 	}
-};
+}
 
 /**
  * @prop object

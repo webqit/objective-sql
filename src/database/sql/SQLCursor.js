@@ -33,4 +33,4 @@ export default class SQLCursor extends _Cursor {
 		await this._storeFetch;
 		return super.fetch();
 	}
-};
+}

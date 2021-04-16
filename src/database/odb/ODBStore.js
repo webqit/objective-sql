@@ -181,7 +181,7 @@ export default class ODBStore extends _Store {
 		return true;
 	}
 
-};
+}
 
 /**
  * @AutoIncremen
@@ -209,4 +209,4 @@ export function processPrimaryKey(store, rowObj, primaryKey, canAutoIncrement) {
 	}
 
 	return primaryKeyVal;
-};
+}

@@ -84,7 +84,7 @@ export default class SQLDatabase extends _Database {
             });
         });
     }
-};
+}
 
 /**
  * ---------

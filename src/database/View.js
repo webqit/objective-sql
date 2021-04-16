@@ -40,4 +40,4 @@ export default class View extends _Store {
 	async syncCursor(cursor) {
 		return this.stmt.base.syncCursors();
 	}
-};
+}

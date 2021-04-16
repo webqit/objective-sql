@@ -5,14 +5,14 @@
 import { expect } from 'chai';
 import { Client, SCHEMA, DATA, Parser } from './install.js';
 
-describe(`# DELETE QUERIES`, function() {
+describe(`DELETE QUERIES`, function() {
 
     before('Import into DB', async function() {
         await Client.import('db1', {schema: SCHEMA, data: DATA}, 'drop'/* onExists */);
     });
 
     var ast1, expr1 = `DELETE FROM t1 USING table1 t1 WHERE t1.age < 60`;
-    describe(`## ${expr1}`, function() {
+    describe(`${expr1}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
             ast1 = Parser.parse(expr1, null, {DB_FACTORY: Client, explain: false});

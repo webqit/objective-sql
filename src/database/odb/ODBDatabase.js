@@ -71,4 +71,4 @@ export default class ODBDatabase extends _Database {
         delete this.database[storeName];
         return true;
     }
-};
+}

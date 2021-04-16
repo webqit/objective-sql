@@ -5,7 +5,7 @@
  import { expect } from 'chai';
  import { Client, SCHEMA, DATA } from './install.js';
  
- describe(`# INSTALL QUERIES`, function() {
+ describe(`INSTALL QUERIES`, function() {
  
     var databases;
     before(`Create database "db1", drop-if-exists`, async function() {

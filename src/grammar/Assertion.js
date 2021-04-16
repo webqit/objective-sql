@@ -9,7 +9,7 @@ import {
 /**
  * @extends
  */
-export default class Assertion extends _Assertion {};
+export default class Assertion extends _Assertion {}
 
 /**
  * @var string

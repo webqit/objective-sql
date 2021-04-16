@@ -142,4 +142,4 @@ export default class IDBStore extends _Store {
 			delRequest.onerror = e => reject(e.target.error);
 		});
 	}
-};
+}

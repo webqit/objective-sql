@@ -5,14 +5,14 @@
 import { expect } from 'chai';
 import { Client, SCHEMA, DATA, Parser } from './install.js';
 
-describe(`# SELECT QUERIES`, function() {
+describe(`SELECT QUERIES`, function() {
 
     before('Import into DB', async function() {
         await Client.import('db1', {schema: SCHEMA, data: DATA}, 'drop'/* onExists */);
     });
 
     var ast1, expr1 = `SELECT aaaa, bbbbb FROM (SELECT age as aaaa, time2 as bbbbb FROM table2 as t2) ta`;
-    describe(`## ${expr1}`, function() {
+    describe(`${expr1}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
             ast1 = Parser.parse(expr1, null, {DB_FACTORY: Client, explain: false});
@@ -28,7 +28,7 @@ describe(`# SELECT QUERIES`, function() {
     });
 
     var ast2, expr2 = `SELECT COUNT(*) FROM db1.table2`;
-    describe(`## ${expr2}`, function() {
+    describe(`${expr2}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
             ast2 = Parser.parse(expr2, null, {DB_FACTORY: Client, explain: false});
@@ -43,7 +43,7 @@ describe(`# SELECT QUERIES`, function() {
     });
 
     var ast3, expr3 = `SELECT COUNT(parent) FROM db1.table2`;
-    describe(`## ${expr3}`, function() {
+    describe(`${expr3}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
             ast3 = Parser.parse(expr3, null, {DB_FACTORY: Client, explain: false});
@@ -58,7 +58,7 @@ describe(`# SELECT QUERIES`, function() {
     });
 
     var ast4, expr4 = `SELECT t2.age, ANY_VALUE(t2.age), SUM(t2.age) total, IF (GROUPING(t2.age), "Grand Total", t1.age) age FROM table1 t1, table2 t2 GROUP BY t2.age WITH ROLLUP`;
-    describe(`## ${expr4}`, function() {
+    describe(`${expr4}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
             ast4 = Parser.parse(expr4, null, {DB_FACTORY: Client, explain: false});
@@ -75,7 +75,7 @@ describe(`# SELECT QUERIES`, function() {
     });
 
     var ast5, expr5 = `SELECT ALL t1.age, t1.fname, t1.lname, CONCAT_WS(" ", t1.fname, t1.lname) as fullname, t2.lname lname2 FROM table1 t1, table2 t2 WHERE t1.age > 1 ORDER BY lname DESC, lname2 DESC`;
-    describe(`## ${expr5}`, function() {
+    describe(`${expr5}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
             ast5 = Parser.parse(expr5, null, {DB_FACTORY: Client, explain: false});
@@ -96,7 +96,7 @@ describe(`# SELECT QUERIES`, function() {
     });
 
     var ast6, expr6 = `SELECT t1.age, SUM(DISTINCT t1.age) OVER (PARTITION BY t2.tablename ORDER BY t2.tablename) totalAge, t1.fname, t2.lname FROM table1 t1, table2 t2`;
-    describe(`## ${expr6}`, function() {
+    describe(`${expr6}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
             ast6 = Parser.parse(expr6, null, {DB_FACTORY: Client, explain: false});
@@ -113,7 +113,7 @@ describe(`# SELECT QUERIES`, function() {
 
     var ast7, expr7 = `SELECT t2.id, t2.age, \`parent~>id\` FROM table2 t2 WHERE parent~>id = 1 or parent~>id = 2`,
         expr7b = `SELECT t2.id, t2.age, \`parent~>id\` FROM table2 t2 WHERE \`parent~>id\` = 1 or \`parent~>id\` = 2`;
-    describe(`## ${expr7}`, function() {
+    describe(`${expr7}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original but with missing backticks added`, function() {
             ast7 = Parser.parse(expr7, null, {DB_FACTORY: Client, explain: false});
@@ -131,7 +131,7 @@ describe(`# SELECT QUERIES`, function() {
 
     var ast8, expr8 = `SELECT t2.id, parent~>id, parent~>parent~>id, parent<~table2~>id, parent<~parent<~table2~>id FROM table2 t2`,
         expr8b = `SELECT t2.id, \`parent~>id\`, \`parent~>parent~>id\`, \`parent<~table2~>id\`, \`parent<~parent<~table2~>id\` FROM table2 t2`;
-    describe(`## ${expr8}`, function() {
+    describe(`${expr8}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original but with missing backticks added`, function() {
             ast8 = Parser.parse(expr8, null, {DB_FACTORY: Client, explain: false});
@@ -153,7 +153,7 @@ describe(`# SELECT QUERIES`, function() {
 
     var ast9, expr9 = `SELECT t2.id, t2.parent~>id, age FROM table2 t2 where t2.age = :age`,
         expr9b = `SELECT t2.id, t2.\`parent~>id\`, age FROM table2 t2 where t2.age = :age`;
-    describe(`## ${expr9}`, function() {
+    describe(`${expr9}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original but with missing backticks added`, function() {
             ast9 = Parser.parse(expr9, null, {DB_FACTORY: Client, explain: false});

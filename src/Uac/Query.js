@@ -187,7 +187,7 @@ export default class Query {
         + (this.AUTHOR_user_RELATIONSHIP_QUERY ? ' LEFT JOIN (' + this.AUTHOR_user_RELATIONSHIP_QUERY.query + ') AS ' + this.AUTHOR_user_RELATIONSHIP_QUERY.alias + ' ON ' + this.AUTHOR_user_RELATIONSHIP_QUERY.on.join(' AND ') : '')
         + ' WHERE ' + this.where.join(' AND ');
     }
-};
+}
 
 /**
  * Helps resolve UAC params from user-supplied params.
@@ -218,7 +218,7 @@ export function createParams(params, tableSpecifiers = []) {
     });
     // --------------
     return UAC_PARAMS;
-};
+}
   
 /**
  * --------------------------
@@ -270,7 +270,7 @@ export function getExplicitRulesQuery(UAC_PARAMS, tableXName, user) {
             + ' LIMIT ' + this.limit;
         },
     };
-};
+}
       
 /**
  * Composes a query that determines the relatiosnhip
@@ -317,7 +317,7 @@ export function getOwnerGuestRelationshipQuery(UAC_PARAMS, user, groupConcat = f
             + (this.where.length ? ' WHERE ' + this.where.join(' AND ') : '');
         },
     };
-};
+}
   
 /**
  * --------------------------
@@ -366,7 +366,7 @@ export function getRightsRulesIntersectionExpression(rules, rightsExpression, wi
     return explicitFirstRule 
         ? 'IF(ISNULL(' + nodeAccessAssertions + '), 1, 0)' 
         : 'IF(ISNULL(' + nodeAccessAssertions + '), 0, ' + (withActingRights ? nodeAccessAssertions : '1') + ')';
-};
+}
 
 /**
  * Gets rules array
@@ -383,4 +383,4 @@ export function rules(rules, accessType) {
     return _isEmpty(rules) 
         ? [] 
         : _arrFrom(rules);
-};
+}

@@ -114,4 +114,4 @@ export default class Window extends WindowInterface {
 		}
 		return new this(dfn);
 	}
-};
+}

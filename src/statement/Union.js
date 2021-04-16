@@ -83,4 +83,4 @@ export default class Union extends UnionInterface {
 			);
 		}
 	}
-};
+}

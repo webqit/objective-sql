@@ -162,7 +162,7 @@ export default class Client {
 		}
 		return OBJECT_QUERY;
 	}
-};
+}
 
 /**
  * @var array

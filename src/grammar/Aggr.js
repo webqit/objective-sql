@@ -73,7 +73,7 @@ export default class Aggr extends _mixin(Call, AggrInterface) {
 			return instance;
 		}
 	}
-};
+}
 
 /**
  * @prop object

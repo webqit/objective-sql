@@ -38,4 +38,4 @@ export default class Parser extends _Parser {
 		params.allowCache = false;
 		return super.parse(expr, Parsers, params);
 	}
-};
+}

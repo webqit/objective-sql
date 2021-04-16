@@ -131,7 +131,7 @@ export default class Delete extends _mixin(Stmt, DeleteInterface) {
 			return new this(stmtParse.exprs, stmtParse.clauses, withUac);
 		}
 	}
-};
+}
 
 /**
  * @prop object

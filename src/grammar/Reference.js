@@ -92,4 +92,4 @@ export default class Reference extends _Reference {
 	static parse(expr, ...args) {
 		return super.parse(expr, ...args);
 	}
-};
+}

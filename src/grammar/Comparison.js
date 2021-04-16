@@ -10,7 +10,7 @@ import {
 /**
  * @extends
  */
-export default class Comparison extends _Comparison {};
+export default class Comparison extends _Comparison {}
 
 /**
  * @prop array

@@ -93,7 +93,7 @@ export default class ODBFactory extends _Factory {
         delete this.databases[databaseName];
         return true;
     }
-};
+}
 
 /**
  * Databases storage.

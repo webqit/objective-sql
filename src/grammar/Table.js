@@ -293,4 +293,4 @@ export default class Table extends TableInterface {
 			return new this(tableParse, alias, claused, SCHEMA);
 		}
 	}
-};
+}

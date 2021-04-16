@@ -150,7 +150,7 @@ export default class SQLStore extends _Store {
 		});
 	}
 
-};
+}
 
 /**
  * --------

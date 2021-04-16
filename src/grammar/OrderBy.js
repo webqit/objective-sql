@@ -87,4 +87,4 @@ export default class OrderBy extends OrderByInterface {
 		}
 		return new this(columns, withRollup);
 	}
-};
+}

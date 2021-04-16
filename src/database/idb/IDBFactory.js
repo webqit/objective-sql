@@ -104,7 +104,7 @@ export default class IDBFactory extends _Factory {
             dbDeleteRequest.onsuccess = e => resolve(true);
         });
     }
-};
+}
 
 // ----------------------------
 

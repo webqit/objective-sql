@@ -39,4 +39,4 @@ export default class IDBCursor extends _Cursor {
 		await this._storeFetch;
 		return super.fetch();
 	}
-};
+}

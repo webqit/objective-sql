@@ -51,4 +51,4 @@ export default class _Cursor {
 			return this.cache[this.key];
 		}
 	}
-};
+}

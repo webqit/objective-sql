@@ -171,7 +171,7 @@ export default class ArrowReference extends ArrowReferenceInterface {
 			b: {table: schema2, actingKey: schema2.primaryKey, select,},
 		};
 	}
-};
+}
 
 /**
  * @var string

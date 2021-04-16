@@ -105,7 +105,7 @@ export default class IDBDatabase extends _Database {
             openDatabase(this.name, this.version, onsuccess, onupgradeneeded, true/* forceUpgrade */);
         });
     }
-};
+}
 
 /**
  * ---------

@@ -163,7 +163,7 @@ export default class Insert extends InsertInterface {
 			return instance;
 		}
 	}
-};
+}
 
 /**
  * @prop object

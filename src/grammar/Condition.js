@@ -56,4 +56,4 @@ export default class Condition extends _Condition {
 			return new this(...tokens.map(expr => parseCallback(expr.trim())));
 		}
 	}
-};
+}

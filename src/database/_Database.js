@@ -78,7 +78,7 @@ export default class _Database {
         // ------------------
         return await this._drop(storeName);
     }
-};
+}
 
 /**
  * ---------

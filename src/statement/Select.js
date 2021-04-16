@@ -319,7 +319,7 @@ export default class Select extends _mixin(Stmt, SelectInterface) {
 			);
 		}
 	}
-};
+}
 
 /**
  * @prop object

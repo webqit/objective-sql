@@ -229,4 +229,4 @@ export default class Row {
 	JSON_MERGE(doc1, doc2) {
 		return _merge(JSON.parse(doc1), JSON.parse(doc2));
 	}
-};
+}

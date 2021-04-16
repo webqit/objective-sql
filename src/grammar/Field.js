@@ -189,4 +189,4 @@ export default class Field extends FieldInterface {
 		exprParse.isFieldName = true;
 		return new this(exprParse, alias, claused);
 	}
-};
+}

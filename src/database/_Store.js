@@ -290,7 +290,7 @@ export default class _Store {
 				&& (field.default === 'CURRENT_TIMESTAMP' || field.onupdate === 'CURRENT_TIMESTAMP')
 		}).length;
 	}
-};
+}
 
 /**
  * @AutoIncremen

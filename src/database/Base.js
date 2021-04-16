@@ -153,4 +153,4 @@ export default class Base {
 			return __tables[i].syncCursor(cursor);
 		}));
 	}
-};
+}

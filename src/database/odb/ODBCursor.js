@@ -11,4 +11,4 @@ import _Cursor from '../_Cursor.js';
  * ---------------------------
  */				
 
-export default class ODBCursor extends _Cursor {};
+export default class ODBCursor extends _Cursor {}

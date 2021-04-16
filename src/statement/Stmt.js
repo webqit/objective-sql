@@ -269,4 +269,4 @@ export default class Stmt {
 			return {exprs:EXPRS, clauses:CLAUSES, tables:TABLES, schemas:SCHEMAS, vars:VARS};
 		}
 	}
-};
+}

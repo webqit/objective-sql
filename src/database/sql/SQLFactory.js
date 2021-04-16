@@ -170,4 +170,4 @@ export default class SQLFactory extends _Factory {
             });
         });
     }
-};
+}
