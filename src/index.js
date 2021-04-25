@@ -4,7 +4,7 @@
  */
 import Parser from './Parser.js';
 import grammar from './grammar.js';
-import ODB from './database/odb/ODBFactory.js';
+import ODB from './database/odb/ODBDriver.js';
 
 /**
  * @var object

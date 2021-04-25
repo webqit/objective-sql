@@ -6,7 +6,7 @@ import _isArray from '@webqit/util/js/isArray.js';
 import _isNumeric from '@webqit/util/js/isNumeric.js';
 import _arrFrom from '@webqit/util/arr/from.js';
 import DuplicateKeyViolationError from '../DuplicateKeyViolationError.js';
-import _Store from '../_Store.js';
+import _Table from '../_Table.js';
 import IDBCursor from './IDBCursor.js';
 import IDBProgressiveCursor from './IDBProgressiveCursor.js';
 
@@ -16,7 +16,7 @@ import IDBProgressiveCursor from './IDBProgressiveCursor.js';
  * ---------------------------
  */				
 
-export default class IDBStore extends _Store {
+export default class IDBStore extends _Table {
 
 	/**
 	 * Returns a cursor.
@@ -24,7 +24,7 @@ export default class IDBStore extends _Store {
 	 * @return IDBCursor
 	 */
 	getCursor() {
-		return new IDBCursor(this.store());
+		return new IDBCursor(this.def.getStore());
 	}
 
 	/**
@@ -33,7 +33,7 @@ export default class IDBStore extends _Store {
 	 * @return IDBProgressiveCursor
 	 */
 	getProgressiveCursor() {
-		return new IDBProgressiveCursor(this.store());
+		return new IDBProgressiveCursor(this.def.getStore());
 	}
 	 
 	/**
@@ -41,7 +41,7 @@ export default class IDBStore extends _Store {
 	 */
 	getAll() {
 		return new Promise(async (resolve, reject) => {
-			var getAllRequest = (this.tx_store || this.store('readonly')).getAll();
+			var getAllRequest = (this.tx_store || this.def.getStore('readonly')).getAll();
 			getAllRequest.onsuccess = e => resolve(_arrFrom(e.target.result));
 			getAllRequest.onerror = e => reject(e.target.error);
 		});
@@ -54,7 +54,7 @@ export default class IDBStore extends _Store {
 		return new Promise(async (resolve, reject) => {
 			// Now this is very important
 			primaryKey = _isNumeric(primaryKey) ? parseInt(primaryKey) : primaryKey;
-			var getRequest = (this.tx_store || this.store('readonly')).get(primaryKey);
+			var getRequest = (this.tx_store || this.def.getStore('readonly')).get(primaryKey);
 			getRequest.onsuccess = e => resolve(e.target.result);
 			getRequest.onerror = e => reject(e.target.error);
 		});
@@ -65,7 +65,7 @@ export default class IDBStore extends _Store {
 	 */
 	count(...query) {
 		return new Promise(async (resolve, reject) => {
-			var countRequest = this.store().count(...query);
+			var countRequest = this.def.getStore().count(...query);
 			countRequest.onsuccess = e => resolve(e.target.result);
 			countRequest.onerror = e => reject(e.target.error);
 		});
@@ -75,7 +75,7 @@ export default class IDBStore extends _Store {
 	 * @inheritdoc
 	 */
 	addAll(multiValues, columns = [], duplicateKeyCallback = null) {
-		this.tx_store = this.store();
+		this.tx_store = this.def.getStore();
 		return super.addAll(...arguments);
 	}
 
@@ -84,7 +84,7 @@ export default class IDBStore extends _Store {
 	 */
 	add(rowObj) {
 		return new Promise(async (resolve, reject) => {
-			var addRequest = (this.tx_store || this.store()).add(rowObj);
+			var addRequest = (this.tx_store || this.def.getStore()).add(rowObj);
 			addRequest.onsuccess = e => resolve(e.target.result);
 			addRequest.onerror = e => {
 				var error = e.target.error;
@@ -101,7 +101,7 @@ export default class IDBStore extends _Store {
 	 * @inheritdoc
 	 */
 	putAll(rowObj) {
-		this.tx_store = this.store();
+		this.tx_store = this.def.getStore();
 		return super.putAll(...arguments);
 	}
 
@@ -110,7 +110,7 @@ export default class IDBStore extends _Store {
 	 */
 	put(rowObj) {
 		return new Promise(async (resolve, reject) => {
-			var putRequest = (this.tx_store || this.store()).put(rowObj);
+			var putRequest = (this.tx_store || this.def.getStore()).put(rowObj);
 			putRequest.onsuccess = e => resolve(e.target.result);
 			putRequest.onerror = e => reject(e.target.error);
 		});
@@ -120,7 +120,7 @@ export default class IDBStore extends _Store {
 	 * @inheritdoc
 	 */
 	deleteAll(primaryKey) {
-		this.tx_store = this.store();
+		this.tx_store = this.def.getStore();
 		return super.deleteAll(...arguments);
 	}
 
@@ -137,7 +137,7 @@ export default class IDBStore extends _Store {
 		// Now this is very important
 		primaryKey = _isNumeric(primaryKey) ? parseInt(primaryKey) : primaryKey;
 		return new Promise(async (resolve, reject) => {
-			var delRequest = (this.tx_store || this.store()).delete(primaryKey);
+			var delRequest = (this.tx_store || this.def.getStore()).delete(primaryKey);
 			delRequest.onsuccess = e => resolve(primaryKey);
 			delRequest.onerror = e => reject(e.target.error);
 		});

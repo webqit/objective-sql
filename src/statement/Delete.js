@@ -77,7 +77,7 @@ export default class Delete extends _mixin(Stmt, DeleteInterface) {
 				if (!deletionIDs[alias]) {
 					deletionIDs[alias] = [];
 				}
-				var rowID = _arrFrom(targetTables[alias].schema.primaryKey).map(key => rowComposition[alias][key]);
+				var rowID = _arrFrom(targetTables[alias].def.schema.primaryKey).map(key => rowComposition[alias][key]);
 				if (!deletionIDs[alias].filter(_rowID => _all(_rowID, (id, i) => id === rowID[i])).length) {
 					deletionIDs[alias].push(rowID);
 				}

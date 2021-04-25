@@ -17,28 +17,73 @@ import _wrapped from '@webqit/util/str/wrapped.js';
 
 /**
  * ---------------------------
- * Store class
+ * Table class
  * ---------------------------
  */				
 
-export default class _Store {
+export default class _Table {
 	 
 	/**
 	 * @inheritdoc
 	 */
-	constructor(store, name, schema = {}, params = {}) {
+	constructor(database, tableName, def, params = {}) {
 		// -----------------
-		this.store = store;
-		this.name = name;
-		this.schema = !_isEmpty(schema) ? schema : {
-			name: store.name,
-			primaryKey: '',
-			fields: {},
-			uniqueKeys: {},
-		};
+		this.database = database;
+		this.name = tableName;
+		this.def = def;
 		this.params = params;
 		// -----------------
+		if (_isEmpty(def.schema)) {
+			def.schema = {
+				primaryKey: '',
+				columns: {},
+				indexes: {},
+				derived: true,
+			};
+		}
 	}
+
+	/**
+	 * ----------
+	 * SCHEMA UTILS
+	 * ----------
+	 */
+
+	/**
+	 * Get Primary Key columns from schema.
+	 * 
+	 * @returns Array
+	 */
+	getKeyPathForPrimaryKey() {
+		var keyPath = Object.keys(this.def.schema.columns).filter(name => this.def.schema.columns[name].primaryKey);
+		if (!keyPath.length && this.def.schema.primaryKey) {
+			keyPath = _arrFrom(this.def.schema.primaryKey);
+		}
+		return keyPath;
+	}
+
+	/**
+	 * Get Index columns from schema.
+	 * 
+	 * @param String type
+	 * 
+	 * @returns Array
+	 */
+	 getKeyPathsForIndex(type) {
+		var keyPaths = Object.keys(this.def.schema.columns).filter(name => this.def.schema.columns[name][type]);
+		if (this.def.schema.indexes) {
+			Object.keys(this.def.schema.indexes).filter(indexName => this.def.schema.indexes[indexName].type === type).forEach(indexName => {
+				keyPaths.push(_arrFrom(this.def.schema.indexes[indexName].keyPath));
+			});
+		}
+		return keyPaths;
+	}
+
+	/**
+	 * ----------
+	 * QUERY UTILS
+	 * ----------
+	 */
 
 	/**
 	 * Syncs a cursor.
@@ -57,8 +102,8 @@ export default class _Store {
 	async match(rowObj) {
 		// -----------
 		var primaryKey, existing;
-		if (this.schema.primaryKey 
-		&& (primaryKey = readKeyPath(rowObj, this.schema.primaryKey)) 
+		if (this.def.schema.primaryKey 
+		&& (primaryKey = readKeyPath(rowObj, this.def.schema.primaryKey)) 
 		&& (existing = await this.get(primaryKey))) {
 			return {
 				matchingKey: 'PRIMARY_KEY',
@@ -67,17 +112,18 @@ export default class _Store {
 			};
 		}
 		// -----------
-		var match;
-		if (this.schema.uniqueKeys) {
+		var match, uniqueKeys = Object.keys(this.def.schema.indexes).filter(alias => this.def.schema.indexes[alias].type === 'unique');
+		if (uniqueKeys.length) {
 			(await this.getAll()).forEach((existingRow, i) => {
 				if (match) {
 					return;
 				}
-				_each(this.schema.uniqueKeys, (constraintName, keyPath) => {
+				uniqueKeys.forEach(constraintName => {
+					var keyPath = this.def.schema.indexes[constraintName].keyPath;
 					if (existingRow && readKeyPath(rowObj, keyPath) === readKeyPath(existingRow, keyPath)) {
 						match = {
 							matchingKey: constraintName,
-							primaryKey: this.schema.primaryKey ? readKeyPath(existingRow, this.schema.primaryKey) : i,
+							primaryKey: this.def.schema.primaryKey ? readKeyPath(existingRow, this.def.schema.primaryKey) : i,
 							row: {...existingRow},
 						};
 					}
@@ -107,7 +153,7 @@ export default class _Store {
 			if (_isObject(values)) {
 				rowObj = values;
 			} else {
-				var _columns = columns.length ? columns : Object.keys(this.schema.fields);
+				var _columns = columns.length ? columns : Object.keys(this.def.schema.columns);
 				if (_columns.length && _columns.length !== values.length) {
 					throw new Error('Column/values count mismatch at line ' + line + '!');
 				}
@@ -154,7 +200,7 @@ export default class _Store {
 			inserts = inserts.concat(await this.putAll(forUpdates));
 		}
 
-		return inserts;
+		return inserts.filter((n, i) => n !== 0 && inserts.indexOf(n) === i);
 	}
 		
 	/**
@@ -162,7 +208,7 @@ export default class _Store {
 	 */
 	async beforeAdd(rowObj, match) {
 		var timestamp = (new Date).toISOString();
-		_each(this.schema.fields || {}, (name, field) => {
+		_each(this.def.schema.columns || {}, (name, field) => {
 			if ((field.type === 'datetime' || field.type === 'timestamp') && field.default === 'CURRENT_TIMESTAMP') {
 				rowObj[name] = timestamp;
 			}
@@ -204,7 +250,7 @@ export default class _Store {
 	async beforePut(rowObj, match) {
 		if (match && !_all(Object.keys(rowObj), key => rowObj[key] === match.row[key])) {
 			var timestamp = (new Date).toISOString();
-			_each(this.schema.fields || {}, (name, field) => {
+			_each(this.def.schema.columns || {}, (name, field) => {
 				if ((field.type === 'datetime' || field.type === 'timestamp') && field.onupdate === 'CURRENT_TIMESTAMP') {
 					rowObj[name] = timestamp;
 				}
@@ -239,7 +285,7 @@ export default class _Store {
 	 */
 	handleInput(rowObj, applyDefaults = false) {
 		var rowObjColumns = Object.keys(rowObj);
-		var schemaColumns = Object.keys(this.schema.fields);
+		var schemaColumns = Object.keys(this.def.schema.columns);
 		// ------------------
 		var unknownFields = rowObjColumns.filter(col => schemaColumns.indexOf(col) === -1);
 		if (unknownFields.length) {
@@ -248,7 +294,7 @@ export default class _Store {
 		// ------------------
 		schemaColumns.forEach(columnName => {
 			var value = rowObj[columnName];
-			var field = _isObject(this.schema.fields[columnName]) ? this.schema.fields[columnName] : {};
+			var field = _isObject(this.def.schema.columns[columnName]) ? this.def.schema.columns[columnName] : {};
 			if (rowObjColumns.includes(columnName)) {
 				// TODO: Validate supplied value
 				if (field.type === 'json') {
@@ -267,7 +313,7 @@ export default class _Store {
 					if (!_isString(value)) {
 					}
 				}
-			} else if (applyDefaults && !_intersect(_arrFrom(columnName), _arrFrom(this.schema.primaryKey)).length) {
+			} else if (applyDefaults && !_intersect(_arrFrom(columnName), _arrFrom(this.def.schema.primaryKey)).length) {
 				// DONE: Apply defaults...
 				rowObj[columnName] = ('default' in field) && !(['date', 'datetime', 'timestamp'].includes(field.type) && field.default === 'CURRENT_TIMESTAMP') 
 					? field.default 
@@ -284,8 +330,8 @@ export default class _Store {
 	 * @inheritdoc
 	 */
 	shouldMatchInput(rowObj) {
-		return Object.keys(this.schema.fields).filter(name => {
-			var field = this.schema.fields[name];
+		return Object.keys(this.def.schema.columns).filter(name => {
+			var field = this.def.schema.columns[name];
 			return ['datetime', 'timestamp'].includes(field.type) 
 				&& (field.default === 'CURRENT_TIMESTAMP' || field.onupdate === 'CURRENT_TIMESTAMP')
 		}).length;

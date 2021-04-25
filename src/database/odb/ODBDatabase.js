@@ -3,6 +3,9 @@
 /**
  * @imports
  */
+import _isObject from '@webqit/util/js/isObject.js';
+import _isFunction from '@webqit/util/js/isFunction.js';
+import _each from '@webqit/util/obj/each.js';
 import _Database from '../_Database.js';
 import ODBStore from './ODBStore.js';
 
@@ -13,62 +16,150 @@ import ODBStore from './ODBStore.js';
  */				
 
 export default class ODBDatabase extends _Database {
+    
+    /**
+     * @inheritdoc
+     */
+    async tables() {
+        return Object.keys(this.def.schema);
+    }
 
     /**
-     * Returns store names.
-     * 
-     * @return Array
+     * @inheritdoc
      */
-    async list() {
-        return Object.keys(this.database);
+    async table(tableName, params = {}) {
+        return new ODBStore(this, tableName, {
+            schema: this.def.schema[tableName], 
+            data: this.def.data[tableName],
+        }, params);
     }
-	 
-	/**
-	 * Opens a store.
-     * 
-     * @param String  storeName
-     * @param String  mode
-     * @param Object params
-     * 
-     * @return ODBStore
-	 */
-	open(storeName, mode = 'readonly', params = {}) {
-		var store = this.database[storeName];
-		params.mode = mode;
-		return new ODBStore(store, storeName, this.schema[storeName], params);
-	}
-	
+
     /**
-     * Creates a store
-     * 
-     * @param String  storeName
-     * @param Object schema
-     * @param Bool  replace
-     * 
-     * @return ODBStore
+     * CREATE/ALTER/DROP
      */
-    async _create(storeName, schema, replace) {
-        var store = [];
-        this.database[storeName] = store;
-        if ((schema || []).length) {
-            Object.values(schema).forEach(storeSchema => {
-                if (!storeSchema.driver) {
-                    storeSchema.driver = 'ODB';
-                }
-            });
-        }
-        return new ODBStore(store, this.schema[storeName]);
-	}
-	
+
     /**
-     * Drops a store.
+     * @inheritdoc
+     */
+    async createTable(tableName, tableSchema, params = {}) {
+        if ((await this.tables()).includes(tableName)) {
+            if (params.ifNotExists) {
+                return;
+            }
+            throw new Error(`Store name "${tableName}" already exists!`);
+        }
+        this.def.schema[tableName] = tableSchema;
+        this.def.data[tableName] = [];
+        return new ODBStore(this, tableName, {
+            schema: this.def.schema[tableName],
+            data: this.def.data[tableName],
+        });
+    }
+
+    /**
+     * @inheritdoc
+     */
+    async alterTable(tableName, newTableSchemaOrCallback, params = {}) {
+
+        var tableSchema = await this.getTableSchema(tableName),
+            newTableSchema;
+        if (_isFunction(newTableSchemaOrCallback)) {
+            // Modify existing schema
+            newTableSchema = this.cloneSchema(tableSchema);
+            await newTableSchemaOrCallback(newTableSchema);
+        } else if (_isObject(callback)) {
+            newTableSchema = newTableSchemaOrCallback;
+        } else {
+            throw new Error('Table/store modification expects only an object (new schema) or a function (callback that recieves existing schema).')
+        }
+
+        if (!(await this.tables()).includes(tableName)) {
+            if (params.ifExists) {
+                return;
+            }
+            throw new Error(`Store name "${tableName}" does not exist!`);
+        }
+
+        var store = this.def.data[tableName];
+        _each(this.diffSchema(tableSchema, newTableSchema), (changeName, changeDef) => {
+            if (changeName !== 'renamedColumns') {
+                // "primaryKey", "columns", "foreignKeys", "indexes", "jsonColumns"
+                _each(changeDef.add, (prop, def) => {
+                    this.applyToStore[changeName](store, prop, def, 'add');
+                });
+                _each(changeDef.alter, (prop, changes) => {
+                    this.applyToStore[changeName](store, prop, changes.current, 'alter');
+                });
+                _each(changeDef.drop, (prop, oldDef) => {
+                    this.applyToStore[changeName](store, prop, oldDef, 'drop');
+                });
+            } else {
+                // "renamedColumns" actually comes last from source...
+                // and really should
+                _each(changeDef, (oldName, newName) => {
+                    this.applyToStore[changeName](store, oldName, newName);
+                });
+            }
+        });
+
+        return new ODBStore(this, tableName, {
+            schema: this.def.schema[tableName],
+            data: store,
+        }, {});
+
+    }
+
+    /**
+     * Drops table.
      * 
-     * @param String  storeName
+     * @param String tableName
+     * @param Object params
      * 
      * @return Bool
      */
-    async _drop(storeName) {
-        delete this.database[storeName];
-        return true;
+    async dropTable(tableName, params = {}) {
+        if (!(await this.tables()).includes(tableName)) {
+            if (params.ifExists) {
+                return;
+            }
+            throw new Error(`Store name "${tableName}" does not exist!`);
+        }
+        delete this.def.schema[tableName];
+        delete this.def.data[tableName];
     }
+
+    /**
+     * @inheritdoc
+     */
+    async getTableSchema(tableName) {
+        return this.def.schema[tableName];
+    }
+
+    // -------
+
+    applyToStore = {
+        primaryKey: (store, columnName, def, delta) => {},
+    
+        columns: (store, columnName, def, delta) => {},
+    
+        foreignKeys: (store, columnName, def, delta) => {},
+    
+        indexes: (store, alias, def, delta) => {
+            if (delta === 'drop') {
+                store.deleteIndex(alias);
+                return;
+            }
+            if (delta === 'alter' && store.indexNames.contains(alias)) {
+                store.deleteIndex(alias);
+            }
+            store.createIndex(alias, def.keyPath, {unique: def.type === 'unique'});
+        },
+    
+        jsonColumns: (store, alias, columnName, delta) => {},
+    
+        renamedColumns: (store, columnName, newColumnName) => {
+            return 'ALTER COLUMN `' + columnName + '` RENAME TO `' + newColumnName + '`';
+        },
+    }
+    
 }

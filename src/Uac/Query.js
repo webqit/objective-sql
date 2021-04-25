@@ -8,7 +8,6 @@ import _isEmpty from '@webqit/util/js/isEmpty.js';
 import _arrFrom from '@webqit/util/arr/from.js';
 import _each from '@webqit/util/obj/each.js';
 import _merge from '@webqit/util/obj/merge.js';
-import { factoryGetSchema } from '../database/_Factory.js';
 
 /**
  * Requires the following tables: uac, uac_token (optional), account
@@ -201,7 +200,7 @@ export default class Query {
 export function createParams(params, tableSpecifiers = []) {
     // --------------
     var UAC_PARAMS = _merge({
-        DB_FACTORY: params.DB_FACTORY,
+        dbDriver: params.dbDriver,
         SCHEMAS: {},
     }, params.UAC || {});
     // --------------
@@ -214,7 +213,7 @@ export function createParams(params, tableSpecifiers = []) {
         var tableNameSplit = fullTableName.split('.');
         var tableName = tableNameSplit.pop(),
             databaseName = tableNameSplit.pop();
-        UAC_PARAMS.SCHEMAS[tableSpecifier] = (factoryGetSchema(UAC_PARAMS.DB_FACTORY, databaseName) || {})[tableName];
+        UAC_PARAMS.SCHEMAS[tableSpecifier] = (UAC_PARAMS.dbDriver.getSchema(databaseName) || {})[tableName];
     });
     // --------------
     return UAC_PARAMS;

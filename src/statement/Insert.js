@@ -38,7 +38,7 @@ export default class Insert extends InsertInterface {
 		var _params = {...params};
 		_params.mode = 'readwrite';
 		var tableBase = await this.TABLE_REFERENCES.eval(context, _params);
-		var tableSchema = tableBase.schema;
+		var tableSchema = tableBase.def.schema;
 		// ---------------------------
 		var values = this.VALUES_LIST;
 		var insertType = this.INSERT_TYPE.toUpperCase();
@@ -47,7 +47,7 @@ export default class Insert extends InsertInterface {
 			var columns = values.map(assignment => assignment.reference.name);
 			values = [values.map(assignment => assignment.val.eval({}, params))];
 		} else {
-			var columns = this.COLUMNS_LIST || (tableSchema.fields ? Object.keys(tableSchema.fields) : []);
+			var columns = this.COLUMNS_LIST || (tableSchema.columns ? Object.keys(tableSchema.columns) : []);
 			if (insertType === 'SELECT') {
 				try {
 					values = (await values.eval(context, params)).map(row => Object.values(row));

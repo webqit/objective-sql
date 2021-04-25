@@ -6,7 +6,7 @@ import _arrFrom from '@webqit/util/arr/from.js';
 import _merge from '@webqit/util/obj/merge.js';
 import _each from '@webqit/util/obj/each.js';
 import DuplicateKeyViolationError from '../DuplicateKeyViolationError.js';
-import _Store from '../_Store.js';
+import _Table from '../_Table.js';
 import ODBCursor from './ODBCursor.js';
 
 /**
@@ -15,12 +15,12 @@ import ODBCursor from './ODBCursor.js';
  * ---------------------------
  */				
 
-export default class ODBStore extends _Store {
+export default class ODBStore extends _Table {
 	 
 	/**
 	 * @inheritdoc
 	 */
-	constructor(store, name, schema = {}, params = {}) {
+	constructor(database, tableName, def, params = {}) {
 		super(...arguments);
 		this.ongoingWrite = null;
 	}
@@ -33,7 +33,7 @@ export default class ODBStore extends _Store {
 	getCursor() {
 		return new ODBCursor(
 			// IMPORTANT: Deep copy... that is... copy each row
-			(this.store || []).reduce((_store, row) => _store.concat(row ? {...row} : undefined), []).filter(row => row)
+			(this.def.data || []).reduce((_store, row) => _store.concat(row ? {...row} : undefined), []).filter(row => row)
 		);
 	}
 	 
@@ -42,19 +42,21 @@ export default class ODBStore extends _Store {
 	 */
 	async getAll() {
 		// IMPORTANT: Deep copy... that is... copy each row
-		return (this.store || []).reduce((_store, row) => _store.concat(row ? {...row} : undefined), []);
+		return (this.def.data || []).reduce((_store, row) => _store.concat(row ? {...row} : undefined), []);
 	}
 	 
 	/**
 	 * @inheritdoc
 	 */
 	async get(rowID) {
-		if (!this.schema.primaryKey) {
+		var primaryKeyColumn = Object.keys(this.def.schema.columns).filter(name => this.def.schema.columns[name].primaryKey)[0];
+        var autoIncrementColumn = Object.keys(this.def.schema.columns).filter(name => this.def.schema.columns[name].autoIncrement)[0];
+		if (!primaryKeyColumn) {
 			throw new Error('Table must define a Primary Key to fetch an item by Primary Key.');
 		}
-		var store = this.store;
+		var store = this.def.data;
 		rowID = _arrFrom(rowID).join('-');
-		if (this.schema.autoIncrement) {
+		if (primaryKeyColumn === autoIncrementColumn) {
 			return store[rowID - 1] ? {...store[rowID - 1]} : undefined;
 		}
 		return store[rowID] ? {...store[rowID]} : undefined;
@@ -64,7 +66,7 @@ export default class ODBStore extends _Store {
 	 * @inheritdoc
 	 */
 	async count() {
-		var store = this.store;
+		var store = this.def.data;
 		return store.length;
 	}
 
@@ -72,7 +74,7 @@ export default class ODBStore extends _Store {
 	 * @inheritdoc
 	 */
 	shouldMatchInput(rowObj) {
-		return this.schema.primaryKey || super.shouldMatchInput(rowObj);
+		return this.def.schema.primaryKey || super.shouldMatchInput(rowObj);
 	}
 
 	/**
@@ -82,8 +84,8 @@ export default class ODBStore extends _Store {
 		if (match) {
 			throw new DuplicateKeyViolationError('Inserting duplicate values on unique key constraint: ' + match.matchingKey);
 		} else {
-			var store = this.store;
-			processPrimaryKey(store, rowObj, this.schema.primaryKey, this.schema.autoIncrement);
+			var store = this.def.data;
+			processPrimaryKey(store, rowObj, this.def.schema.primaryKey, this.def.schema.autoIncrement);
 		}
 
 		await super.beforeAdd(rowObj, match);
@@ -95,9 +97,9 @@ export default class ODBStore extends _Store {
 	add(rowObj) {
 		this.ongoingWrite = new Promise(async (resolve, reject) => {
 			try { await this.ongoingWrite; } catch(e) {}
-			var store = this.store;
-			var primaryKey = readKeyPath(rowObj, this.schema.primaryKey);
-			if (this.schema.autoIncrement) {
+			var store = this.def.data;
+			var primaryKey = readKeyPath(rowObj, this.def.schema.primaryKey);
+			if (this.def.schema.autoIncrement) {
 				store[primaryKey - 1] = rowObj;
 			} else {
 				store[primaryKey] = rowObj;
@@ -119,8 +121,8 @@ export default class ODBStore extends _Store {
 				}
 			});
 		} else {
-			var store = this.store;
-			processPrimaryKey(store, rowObj, this.schema.primaryKey, this.schema.autoIncrement);
+			var store = this.def.data;
+			processPrimaryKey(store, rowObj, this.def.schema.primaryKey, this.def.schema.autoIncrement);
 		}
 
 		await super.beforePut(rowObj, match);
@@ -132,9 +134,9 @@ export default class ODBStore extends _Store {
 	put(rowObj) {
 		this.ongoingWrite = new Promise(async resolve => {
 			try { await this.ongoingWrite; } catch(e) {}
-			var store = this.store,
-				primaryKey = readKeyPath(rowObj, this.schema.primaryKey);
-			if (this.schema.autoIncrement) {
+			var store = this.def.data,
+				primaryKey = readKeyPath(rowObj, this.def.schema.primaryKey);
+			if (this.def.schema.autoIncrement) {
 				store[primaryKey - 1] = rowObj;
 			} else {
 				store[primaryKey] = rowObj;
@@ -151,8 +153,8 @@ export default class ODBStore extends _Store {
 	delete(rowID, assertExisting = true) {
 		this.ongoingWrite = new Promise(async (resolve, reject) => {
 			try { await this.ongoingWrite; } catch(e) {}
-			var primaryKey, store = this.store;
-			if (this.schema.autoIncrement) {
+			var primaryKey, store = this.def.data;
+			if (this.def.schema.autoIncrement) {
 				if (store[rowID - 1]) {
 					delete store[rowID - 1];
 					primaryKey = rowID;
@@ -164,7 +166,7 @@ export default class ODBStore extends _Store {
 				}
 			}
 			if (!primaryKey && assertExisting) {
-				return reject(new Error('The given row (with ' + _arrFrom(this.schema.primaryKey).join(',') + ' = ' + primaryKey + ') does not exist in the store.'));
+				return reject(new Error('The given row (with ' + _arrFrom(this.def.schema.primaryKey).join(',') + ' = ' + primaryKey + ') does not exist in the store.'));
 			}
 			resolve(primaryKey);
 		});
@@ -176,7 +178,7 @@ export default class ODBStore extends _Store {
 	 * @inheritdoc
 	 */
 	async clear() {
-		var store = this.store;
+		var store = this.def.data;
 		store.splice(0);
 		return true;
 	}
@@ -199,13 +201,13 @@ export function processPrimaryKey(store, rowObj, primaryKey, canAutoIncrement) {
 	}
 	
 	var primaryKeyVal = readKeyPath(rowObj, primaryKey);
-	if (!primaryKeyVal && canAutoIncrement) {
 		var primaryKeyPath = _arrFrom(primaryKey);
 		if (primaryKeyPath.length > 1) {
 			throw new Error('The Auto-Increment flag cannot be used with Composite Primary Keys.');
 		}
 		primaryKeyVal = store.length + 1;
 		rowObj[primaryKeyPath[0]] = primaryKeyVal;
+	if (!primaryKeyVal && canAutoIncrement) {
 	}
 
 	return primaryKeyVal;

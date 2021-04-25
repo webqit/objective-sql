@@ -21,7 +21,7 @@ import LiteralInterface from '../grammar/LiteralInterface.js';
 import Literal from '../grammar/Literal.js';
 import TableInterface from './TableInterface.js';
 import View from '../database/View.js';
-import _Factory, { factoryGetSchema } from '../database/_Factory.js';
+import _Driver from '../database/_Driver.js';
 import _Database from '../database/_Database.js';
 
 /**
@@ -140,38 +140,36 @@ export default class Table extends TableInterface {
 			var MAIN_SCHEMA = _objFirst(ALL_SCHEMAS);
 			// ---------------------
 			// Fields schemas
-			var derivedSchema = { name: derivedName, fields: {}, uniqueKeys: {}, derived: true, };
+			var derivedSchema = { name: derivedName, columns: {}, indexes: {}, derived: true, };
 			derivedQuery.getFields().forEach(field => {
 				if (field.expr instanceof ReferenceInterface) {
 					if (field.getName() === '*') {
 						field.expr.interpreted.forEach(ref => {
-							derivedSchema.fields[ref.name] = ((ALL_SCHEMAS[ref.context.name] || {}).fields || {})[name] || {type: 'any', derived: true};
+							derivedSchema.columns[ref.name] = ((ALL_SCHEMAS[ref.context.name] || {}).columns || {})[name] || {type: 'any', derived: true};
 						});
 					} else {
 						var name = field.getName(), context = field.getContextName();
-						derivedSchema.fields[field.getAlias()] = (((context ? ALL_SCHEMAS[context] : MAIN_SCHEMA) || {}).fields || {})[name] || {type: 'any', derived: true};
+						derivedSchema.columns[field.getAlias()] = (((context ? ALL_SCHEMAS[context] : MAIN_SCHEMA) || {}).columns || {})[name] || {type: 'any', derived: true};
 					}
 				} else {
-					derivedSchema.fields[field.getAlias()] = {type: 'any', derived: true};
+					derivedSchema.columns[field.getAlias()] = {type: 'any', derived: true};
 				}
 			});
 			// ---------------------
 			// PRIMARY KEY
-			derivedSchema.primaryKey = _isArray(MAIN_SCHEMA.primaryKey) 
-				? MAIN_SCHEMA.primaryKey.map(fieldName => getAliasOfField(fieldName))
-				: getAliasOfField(MAIN_SCHEMA.primaryKey);
-			derivedSchema.autoIncrement = MAIN_SCHEMA.autoIncrement;
-			if (_isEmpty(derivedSchema.primaryKey)) {
-				delete derivedSchema.primaryKey;
-				delete derivedSchema.autoIncrement;
+			if (!_isEmpty(derivedSchema.primaryKey)) {
+				derivedSchema.primaryKey = _isArray(MAIN_SCHEMA.primaryKey) 
+					? MAIN_SCHEMA.primaryKey.map(fieldName => getAliasOfField(fieldName))
+					: getAliasOfField(MAIN_SCHEMA.primaryKey);
 			}
 			// ---------------------
 			// RUNTIME UNIQUE
-			_each(MAIN_SCHEMA.uniqueKeys || {}, (name, keyPath) => {
-				var keyPathAliased = _arrFrom(keyPath).map(fieldName => getAliasOfField(fieldName));
-				derivedSchema.uniqueKeys[name] = !_isArray(keyPath) ? keyPathAliased[0] : keyPathAliased;
-				if (_isEmpty(derivedSchema.uniqueKeys[name])) {
-					delete derivedSchema.uniqueKeys[name];
+			_each(MAIN_SCHEMA.indexes || {}, (indexName, indexDef) => {
+				indexDef = {...indexDef};
+				var keyPathAliased = _arrFrom(indexDef.keyPath).map(fieldName => getAliasOfField(fieldName));
+				indexDef.keyPath = !_isArray(indexDef.keyPath) ? keyPathAliased[0] : keyPathAliased;
+				if (!_isEmpty(indexDef.keyPath)) {
+					derivedSchema.indexes[indexName] = indexDef;
 				}
 			});
 			// ---------------------
@@ -188,48 +186,53 @@ export default class Table extends TableInterface {
 	/**
 	 * @inheritdoc
 	 */
-	eval(DB_FACTORY = null, params = {}) {
+	eval(dbDriver = null, params = {}) {
 
 		if (this.interpreted) {
-			return this.interpreted.eval(DB_FACTORY, params);
+			return this.interpreted.eval(dbDriver, params);
 		}
 
 		// --------------------------
 
-		if (!DB_FACTORY) {
+		if (!dbDriver) {
 			throw new Error('Context must be provided!');
 		}
 
+		const getDatabase = databaseName => {
+			return Promise.resolve().then(() => {
+				if (dbDriver instanceof _Driver) {
+					return databaseName ? dbDriver.database(databaseName) : dbDriver.database();
+				}
+				if (databaseName) {
+					throw new Error('[' + this.expr + ']: For tables that are fully-qualified with a database name, a database factory must be provided as context.');
+				}
+				return dbDriver;
+			})
+		};
 		// --------------------------
 
 		// Derived table???
 		if (this.isDerivedQuery()) {
-
 			var derivedName = this.getAlias(),
 				derivedQuery = this.getDerivedQuery(),
-				derivedSchema = this.getSchema(DB_FACTORY);
-			return derivedQuery.eval(DB_FACTORY, params).then(derivedStore => {
+				derivedSchema = this.getSchema(dbDriver);
+			return derivedQuery.eval(dbDriver, params).then(async derivedStore => {
+				var database = await getDatabase();
 				var _params = {...params};
 				_params.alias = derivedName;
-				return new View(derivedQuery, derivedStore, derivedName, derivedSchema, _params);
+				return new View(derivedQuery, database, derivedName, {
+					schema: derivedSchema, 
+					data: derivedStore,
+				}, _params);
 			});
-
 		}
 
-		return Promise.resolve().then(() => {
-			var databaseName = this.getDatabaseName();
-			if (DB_FACTORY.prototype instanceof _Factory) {
-				return databaseName ? DB_FACTORY.open(databaseName) : DB_FACTORY.open();
-			}
-			if (databaseName) {
-				throw new Error('[' + this.expr + ']: For tables that are fully-qualified with a database name, a database factory must be provided as context.');
-			}
-			return DB_FACTORY;
-		}).then(database => {
+		var databaseName = this.getDatabaseName();
+		return getDatabase(databaseName).then(database => {
 			if (!(database instanceof _Database)) {
 				throw new Error('[' + this.expr + ']: The provided context could not be resolved to a valid database instance.');
 			}
-			return database.open(this.getName(), params.mode, {alias: this.getAlias()});
+			return database.table(this.getName(), {mode: params.mode, alias: this.getAlias()});
 		});
 
 	}
@@ -269,11 +272,10 @@ export default class Table extends TableInterface {
 			// -------------------
 
 			if (tableParse instanceof LiteralInterface) {
-				var DB_SCHEMA = {},
-					fullTableName = tableParse.toString().split('.'),
+				var fullTableName = tableParse.toString().split('.'),
 					tableName = fullTableName.pop(),
-					databaseName = fullTableName.pop();
-					DB_SCHEMA = factoryGetSchema(params.DB_FACTORY, databaseName);
+					databaseName = fullTableName.pop(),
+					DB_SCHEMA = params.dbDriver.getDatabaseSchema(databaseName);
 				// -----------
 				if (DB_SCHEMA && DB_SCHEMA[tableName]) {
 					SCHEMA = DB_SCHEMA[tableName];
@@ -282,11 +284,11 @@ export default class Table extends TableInterface {
 						// Throw "Table unknown!"
 						throw new Error('Unknown table: ' + tableName + '.');
 					}
-					SCHEMA = { name: tableName, fields: {}, derived: true, };
+					SCHEMA = { name: tableName, columns: {}, indexes: {}, derived: true, };
 				}
 			} else {
 				if (!alias) {
-					throw new Error('Derived tables must be aliased.');
+					throw new Error(`Derived tables must be aliased.`);
 				}
 			}
 

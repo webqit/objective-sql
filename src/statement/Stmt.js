@@ -17,7 +17,7 @@ import ArrowReference from '../grammar/ArrowReference.js';
 import Reference from '../grammar/Reference.js';
 import Table from '../grammar/Table.js';
 import Base from '../database/Base.js';
-import _Factory from '../database/_Factory.js';
+import _Driver from '../database/_Driver.js';
 import UACClient from '../uac/Client.js';
 
 /**
@@ -173,7 +173,7 @@ export default class Stmt {
 					// -------------
 					if (_var.context) {
 						ref_context = _var.context.name.replace(/`/g, '');
-						if (!SCHEMAS[ref_context] || (ref_name !== '*' && !(ref_name in SCHEMAS[ref_context].fields))) {
+						if (!SCHEMAS[ref_context] || (ref_name !== '*' && !(ref_name in SCHEMAS[ref_context].columns))) {
 							// Qualified, but unknown column name!
 							if (params.validation !== false) {
 								// Throw
@@ -182,19 +182,19 @@ export default class Stmt {
 							// Or use as is
 						}
 						if (ref_name === '*') {
-							_var.interpreted = Object.keys(SCHEMAS[ref_context].fields).map(field => parseCallback(ref_context + '.' + field, [Reference]));
+							_var.interpreted = Object.keys(SCHEMAS[ref_context].columns).map(field => parseCallback(ref_context + '.' + field, [Reference]));
 						}
 					} else if (ref_name === '*') {
 						ref_context = TABLES[''].getAlias();
 						var impliedFields;
-						if ((impliedFields = Object.keys(SCHEMAS[''].fields)) && !impliedFields.length) {
+						if ((impliedFields = Object.keys(SCHEMAS[''].columns)) && !impliedFields.length) {
 							// Throw
 							throw new Error('The wildcard column specifier (*) cannot used on table "' + ref_context + '"; table defines no columns.');
 						}
 						_var.interpreted = impliedFields.map(field => parseCallback(ref_context + '.' + field, [Reference]));
 					} else if (!(literalValidateCallback && literalValidateCallback(ref_name, clauseType))) {
 						ref_context = Object.keys(SCHEMAS).filter(a => a).reduce((_ref_context, alias) => {
-							if (ref_name in SCHEMAS[alias].fields) {
+							if (ref_name in SCHEMAS[alias].columns) {
 								if (_ref_context) {
 									// Ambiguous column name!
 									if (params.validation !== false) {
@@ -243,7 +243,7 @@ export default class Stmt {
 						_select = table.getAssociateReferences().filter(ref => !(ref instanceof ArrowReferenceInterface)).map(ref => tableName + '.' + ref.name);
 					// ----------
 					arrowReferences.forEach(ref => {
-						var join = ref.process(SCHEMAS[alias], params.DB_FACTORY);
+						var join = ref.process(SCHEMAS[alias], params.dbDriver);
 						var joinUUID = join.b.table.name + '__by__' + join.b.actingKey;
 						if (!joins[joinUUID]) {
 							joins[joinUUID] = join

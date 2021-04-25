@@ -3,14 +3,13 @@
 /**
  * @imports
  */
+import _isFunction from '@webqit/util/js/isFunction.js';
+import _isObject from '@webqit/util/js/isObject.js';
 import _isNull from '@webqit/util/js/isNull.js';
-import _isString from '@webqit/util/js/isString.js';
-import _isNumeric from '@webqit/util/js/isNumeric.js';
-import _intersect from '@webqit/util/arr/intersect.js';
 import _arrFrom from '@webqit/util/arr/from.js';
 import _each from '@webqit/util/obj/each.js';
 import _Database from '../_Database.js';
-import SQLStore from './SQLStore.js';
+import SQLTable from './SQLTable.js';
 
 /**
  * ---------------------------
@@ -21,298 +20,242 @@ import SQLStore from './SQLStore.js';
 export default class SQLDatabase extends _Database {
 	
     /**
-     * Returns store names.
-     * 
-     * @return void
+     * @inheritdoc
      */
-    async list() {
+    async tables() {
+        var conn = await this.driver.getConnection();
         return new Promise((resolve, reject) => {
-            this.database.conn.query('SHOW TABLES FROM ' + this.database.name, (err, result) => {
+            conn.query(`SHOW TABLES FROM ${this.name}`, (err, result) => {
                 if (err) return reject(err);
-                resolve(result.map(row => row['Tables_in_' + this.database.name]));
+                resolve(result.map(row => row['Tables_in_' + this.name]));
             });
         });
     }
-	 
-	/**
-	 * Opens a store.
-     * 
-     * @param String  storeName
-     * @param String  mode
-     * @param Object params
-     * 
-     * @return SQLStore
-	 */
-	open(storeName, mode = 'readonly', params = {}) {
-        params.mode = mode;
-		return new SQLStore(
-            {name: storeName, database: this.database},
-            storeName,
-            this.schema[storeName],
-            params
-        );
-	}
 
     /**
-     * Creates a store
-     * 
-     * @param String  storeName
-     * @param Object schema
-     * @param String  onExists
-     * 
-     * @return SQLStore
+     * @inheritdoc
      */
-    async _create(storeName, schema, onExists = null) {
-        var _schema = {...schema};
-        _schema.name = storeName;
-        await databaseCreateSchema(this.database, [schema], onExists);
-        return this.open(storeName, 'readwrite');
+    async table(tableName, params = {}) {
+        return new SQLTable(this, tableName, {
+            schema: await this.getTableSchema(tableName),
+        }, params);
     }
 
     /**
-     * Drops a store.
-     * 
-     * @param String  storeName
-     * 
-     * @return Bool
+     * CREATE/ALTER/DROP
      */
-    _drop(storeName) {
-        return new Promise((resolve, reject) => {
-            this.database.conn.query('DROP TABLE IF EXISTS ' + storeName, err => {
-                if (err) return reject(err);
-                resolve(true);
-            });
-        });
-    }
-}
 
-/**
- * ---------
- * HELPERS
- * ---------
- */
-
-/**
- * Helps create Object Stores
- * 
- * @param Object conn 
- * @param SQLDatabase database 
- * @param Array schema 
- * @param String onExists
- * 
- * @return void
- */
-export const databaseCreateSchema = (database, schema, onExists) => {
-    return Promise.all(schema.map(async storeSchema => {
-        if (!storeSchema.driver) {
-            storeSchema.driver = 'SQL';
-        }
-        // Create store...
-        var storeExistence = await queryTableColumns(database.conn, storeSchema.name);
-        if (!storeExistence.length) {
-            storeExistence = null;
-        }
-        if (storeExistence && !onExists) {
-            throw new Error('Table "' + storeSchema.name + '" already exists!');
-        }
-        if (onExists === 'drop') {
-            await (new Promise((resolve, reject) => {
-                database.conn.query('DROP TABLE IF EXISTS ' + storeSchema.name, err => {
-                    if (err) return reject(err);
-                    storeExistence = false;
-                    resolve();
+    /**
+     * @inheritdoc
+     */
+    async createTable(tableName, tableSchema, params = {}) {
+        
+        var sqlStmt = [], actions = this.diffSchema({}, tableSchema);
+        _each(actions, (changeName, changeDef) => {
+            if (changeName === 'primaryKey') {
+                if (changeDef.add) {
+                    sqlStmt.push(this.toSql[changeName](changeDef.add, changeDef.add));
+                }
+            } else {
+                _each(changeDef.add, (prop, def) => {
+                    sqlStmt.push(this.toSql[changeName](prop, def));
                 });
-            }));
-        }
-        // Moving on to create or alter 
-        // ---------------------------
-        var sqlStmt = {},
-            foreignKeys = [],
-            jsonColumns = [];
-        // Primary Key
-		// ---------------------------
-		if (!(storeExistence || []).includes(storeSchema.primaryKey)) {
-			sqlStmt[storeSchema.primaryKey] = (storeExistence ? 'ADD COLUMN ' : '') + '`' + storeSchema.primaryKey + '` int AUTO_INCREMENT NOT NULL PRIMARY KEY';
-		}
-        // Columns
-		// ---------------------------
-        var fieldsLoop, prevIteration;
-        await Promise.all(Object.keys(storeSchema.fields).map(name => {
-            prevIteration/* block next iteration */ = new Promise(async resolve => {
-                var prevColumn = await prevIteration;/* wait prev iteration */
-
-                var field = storeSchema.fields[name];
-                if (field.referencedEntity) {
-                    // Resolve dependency
-                    if (field.referencedEntity.table !== storeSchema.name && !(await tableExists(database.conn, field.referencedEntity.table))) {
-                        // Simply ignore?
-                        var referencedEntitySchema = schema.filter(_schema => _schema.name === field.referencedEntity.table)[0];
-                        if (referencedEntitySchema && (await databaseCreateSchema(database, referencedEntitySchema, replace))[0]) {
-                            // Add to foreign keys list
-                            foreignKeys[name] = field.referencedEntity;
-                        }
-                    } else if (!(await isLinkedForeignKey(database.conn, storeSchema.name, name))) {
-                        // Add to foreign keys list
-                        foreignKeys[name] = field.referencedEntity;
-                    }
-                }
-
-                if ((storeExistence || []).includes(name) || name === storeSchema.primaryKey) {
-                    // End it here for this field
-                    return resolve(name);
-                }
-
-                if ((field.type || '').toLowerCase() === 'json') {
-                    jsonColumns.push(name);
-                }
-
-                var columnBlueprintStr = '`' + name + '` ' + (field.type || 'varchar(255)') + (field.charlen ? ' (' + field.charlen + ')' : '') + (field.nullable === false ? ' NOT NULL' : '');
-                if ('default' in field) {
-                    columnBlueprintStr += ' DEFAULT ' + (!_isNull(field.default) ? (field.default === 'CURRENT_TIMESTAMP' ? field.default : '"' + field.default + '"') : 'NULL');
-                }
-
-                if (field.onupdate === 'CURRENT_TIMESTAMP') {
-                    columnBlueprintStr += ' ON UPDATE CURRENT_TIMESTAMP';
-                }
-
-                sqlStmt[name] = (storeExistence ? 'ADD COLUMN ' : '') + columnBlueprintStr + (storeExistence && prevColumn ? ' AFTER ' + prevColumn : '');
-                resolve(name);
-                
-            });
-
-            // Into the map
-            return prevIteration;
-        }));
-        
-		// Was terminated?
-		if (fieldsLoop === false) {
-			return;
-        }
-
-        // Fulltext Columns
-		// ---------------------------
-		if (storeSchema.fulltextColumns && _intersect(storeSchema.fulltextColumns, (storeExistence || [])).length) {
-			sqlStmt['FULLTEXT'] = (storeExistence ? 'ADD ' : '') + 'FULLTEXT (`' + storeSchema.fulltextColumns.join('`, `') + '`)';
-        }
-        // Unique Keys
-		// ---------------------------
-		if (storeSchema.uniqueKeys) {
-            var i = 0;
-			_each(storeSchema.uniqueKeys, (alias, keyPath) => {
-                var addedKeys = _intersect(_arrFrom(keyPath), Object.keys(sqlStmt));
-				if (addedKeys.length) {
-					if (!_isNumeric(alias)) {
-						sqlStmt[(i ++) + 'unique'] = (storeExistence ? 'ADD ' : '') + 'CONSTRAINT `' + alias + '` UNIQUE KEY (`' + _arrFrom(keyPath).join('`, `') + '`)';
-					} else if (_isString(keyPath)) {
-						sqlStmt[(i ++) + 'unique'] = (storeExistence ? 'ADD ' : '') + 'UNIQUE KEY (`' + keyPath + '`)';
-					}
-				}
-			});
-        }
-        // JSON Columns checks
-		// ---------------------------
-		jsonColumns.forEach((name, i) => {
-			sqlStmt[i + 'json'] = (storeExistence ? 'ADD ' : '') + 'CHECK(JSON_VALID(' + name + '))';
-        });
-        // Foreign Keys
-		// ---------------------------
-		_each(foreignKeys, (name, referenceBlueprint) => {
-			var referenceBlueprintStr = (storeExistence ? 'ADD ' : '') + 'CONSTRAINT FOREIGN KEY (`' + name + '`) REFERENCES ' + prefixedTableName(referenceBlueprint.table) + ' (`' + referenceBlueprint.column + '`)';
-			if (referenceBlueprint.onupdate) {
-				referenceBlueprintStr += ' ON UPDATE ' + referenceBlueprint.onupdate.replace(/_/g, ' ');
             }
-            if (referenceBlueprint.ondelete) {
-				referenceBlueprintStr += ' ON DELETE ' + referenceBlueprint.ondelete.replace(/_/g, ' ');
-			}
-			sqlStmt['foreignKeys'] = referenceBlueprintStr;
         });
         
-        // -------------------
-
-		if (!sqlStmt) {
-			if (storeExistence) {
-				return 2;
-			}
-			return 0;
-        }
-
-        var sql;
-        if (storeExistence) {
-			// ALTER Table
-			// ---------------------------
-			sql = 'ALTER TABLE `' + storeSchema.name + '`';
-			// Blueprint
-			// ---------------------------
-			sql += "\r\n\t" + Object.values(sqlStmt).join(",\r\n\t") + "\r\n";
-		} else {
-			// CREATE Table and opening bracket
-			// ---------------------------
-			sql = 'CREATE TABLE `' + storeSchema.name + '`(';
-			// Blueprint
-			// ---------------------------
-			sql += "\r\n\t" + Object.values(sqlStmt).join(",\r\n\t") + "\r\n";
-			// Closing bracket and engine
-			// ---------------------------
-			sql += ') ENGINE=' + (storeSchema.engine || 'InnoDB') + ';';
-        }
+        var sql = `CREATE TABLE ${params.ifNotExists ? 'IF NOT EXISTS ' : ''}\`${tableName}\` (`;
+        sql += "\r\n\t" + Object.values(sqlStmt).join(",\r\n\t") + "\r\n";
+        sql += ') ENGINE=' + (tableSchema.engine || 'InnoDB') + ';';
         
-        // -------------------
-
+        var conn = await this.driver.getConnection();
         return await (new Promise((resolve, reject) => {
-            database.conn.query(sql, (err, result) => {
+            conn.query(sql, (err, result) => {
                 if (err) return reject(err);
+                this.def.schema[tableName] = tableSchema;
+                resolve(new SQLTable(this, tableName, {
+                    schema: tableSchema,
+                }));
+            });
+        }));
+
+    }
+
+    /**
+     * @inheritdoc
+     */
+    async alterTable(tableName, newTableSchemaOrCallback, params = {}) {
+
+        var tableSchema = await this.getTableSchema(tableName),
+            newTableSchema;
+        if (_isFunction(newTableSchemaOrCallback)) {
+            // Modify existing schema
+            newTableSchema = this.cloneSchema(tableSchema);
+            await newTableSchemaOrCallback(newTableSchema);
+        } else if (_isObject(callback)) {
+            newTableSchema = newTableSchemaOrCallback;
+        } else {
+            throw new Error('Table/store modification expects only an object (new schema) or a function (callback that recieves existing schema).')
+        }
+
+        var sqlStmt = [], actions = this.diffSchema({}, newTableSchema);
+        _each(actions, (changeName, changeDef) => {
+            if (changeName !== 'renamedColumns') {
+                // "primaryKey", "columns", "foreignKeys", "indexes", "jsonColumns"
+                if (changeName === 'primaryKey') {
+                    if (changeDef.add) {
+                        sqlStmt.push(this.toSql[changeName](changeDef.add, changeDef.add, 'add'));
+                    } else if (changeDef.alter) {
+                        sqlStmt.push(this.toSql[changeName](changeDef.alter, changeDef.alter, 'alter'));
+                    } else if (changeDef.drop) {
+                        sqlStmt.push(this.toSql[changeName](changeDef.drop, changeDef.drop, 'drop'));
+                    }
+                } else {
+                    _each(changeDef.add, (prop, def) => {
+                        sqlStmt.push(this.toSql[changeName](prop, def, 'add'));
+                    });
+                    _each(changeDef.alter, (prop, changes) => {
+                        sqlStmt.push(this.toSql[changeName](prop, changes.current, 'alter'));
+                    });
+                    _each(changeDef.drop, (prop, oldDef) => {
+                        sqlStmt.push(this.toSql[changeName](prop, oldDef, 'drop'));
+                    });
+                }
+            } else {
+                // "renamedColumns" actually comes last from source...
+                // and really should
+                _each(changeDef, (oldName, newName) => {
+                    sqlStmt.push(this.toSql[changeName](oldName, newName));
+                });
+            }
+        });
+
+        var sql = `ALTER TABLE ${params.ifExists ? 'IF EXISTS ' : ''}\`${tableName}\` (`;
+        sql += "\r\n\t" + Object.values(sqlStmt).join(",\r\n\t") + "\r\n";
+        sql += ');';
+        
+        var conn = await this.driver.getConnection();
+        return await (new Promise((resolve, reject) => {
+            conn.query(sql, (err, result) => {
+                if (err) return reject(err);
+                this.def.schema[tableName] = newTableSchema;
+                resolve(new SQLTable(this, tableName, {
+                    schema: newTableSchema,
+                }));
+            });
+        }));
+
+    }
+
+    /**
+     * @inheritdoc
+     */
+    async dropTable(tableName, params = {}) {
+        var sql = `DROP TABLE ${params.ifExists ? 'IF EXISTS ' : ''}\`${tableName}\``;
+        
+        var conn = await this.driver.getConnection();
+        return await (new Promise((resolve, reject) => {
+            conn.query(sql, (err, result) => {
+                if (err) return reject(err);
+                delete this.def.schema[tableName];
                 resolve(result);
             });
         }));
+    }
 
-    }));
-};
+    /**
+     * @inheritdoc
+     */
+    async getTableSchema(tableName) {
+        return this.def.schema[tableName];
+    }
 
-/**
- * Checks table existence.
- * 
- * @param Object conn 
- * @param String tableName 
- * 
- * @return Promise -> Number
- */
-export const tableExists = async (conn, tableName) => {
-    return (await queryTableColumns(conn, tableName) || []).length > 0;
-};
+    // ----------------
 
-/**
- * Checks foreign key existence.
- * 
- * @param Object conn 
- * @param String tableName 
- * @param String keyName 
- * 
- * @return Promise -> Number
- */
-export const isLinkedForeignKey = (conn, tableName, keyName) => {
-    return new Promise(resolve => {
-        var isLinkedSql = 'SELECT REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME FROM INFORMATION_SCHEMA.`KEY_COLUMN_USAGE` WHERE REFERENCED_TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?';
-        conn.query(isLinkedSql, [tableName, keyName], (err, result) => {
-            if (err) return resolve(0);
-            resolve(result.length);
-        });
-    });
-};
+    /**
+     * @var Object.
+     * 
+     * SQL translators.
+     */
+    toSql = {
 
-/**
- * Queries table columns.
- * 
- * @param Object conn 
- * @param String tableName 
- * 
- * @return Promise -> Array
- */
-export const queryTableColumns = (conn, tableName) => {
-    return new Promise(resolve => {
-        var columnsQuerySql = 'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?';
-        conn.query(columnsQuerySql, [tableName], (err, result) => {
-            if (err) return resolve([]);
-            resolve(result.reduce((columns, row) => columns.concat(row['COLUMN_NAME']), []));
-        });
-    });
-};
+        primaryKey: (columnName, def, delta) => {
+            if (delta === 'drop') {
+                return 'DROP PRIMARY KEY';
+            }
+            // Compose STRING
+            var columnSql = 'PRIMARY KEY (`' + _arrFrom(def).join('`, `') + '`)';
+            if (delta) {
+                return (delta === 'alter' ? 'DROP PRIMARY KEY, ADD ' : 'ADD ') + columnSql;
+            }
+            return columnSql;
+        },
+    
+        columns: (columnName, def, delta) => {
+            if (delta === 'drop') {
+                return 'DROP COLUMN `' + columnName + '`';
+            }
+            // Compose STRING
+            var columnSql = '`' + columnName + '` ' + (def.type ? def.type + (def.charlen ? ' (' + def.charlen + ')' : '') : (def.referencedEntity ? 'int' : 'varchar(255)')) + (def.nullable === false ? ' NOT NULL' : '') + (def.primaryKey ? ' PRIMARY KEY' : '') + (def.autoIncrement ? ' AUTO_INCREMENT' : '');
+            if ('default' in def) {
+                columnSql += ' DEFAULT ' + (!_isNull(def.default) ? (def.default === 'CURRENT_TIMESTAMP' ? def.default : '"' + def.default + '"') : 'NULL');
+            }
+            if (def.onupdate === 'CURRENT_TIMESTAMP') {
+                columnSql += ' ON UPDATE CURRENT_TIMESTAMP';
+            }
+            if (delta) {
+                return (delta === 'alter' ? 'ALTER COLUMN ' : 'ADD COLUMN ') + columnSql + (def.before ? ' BEFORE ' + def.before : (def.after ? ' AFTER ' + def.after : ''));
+            }
+            return columnSql;
+        },
+    
+        foreignKeys: (columnName, def, delta) => {
+            if (delta === 'drop') {
+                return 'DROP CONSTRAINT `' + columnName + '`';
+            }
+            var columnSql = 'CONSTRAINT FOREIGN KEY (`' + columnName + '`) REFERENCES ' + def.table + ' (`' + (def.column) + '`)';
+            if (def.onupdate) {
+                columnSql += ' ON UPDATE ' + def.onupdate.replace(/_/g, ' ');
+            }
+            if (def.ondelete) {
+                columnSql += ' ON DELETE ' + def.ondelete.replace(/_/g, ' ');
+            }
+            if (delta) {
+                return (delta === 'alter' ? 'ALTER ' : 'ADD ') + columnSql;
+            }
+            return columnSql;
+        },
+    
+        indexes: (alias, def, delta) => {
+            if (delta === 'drop') {
+                return 'DROP CONSTRAINT `' + alias + '`';
+            }
+            var columnSql;
+            if (def.type === 'fulltext' || def.type === 'unique') {
+                columnSql = (def.type === 'fulltext' ? 'FULLTEXT' : 'UNIQUE KEY') + ' `' + alias + '` (`' + _arrFrom(def.keyPath).join('`, `') + '`)';
+            } else {
+                columnSql = 'INDEX `' + alias + '` (`' + _arrFrom(def.keyPath).join('`, `') + '`)';
+            }
+            if (delta) {
+                return (delta === 'alter' ? 'ALTER ' : 'ADD ') + columnSql;
+            }
+            return columnSql;
+        },
+    
+        jsonColumns: (alias, columnName, delta) => {
+            if (delta === 'drop') {
+                return 'DROP CONSTRAINT `' + alias + '`';
+            }
+            var columnSql = 'CONSTRAINT `' + alias + ' CHECK(JSON_VALID(' + columnName + '))';
+            if (delta) {
+                return (delta === 'alter' ? 'ALTER ' : 'ADD ') + columnSql;
+            }
+            return columnSql;
+        },
+    
+        renamedColumns: (columnName, newColumnName) => {
+            return 'ALTER COLUMN `' + columnName + '` RENAME TO `' + newColumnName + '`';
+        },
+    
+    }
+
+}

@@ -3,7 +3,7 @@
  * @imports
  */
 import _Cursor from './_Cursor.js';
-import _Store from './_Store.js';
+import _Table from './_Table.js';
 
 /**
  * ---------------------------
@@ -11,13 +11,13 @@ import _Store from './_Store.js';
  * ---------------------------
  */				
 
-export default class View extends _Store {
+export default class View extends _Table {
 	 
 	/**
 	 * @inheritdoc
 	 */
-	constructor(stmt, store, name, schema = {}, params = {}) {
-		super(store, name, schema, params);
+	constructor(stmt, database, tableName, def, params = {}) {
+		super(database, tableName, def, params);
 		this.stmt = stmt;
 	}
 
@@ -27,7 +27,7 @@ export default class View extends _Store {
 	 * @return Cursor
 	 */
 	getCursor() {
-		return new _Cursor((this.store || []).filter(row => row));
+		return new _Cursor((this.def.data || []).filter(row => row));
 	}
 
 	/**

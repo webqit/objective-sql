@@ -9,7 +9,6 @@ import _isString from '@webqit/util/js/isString.js';
 import _isObject from '@webqit/util/js/isObject.js';
 import _objFirst from '@webqit/util/obj/first.js';
 import ArrowReferenceInterface from './ArrowReferenceInterface.js';
-import { factoryGetSchema } from '../database/_Factory.js';
 
 /**
  * ---------------------------
@@ -22,13 +21,13 @@ export default class ArrowReference extends ArrowReferenceInterface {
 	 * Gets the immediate target in a reference path.
 	 * 
 	 * @param {Object} schema1
-	 * @param {Object} DB_FACTORY
+	 * @param {Object} dbDriver
 	 * 
 	 * @return {Object}
 	 */
-	process(schema1, DB_FACTORY = null) {
+	process(schema1, dbDriver = null) {
 		var reference = this.interpreted ? this.interpreted.toString() : this.toString();
-		return ArrowReference.process(schema1, reference.replace(/`/g, ''), DB_FACTORY);
+		return ArrowReference.process(schema1, reference.replace(/`/g, ''), dbDriver);
 	}
 
 	/**
@@ -95,13 +94,13 @@ export default class ArrowReference extends ArrowReferenceInterface {
 	 * 
 	 * @param {Object} schema1 
 	 * @param {String} reference 
-	 * @param {Object} DB_FACTORY 
+	 * @param {Object} dbDriver 
 	 * 
 	 * @return {Object}
 	 */
-    static process(schema1, reference, DB_FACTORY = null) {
+    static process(schema1, reference, dbDriver = null) {
 		var schema2,
-			SCHEMAS = factoryGetSchema(DB_FACTORY, schema1 ? schema1.databaseName : null) || {fields: {}};
+			SCHEMAS = (schema1 ? dbDriver.getDatabaseSchema(schema1.databaseName) : dbDriver.getDatabaseSchema()) || {columns: {}};
 		if (this.isIncoming(reference)) {
 			// reference === actingKey<-...
 			var actingKey = _before(reference, this.arrLeft),
@@ -117,7 +116,7 @@ export default class ArrowReference extends ArrowReferenceInterface {
 			// --------------------------
 			if (this.isIncoming(sourceTable)) {
 				// reference === actingKey<-actingKey2<-table->?...
-				schema2 = this.process(null, sourceTable/* as new reference */, DB_FACTORY).a.table;
+				schema2 = this.process(null, sourceTable/* as new reference */, dbDriver).a.table;
 				var select = sourceTable;
 			} else {
 				// reference === actingKey<-table->?...
@@ -132,10 +131,10 @@ export default class ArrowReference extends ArrowReferenceInterface {
 				// Now get schema1 from schema2
 				// --------------------------
 				var referencedEntity;
-				if (!schema2.fields[actingKey] || !(referencedEntity = schema2.fields[actingKey].referencedEntity)) {
+				if (!schema2.columns[actingKey] || !(referencedEntity = schema2.columns[actingKey].referencedEntity)) {
 					throw new Error('[' + reference + ']: The "' + schema2.name + '" table does not define the implied foreign key "' + actingKey + '".');
 				}
-				schema1 = SCHEMAS[referencedEntity.name];
+				schema1 = SCHEMAS[referencedEntity.table];
 			}
 			return {
 				a: {table: schema1, actingKey: schema1.primaryKey,},
@@ -162,10 +161,10 @@ export default class ArrowReference extends ArrowReferenceInterface {
 		// Now get schema2 from schema1
 		// --------------------------
 		var referencedEntity;
-		if (!schema1.fields[foreignKey] || !(referencedEntity = schema1.fields[foreignKey].referencedEntity)) {
+		if (!schema1.columns[foreignKey] || !(referencedEntity = schema1.columns[foreignKey].referencedEntity)) {
 			throw new Error('[' + schema1.name + this.arrRight + reference + ']: The "' + schema1.name + '" table does not define the implied foreign key "' + foreignKey + '".');
 		}
-		schema2 = SCHEMAS[referencedEntity.name];
+		schema2 = SCHEMAS[referencedEntity.table];
 		return {
 			a: {table: schema1, actingKey: foreignKey,},
 			b: {table: schema2, actingKey: schema2.primaryKey, select,},

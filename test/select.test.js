@@ -3,24 +3,25 @@
  * @imports
  */
 import { expect } from 'chai';
-import { Client, SCHEMA, DATA, Parser } from './install.js';
+import { dbDriver, dbSchema as schema, dbData as data, Parser } from './install.js';
 
 describe(`SELECT QUERIES`, function() {
 
     before('Import into DB', async function() {
-        await Client.import('db1', {schema: SCHEMA, data: DATA}, 'drop'/* onExists */);
+        await dbDriver.dropDatabase('db1', {ifExists: true});
+        await dbDriver.importDatabase('db1', { schema, data });
     });
 
     var ast1, expr1 = `SELECT aaaa, bbbbb FROM (SELECT age as aaaa, time2 as bbbbb FROM table2 as t2) ta`;
     describe(`${expr1}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
-            ast1 = Parser.parse(expr1, null, {DB_FACTORY: Client, explain: false});
+            ast1 = Parser.parse(expr1, null, {dbDriver, explain: false});
             expect(ast1.stringify({interpreted:false}).toLowerCase()).to.be.equal(expr1.toLowerCase());
         });
 
         it(`"eval()" the expression and expect number of rows to be: 3`, async function() {
-            var result = await ast1.eval(Client);
+            var result = await ast1.eval(dbDriver);
             expect(result).to.be.an('array').that.have.lengthOf(3);
             expect(result[0]).to.be.an('object').that.have.keys('aaaa', 'bbbbb');
         });
@@ -31,12 +32,12 @@ describe(`SELECT QUERIES`, function() {
     describe(`${expr2}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
-            ast2 = Parser.parse(expr2, null, {DB_FACTORY: Client, explain: false});
+            ast2 = Parser.parse(expr2, null, {dbDriver, explain: false});
             expect(ast2.stringify({interpreted:false}).toLowerCase()).to.be.equal(expr2.toLowerCase());
         });
 
         it(`"eval()" the expression and expect number of rows to be 3: [ { 'COUNT(*)': 3 } ]`, async function() {
-            var result = await ast2.eval(Client);
+            var result = await ast2.eval(dbDriver);
             expect(result).to.be.an('array').that.eql([ { 'COUNT(*)': 3 } ]);
         });
 
@@ -46,12 +47,12 @@ describe(`SELECT QUERIES`, function() {
     describe(`${expr3}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
-            ast3 = Parser.parse(expr3, null, {DB_FACTORY: Client, explain: false});
+            ast3 = Parser.parse(expr3, null, {dbDriver, explain: false});
             expect(ast3.stringify({interpreted:false}).toLowerCase()).to.be.equal(expr3.toLowerCase());
         });
 
         it(`"eval()" the expression and expect number of rows to be ONLY 2: [ { 'COUNT(parent)': 2 } ]`, async function() {
-            var result = await ast3.eval(Client);
+            var result = await ast3.eval(dbDriver);
             expect(result).to.be.an('array').that.eql([ { 'COUNT(parent)': 2 } ]);
         });
 
@@ -61,12 +62,12 @@ describe(`SELECT QUERIES`, function() {
     describe(`${expr4}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
-            ast4 = Parser.parse(expr4, null, {DB_FACTORY: Client, explain: false});
+            ast4 = Parser.parse(expr4, null, {dbDriver, explain: false});
             expect(ast4.stringify({interpreted:false}).toLowerCase()).to.be.equal(expr4.toLowerCase());
         });
 
         it(`"eval()" the expression and expect number of rows to be 3 + 1 (with the ROLLUP row having: { age: 'Grand Total', total: 216 })`, async function() {
-            var result = await ast4.eval(Client);
+            var result = await ast4.eval(dbDriver);
             expect(result).to.be.an('array').with.lengthOf(4);
             expect(result[3]).to.have.property('age', 'Grand Total');
             expect(result[3]).to.have.property('total', 216);
@@ -78,12 +79,12 @@ describe(`SELECT QUERIES`, function() {
     describe(`${expr5}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
-            ast5 = Parser.parse(expr5, null, {DB_FACTORY: Client, explain: false});
+            ast5 = Parser.parse(expr5, null, {dbDriver, explain: false});
             expect(ast5.stringify({interpreted:false}).toLowerCase()).to.be.equal(expr5.toLowerCase());
         });
 
         it(`"eval()" the expression and expect number of rows to be 9 and in the correct order`, async function() {
-            var result = await ast5.eval(Client);
+            var result = await ast5.eval(dbDriver);
             expect(result).to.be.an('array').with.lengthOf(9);
             result.reduce((prev, current) => {
                 if (prev) {
@@ -99,12 +100,12 @@ describe(`SELECT QUERIES`, function() {
     describe(`${expr6}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, function() {
-            ast6 = Parser.parse(expr6, null, {DB_FACTORY: Client, explain: false});
+            ast6 = Parser.parse(expr6, null, {dbDriver, explain: false});
             expect(ast6.stringify({interpreted:false}).toLowerCase()).to.be.equal(expr6.toLowerCase());
         });
 
         it(`"eval()" the expression and expect number of rows to be 6 and in the correct order`, async function() {
-            var result = await ast6.eval(Client);
+            var result = await ast6.eval(dbDriver);
             expect(result).to.be.an('array').with.lengthOf(9);
             expect(result.reduce((prev, current) => prev.totalAge === current.totalAge ? current : 0, {totalAge: 133})).to.have.property('totalAge', 133);
         });
@@ -116,12 +117,12 @@ describe(`SELECT QUERIES`, function() {
     describe(`${expr7}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original but with missing backticks added`, function() {
-            ast7 = Parser.parse(expr7, null, {DB_FACTORY: Client, explain: false});
+            ast7 = Parser.parse(expr7, null, {dbDriver, explain: false});
             expect(ast7.stringify({interpreted:false}).toLowerCase()).to.be.equal(expr7b.toLowerCase());
         });
 
         it(`"eval()" the expression and expect number of rows to be 2 and the "parent~>id" field to be 1 and 2 respectively`, async function() {
-            var result = await ast7.eval(Client);
+            var result = await ast7.eval(dbDriver);
             expect(result).to.be.an('array').with.lengthOf(2);
             expect(result[0]).to.have.property('parent~>id', 1);
             expect(result[1]).to.have.property('parent~>id', 2);
@@ -134,12 +135,12 @@ describe(`SELECT QUERIES`, function() {
     describe(`${expr8}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original but with missing backticks added`, function() {
-            ast8 = Parser.parse(expr8, null, {DB_FACTORY: Client, explain: false});
+            ast8 = Parser.parse(expr8, null, {dbDriver, explain: false});
             expect(ast8.stringify({interpreted:false}).toLowerCase()).to.be.equal(expr8b.toLowerCase());
         });
 
         it(`"eval()" the expression and expect number of rows to be 3 and the "parent~>id" field of each to equal the "id" field of the previous`, async function() {
-            var result = await ast8.eval(Client);
+            var result = await ast8.eval(dbDriver);
             expect(result).to.be.an('array').with.lengthOf(3);
             result.reduce((prev, current) => {
                 if (prev) {
@@ -156,12 +157,12 @@ describe(`SELECT QUERIES`, function() {
     describe(`${expr9}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original but with missing backticks added`, function() {
-            ast9 = Parser.parse(expr9, null, {DB_FACTORY: Client, explain: false});
+            ast9 = Parser.parse(expr9, null, {dbDriver, explain: false});
             expect(ast9.stringify({interpreted:false}).toLowerCase()).to.be.equal(expr9b.toLowerCase());
         });
 
         it(`"eval()" the expression and expect number of rows to be 1: { id: 3, 'parent~>id': 2, age: 30 }`, async function() {
-            var result = await ast9.eval(Client, {vars:{age:30}});
+            var result = await ast9.eval(dbDriver, {vars:{age:30}});
             expect(result).to.be.an('array').with.lengthOf(1);
             expect(result[0]).to.eql({ id: 3, 'parent~>id': 2, age: 30 });
         });
