@@ -145,9 +145,9 @@ export default class Driver {
      */
     setDatabaseSchema(databaseName, databaseSchema) {
         if (!this.$.databases[databaseName]) {
-            this.$.databases[databaseName] = { data: {}};
+            this.$.databases[databaseName] = {};
         }
-        this.$.databases[databaseName] = databaseSchema;
+        this.$.databases[databaseName].schema = databaseSchema;
         return this;
     }
 

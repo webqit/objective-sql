@@ -89,7 +89,7 @@ export default class _Database {
      * 
      * @return Object
      */
-    async getSchema(tableName) {}
+    async getTableSchema(tableName) {}
 
     /**
      * Deep-clones the given inout.
@@ -153,20 +153,20 @@ export default class _Database {
                         schemaChanges.primaryKey.add = columnName;
                     }
                     if (newColumnsDef[columnName].referencedEntity) {
-                        schemaChanges.foreignKeys.add[columnName] = newColumnsDef[columnName].referencedEntity;
+                        schemaChanges.foreignKeys.add['fk_index__' + columnName] = newColumnsDef[columnName].referencedEntity;
                     }
                     if (newColumnsDef[columnName].index) {
-                        schemaChanges.indexes.add[columnName] = {keys: columnName, type: 'index'};
+                        schemaChanges.indexes.add['index__' + columnName] = {keys: columnName, type: 'index'};
                     }
                     if (newColumnsDef[columnName].unique) {
-                        schemaChanges.indexes.add[columnName] = {keyPath: columnName, type: 'unique'};
+                        schemaChanges.indexes.add['unique_index__' + columnName] = {keyPath: columnName, type: 'unique'};
                     }
                     if (newColumnsDef[columnName].fulltext) {
-                        schemaChanges.indexes.add[columnName] = {keyPath: columnName, type: 'fulltext'};
+                        schemaChanges.indexes.add['fulltext_index__' + columnName] = {keyPath: columnName, type: 'fulltext'};
                     }
                     // -------
                     if ((newColumnsDef[columnName].type || '').toLowerCase() === 'json') {
-                        schemaChanges.jsonColumns.add[columnName] = true;
+                        schemaChanges.jsonColumns.add['json_check_constraint__' + columnName] = columnName;
                     }
                 });
                 _intersect(currentColumns, prevColumns).forEach(columnName => {
@@ -191,30 +191,30 @@ export default class _Database {
                         schemaChanges.primaryKey.drop = columnName;
                     }
                     if (changes.addedProps.includes('referencedEntity') || (changes.alteredProps.includes('referencedEntity') && newColumnsDef[columnName].referencedEntity)) {
-                        schemaChanges.foreignKeys.add[columnName] = newColumnsDef[columnName].referencedEntity;
+                        schemaChanges.foreignKeys.add['fk_index__' + columnName] = newColumnsDef[columnName].referencedEntity;
                     } else if (changes.droppedProps.includes('referencedEntity') || (changes.alteredProps.includes('referencedEntity') && !newColumnsDef[columnName].referencedEntity)) {
-                        schemaChanges.foreignKeys.drop[columnName] = prevColumnsDef[columnName].referencedEntity;
+                        schemaChanges.foreignKeys.drop['fk_index__' + columnName] = prevColumnsDef[columnName].referencedEntity;
                     }
                     if (changes.addedProps.includes('index') || (changes.alteredProps.includes('index') && newColumnsDef[columnName].index)) {
-                        schemaChanges.indexes.add[columnName] = {keys: columnName, type: 'index'};
+                        schemaChanges.indexes.add['index__' + columnName] = {keys: columnName, type: 'index'};
                     } else if (changes.droppedProps.includes('index') || (changes.alteredProps.includes('index') && !newColumnsDef[columnName].index)) {
-                        schemaChanges.indexes.drop[columnName] = {keys: columnName, type: 'index'};
+                        schemaChanges.indexes.drop['index__' + columnName] = {keys: columnName, type: 'index'};
                     }
                     if (changes.addedProps.includes('unique') || (changes.alteredProps.includes('unique') && newColumnsDef[columnName].unique)) {
-                        schemaChanges.indexes.add[columnName] = {keyPath: columnName, type: 'unique'};
+                        schemaChanges.indexes.add['unique_index__' + columnName] = {keyPath: columnName, type: 'unique'};
                     } else if (changes.droppedProps.includes('unique') || (changes.alteredProps.includes('unique') && !newColumnsDef[columnName].unique)) {
-                        schemaChanges.indexes.drop[columnName] = {keyPath: columnName, type: 'unique'};
+                        schemaChanges.indexes.drop['unique_index__' + columnName] = {keyPath: columnName, type: 'unique'};
                     }
                     if (changes.addedProps.includes('fulltext') || (changes.alteredProps.includes('fulltext') && newColumnsDef[columnName].fulltext)) {
-                        schemaChanges.indexes.add[columnName] = {keyPath: columnName, type: 'fulltext'};
+                        schemaChanges.indexes.add['fulltext_index__' + columnName] = {keyPath: columnName, type: 'fulltext'};
                     } else if (changes.droppedProps.includes('fulltext') || (changes.alteredProps.includes('fulltext') && !newColumnsDef[columnName].fulltext)) {
-                        schemaChanges.indexes.drop[columnName] = {keyPath: columnName, type: 'fulltext'};
+                        schemaChanges.indexes.drop['fulltext_index__' + columnName] = {keyPath: columnName, type: 'fulltext'};
                     }
                     // -------
                     if ((changes.addedProps.includes('type') || changes.alteredProps.includes('type')) && (newColumnsDef[columnName].type || '').toLowerCase() === 'json') {
-                        schemaChanges.jsonColumns.add[columnName] = columnName;
+                        schemaChanges.jsonColumns.add['json_check_constraint__' + columnName] = columnName;
                     } else if ((changes.droppedProps.includes('type') || changes.alteredProps.includes('type')) && (prevColumnsDef[columnName].type || '').toLowerCase() === 'json') {
-                        schemaChanges.jsonColumns.drop[columnName] = columnName;
+                        schemaChanges.jsonColumns.drop['json_check_constraint__' + columnName] = columnName;
                     }
                 
                 });
@@ -225,20 +225,20 @@ export default class _Database {
                         schemaChanges.primaryKey.drop = columnName;
                     }
                     if (prevColumnsDef[columnName].referencedEntity) {
-                        schemaChanges.foreignKeys.drop[columnName] = prevColumnsDef[columnName].referencedEntity;
+                        schemaChanges.foreignKeys.drop['fk_index__' + columnName] = prevColumnsDef[columnName].referencedEntity;
                     }
                     if (prevColumnsDef[columnName].index) {
-                        schemaChanges.indexes.drop[columnName] = {keys: columnName, type: 'index'};
+                        schemaChanges.indexes.drop['index__' + columnName] = {keys: columnName, type: 'index'};
                     }
                     if (prevColumnsDef[columnName].unique) {
-                        schemaChanges.indexes.drop[columnName] = {keyPath: columnName, type: 'unique'};
+                        schemaChanges.indexes.drop['unique_index__' + columnName] = {keyPath: columnName, type: 'unique'};
                     }
                     if (prevColumnsDef[columnName].fulltext) {
-                        schemaChanges.indexes.drop[columnName] = {keyPath: columnName, type: 'fulltext'};
+                        schemaChanges.indexes.drop['fulltext_index__' + columnName] = {keyPath: columnName, type: 'fulltext'};
                     }
                     // -------
                     if ((prevColumnsDef[columnName].type || '').toLowerCase() === 'json') {
-                        schemaChanges.jsonColumns.drop[columnName] = true;
+                        schemaChanges.jsonColumns.drop['json_check_constraint__' + columnName] = true;
                     }
                 });
             },

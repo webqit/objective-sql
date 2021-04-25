@@ -66,7 +66,7 @@ export default class SQLDatabase extends _Database {
         var sql = `CREATE TABLE ${params.ifNotExists ? 'IF NOT EXISTS ' : ''}\`${tableName}\` (`;
         sql += "\r\n\t" + Object.values(sqlStmt).join(",\r\n\t") + "\r\n";
         sql += ') ENGINE=' + (tableSchema.engine || 'InnoDB') + ';';
-        
+    
         var conn = await this.driver.getConnection();
         return await (new Promise((resolve, reject) => {
             conn.query(sql, (err, result) => {
@@ -166,7 +166,9 @@ export default class SQLDatabase extends _Database {
      * @inheritdoc
      */
     async getTableSchema(tableName) {
-        return this.def.schema[tableName];
+        if (this.def.schema) {
+            return this.def.schema[tableName];
+        }
     }
 
     // ----------------
@@ -195,7 +197,7 @@ export default class SQLDatabase extends _Database {
                 return 'DROP COLUMN `' + columnName + '`';
             }
             // Compose STRING
-            var columnSql = '`' + columnName + '` ' + (def.type ? def.type + (def.charlen ? ' (' + def.charlen + ')' : '') : (def.referencedEntity ? 'int' : 'varchar(255)')) + (def.nullable === false ? ' NOT NULL' : '') + (def.primaryKey ? ' PRIMARY KEY' : '') + (def.autoIncrement ? ' AUTO_INCREMENT' : '');
+            var columnSql = '`' + columnName + '` ' + (def.type ? def.type + (def.charlen ? ' (' + def.charlen + ')' : '') : (def.referencedEntity ? 'int' : 'varchar(255)')) + (!def.nullable ? ' NOT NULL' : '') + (def.autoIncrement ? ' AUTO_INCREMENT' : '');
             if ('default' in def) {
                 columnSql += ' DEFAULT ' + (!_isNull(def.default) ? (def.default === 'CURRENT_TIMESTAMP' ? def.default : '"' + def.default + '"') : 'NULL');
             }
@@ -245,7 +247,7 @@ export default class SQLDatabase extends _Database {
             if (delta === 'drop') {
                 return 'DROP CONSTRAINT `' + alias + '`';
             }
-            var columnSql = 'CONSTRAINT `' + alias + ' CHECK(JSON_VALID(' + columnName + '))';
+            var columnSql = 'CONSTRAINT `' + alias + '` CHECK(JSON_VALID(' + columnName + '))';
             if (delta) {
                 return (delta === 'alter' ? 'ALTER ' : 'ADD ') + columnSql;
             }

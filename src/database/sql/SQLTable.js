@@ -6,6 +6,7 @@ import _isObject from '@webqit/util/js/isObject.js';
 import _isNull from '@webqit/util/js/isNull.js';
 import _arrFrom from '@webqit/util/arr/from.js';
 import _isNumeric from '@webqit/util/js/isNumeric.js';
+import _wrapped from '@webqit/util/str/wrapped.js';
 import _Table from '../_Table.js';
 import SQLCursor from './SQLCursor.js';
 import SQLInsertQueryInspector from './SQLInsertQueryInspector.js';
@@ -204,7 +205,8 @@ export default class SQLTable extends _Table {
  * HELPERS
  * --------
  */
-const formatVal = val => val instanceof Date ? '"' + val.toISOString().split('.')[0] + '"' : (_isNumeric(val) ? val : (_isNull(val) ? 'NULL' : '"' + val + '"'));
+const isJSON = str => _wrapped(str, '{', '}') || _wrapped(str, '[', ']');
+const formatVal = val => val instanceof Date ? "'" + val.toISOString().split('.')[0] + "'" : (_isNumeric(val) ? val : (_isNull(val) ? 'NULL' : "'" + val + "'"));
 const formatAssignments = rowObj => Object.keys(rowObj).map(key => '`' + key + '` = ' + formatVal(rowObj[key])).join(', ');
 const formatAddRow = values => '(' + values.map(formatVal).join(', ') + ')';
 const formatPutRow = rowObj => {

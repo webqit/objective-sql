@@ -134,6 +134,7 @@ export default class SQLDriver extends Driver {
         if (!databases.filter(d => d.name = databaseName && d.version === params.version).length) {
             // Fire upgradedneeded!
         }
+        await this.setDefaultDB(databaseName, params);
         return new SQLDatabase(this, databaseName, {
             ...this.$.databases[databaseName]
         }, params);
