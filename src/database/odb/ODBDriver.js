@@ -20,6 +20,7 @@ export default class ODBDriver extends Driver {
      */
     constructor() {
         super();
+        this.$.data = {};
         this.name = 'odb';
     }
 
@@ -32,7 +33,7 @@ export default class ODBDriver extends Driver {
      * @return Array
 	 */
     async databases(databaseName = null, params = {}) {
-        var databaseList = Object.keys(this.$.databases).map(name => ({name}));
+        var databaseList = Object.keys(this.$.schema).map(name => ({name}));
         return this.matchDatabaseList(databaseList, databaseName, params);
 	}
 
@@ -52,11 +53,15 @@ export default class ODBDriver extends Driver {
         if (!databases.length) {
             // Fire upgradedneeded!
         }
-        if (!this.$.databases[databaseName]) {
-            this.$.databases[databaseName] = {schema: {}, data: {}};
+        if (!(databaseName in this.$.data)) {
+            // ----------------
+            this.setDatabaseSchema(databaseName, {});
+            this.$.data[databaseName] = {};
+            // ----------------
         }
         return new ODBDatabase(this, databaseName, {
-            ...this.$.databases[databaseName],
+            schema: this.getDatabaseSchema(databaseName),
+            data: this.$.data[databaseName],
         }, params);
     }
 
@@ -80,11 +85,13 @@ export default class ODBDriver extends Driver {
             throw new Error(`Database ${databaseName} already exists.`);
         }
         // ----------------
-        this.$.databases[databaseName] = {schema: {}, data: {}};
+        this.setDatabaseSchema(databaseName, {});
+        this.$.data[databaseName] = {};
         // ----------------
         await this.setDefaultDB(databaseName, params);
         return new ODBDatabase(this, databaseName, {
-            ...this.$.databases[databaseName],
+            schema: this.getDatabaseSchema(databaseName),
+            data: this.$.data[databaseName],
         }, params);
     }
 
@@ -103,7 +110,7 @@ export default class ODBDriver extends Driver {
             }
             throw new Error(`Database ${databaseName} does not exist.`);
         }
-        delete this.$.databases[databaseName];
+        this.unsetDatabaseSchema(databaseName);
     }
 
     /**
@@ -122,10 +129,3 @@ export default class ODBDriver extends Driver {
         return ObjSQL.parse(query, null, params).eval(this);
     }
 }
-
-/**
- * Databases storage.
- * 
- * @var Object
- */
- ODBDriver.databases = {};

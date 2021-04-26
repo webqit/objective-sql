@@ -4,9 +4,11 @@
  * @imports
  */
 import _isObject from '@webqit/util/js/isObject.js';
+import _isArray from '@webqit/util/js/isArray.js';
 import _arrFrom from '@webqit/util/arr/from.js';
 import _each from '@webqit/util/obj/each.js';
 import _intersect from '@webqit/util/arr/intersect.js';
+import _unique from '@webqit/util/arr/unique.js';
 import _difference from '@webqit/util/arr/difference.js';
 
 /**
@@ -83,31 +85,63 @@ export default class _Database {
      */
 
     /**
-     * Deep-clones the given inout.
+     * Returns a table schema.
      * 
      * @param String            tableName
      * 
      * @return Object
      */
-    async getTableSchema(tableName) {}
+    getTableSchema(tableName) {
+        return this.driver.getDatabaseSchema(this.databaseName)[tableName];
+    }
 
     /**
-     * Deep-clones the given inout.
+     * Sets a table schema.
+     * 
+     * @param String            tableName
+     * @param Object            schema
+     * @param Object            renameList
+     * 
+     * @return this
+     */
+    setTableSchema(tableName, schema, renameList = {}) {
+        _each(renameList, (oldName, newName) => {
+            schema.columns[newName] = schema.columns[oldName];
+            delete schema.columns[oldName];
+        });
+        this.driver.getDatabaseSchema(this.databaseName)[tableName] = schema;
+        return this;
+    }
+
+    /**
+     * Sets a table schema.
+     * 
+     * @param String            tableName
+     * 
+     * @return this
+     */
+    unsetTableSchema(tableName) {
+        delete this.driver.getDatabaseSchema(this.databaseName)[tableName];
+        return this;
+    }
+
+    /**
+     * Deep-clones a table schema.
      * 
      * @param Any               schema
      * 
      * @return Any
      */
-     cloneSchema(schema) {
+     cloneTableSchema(schema) {
         if (_isObject(schema)) {
             var newSchema = {};
             _each(schema, (name, value) => {
-                newSchema[name] = this.cloneSchema(value);
+                newSchema[name] = this.cloneTableSchema(value);
             });
             return newSchema;
         }
         if (_isArray(schema)) {
-            return schema.map(value => this.cloneSchema(value));
+            return schema.map(value => this.cloneTableSchema(value));
         }
         return schema;
     }
@@ -120,11 +154,11 @@ export default class _Database {
      * 
      * @return Object
      */
-    diffSchema(prevSchema, newSchema) {
+    diffTableSchema(prevSchema, newSchema) {
 
         const schemaChanges = {
             columns: {add: {}, alter: {}, drop: {}},
-            primaryKey: {add: {}, alter: {}, drop: {}},
+            primaryKey: {},
             foreignKeys: {add: {}, alter: {}, drop: {}},
             indexes: {add: {}, alter: {}, drop: {}},
             jsonColumns: {add: {}, alter: {}, drop: {}},
@@ -169,22 +203,29 @@ export default class _Database {
                         schemaChanges.jsonColumns.add['json_check_constraint__' + columnName] = columnName;
                     }
                 });
-                _intersect(currentColumns, prevColumns).forEach(columnName => {
+               _intersect(currentColumns, prevColumns).forEach(columnName => {
                     // -------
                     // Identify added/altered/dropped properties
                     // -------
                     var currentColumnProps = Object.keys(newColumnsDef[columnName]),
                         prevColumnProps = Object.keys(prevColumnsDef[columnName]);
     
-                    var changes = schemaChanges.columns.alter[columnName] = {
+                    var changes = {
                         current: newColumnsDef[columnName], 
                         prev: prevColumnsDef[columnName],
                         addedProps: _difference(currentColumnProps, prevColumnProps),
-                        alteredProps: _intersect(currentColumnProps, prevColumnProps),
+                        alteredProps: _intersect(currentColumnProps, prevColumnProps).filter(prop => !isSame(newColumnsDef[columnName][prop], prevColumnsDef[columnName][prop])),
                         droppedProps: _difference(prevColumnProps, currentColumnProps),
                     };
-    
+                    
                     // -------
+                    if (_difference(_unique([].concat(changes.addedProps, changes.alteredProps, changes.droppedProps)), ['name', 'primaryKey', 'referencedEntity', 'index', 'unique', 'fulltext', ]).length) {
+                        schemaChanges.columns.alter[columnName] = changes;
+                    }
+                    // -------
+                    if (changes.addedProps.includes('name') || (changes.alteredProps.includes('name') && newColumnsDef[columnName].name !== columnName)) {
+                        schemaChanges.renamedColumns[columnName] = newColumnsDef[columnName].name;                        
+                    }
                     if (changes.addedProps.includes('primaryKey') || (changes.alteredProps.includes('primaryKey') && newColumnsDef[columnName].primaryKey)) {
                         schemaChanges.primaryKey.add = columnName;
                     } else if (changes.droppedProps.includes('primaryKey') || (changes.alteredProps.includes('primaryKey') && !newColumnsDef[columnName].primaryKey)) {
@@ -358,3 +399,14 @@ export default class _Database {
     }
 
 }
+const isSame = (a, b) => {
+    if (a === b) return true;
+    if (_isArray(a) && _isArray(b) && a.length === b.length) {
+        return a.reduce((prev, v) => prev && b.includes(v), true);
+    }
+    var temp = {};
+    if (_isObject(a) && _isObject(b) && (temp.keys_a = Object.keys(a)).length === (temp.keys_b = Object.keys(b)).length) {
+        return temp.keys_a.reduce((prev, k) => prev && isSame(a[k], b[k]), true);
+    }
+    return false;
+};

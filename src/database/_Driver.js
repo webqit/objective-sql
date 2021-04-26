@@ -18,9 +18,24 @@ import _each from '@webqit/util/obj/each.js';
 export default class Driver {
     
     constructor() {
-        this.$ = {databases: {}};
+        this.$ = {schema: {},};
         this.defaultDB = 'db1';
         this.defaultDBParams = {};
+    }
+
+    /**
+     * Sets default database.
+     * 
+     * @param Object schema
+     * 
+     * @return this
+     */
+    async bindSchema(schema) {
+        if (!_isObject(schema)) {
+            throw new Error(`Schema must be an object.`);
+        }
+        this.$.schema = schema;
+        return this;
     }
 
     /**
@@ -29,11 +44,12 @@ export default class Driver {
      * @param String databaseName
      * @param Object params
      * 
-     * @return void
+     * @return this
      */
     async setDefaultDB(databaseName, params = this.defaultDBParams) {
         this.defaultDB = databaseName;
         this.defaultDBParams = params;
+        return this;
     }
 
     /**
@@ -132,7 +148,7 @@ export default class Driver {
      * @returns Object
      */
     getDatabaseSchema(databaseName = this.defaultDB) {
-        return (this.$.databases[databaseName] || {}).schema;
+        return this.$.schema[databaseName] || {};
     }
 
     /**
@@ -144,10 +160,19 @@ export default class Driver {
      * @returns this
      */
     setDatabaseSchema(databaseName, databaseSchema) {
-        if (!this.$.databases[databaseName]) {
-            this.$.databases[databaseName] = {};
-        }
-        this.$.databases[databaseName].schema = databaseSchema;
+        this.$.schema[databaseName] = databaseSchema;
+        return this;
+    }
+
+    /**
+     * Removes the database schema.
+     * 
+     * @param String databaseName 
+     * 
+     * @returns this
+     */
+    unsetDatabaseSchema(databaseName) {
+        delete this.$.schema[databaseName];
         return this;
     }
 

@@ -135,9 +135,7 @@ export default class SQLDriver extends Driver {
             // Fire upgradedneeded!
         }
         await this.setDefaultDB(databaseName, params);
-        return new SQLDatabase(this, databaseName, {
-            ...this.$.databases[databaseName]
-        }, params);
+        return new SQLDatabase(this, databaseName, {}, params);
 	}
 
 
@@ -165,12 +163,10 @@ export default class SQLDriver extends Driver {
             conn.query(`CREATE DATABASE${params.ifNotExists ? ` IF NOT EXISTS` : ``} ${databaseName}`, err => {
                 if (err) return reject(err);
                 // ----------------
-                this.$.databases[databaseName] = {schema: {}};
+                this.setDatabaseSchema(databaseName, {});
                 // ----------------
                 this.setDefaultDB(databaseName, params).then(() => {
-                    resolve(new SQLDatabase(this, databaseName, {
-                        ...this.$.databases[databaseName]
-                    }, params));
+                    resolve(new SQLDatabase(this, databaseName, {}, params));
                 });
             });
         });
@@ -190,7 +186,7 @@ export default class SQLDriver extends Driver {
             conn.query(`DROP DATABASE${params.ifExists ? ` IF EXISTS` : ``} ${databaseName}`, err => {
                 if (err) return reject(err);
                 // ----------------
-                delete this.$.databases[databaseName];
+                this.unsetDatabaseSchema(databaseName);
                 // ----------------
                 resolve(true);
             });

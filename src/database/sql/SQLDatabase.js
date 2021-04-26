@@ -8,6 +8,7 @@ import _isObject from '@webqit/util/js/isObject.js';
 import _isNull from '@webqit/util/js/isNull.js';
 import _arrFrom from '@webqit/util/arr/from.js';
 import _each from '@webqit/util/obj/each.js';
+import _diff from '@webqit/util/obj/diff.js';
 import _Database from '../_Database.js';
 import SQLTable from './SQLTable.js';
 
@@ -37,7 +38,7 @@ export default class SQLDatabase extends _Database {
      */
     async table(tableName, params = {}) {
         return new SQLTable(this, tableName, {
-            schema: await this.getTableSchema(tableName),
+            schema: this.getTableSchema(tableName),
         }, params);
     }
 
@@ -50,7 +51,7 @@ export default class SQLDatabase extends _Database {
      */
     async createTable(tableName, tableSchema, params = {}) {
         
-        var sqlStmt = [], actions = this.diffSchema({}, tableSchema);
+        var sqlStmt = [], actions = this.diffTableSchema({}, tableSchema);
         _each(actions, (changeName, changeDef) => {
             if (changeName === 'primaryKey') {
                 if (changeDef.add) {
@@ -71,9 +72,9 @@ export default class SQLDatabase extends _Database {
         return await (new Promise((resolve, reject) => {
             conn.query(sql, (err, result) => {
                 if (err) return reject(err);
-                this.def.schema[tableName] = tableSchema;
+                this.setTableSchema(tableName, tableSchema);
                 resolve(new SQLTable(this, tableName, {
-                    schema: tableSchema,
+                    schema: this.getTableSchema(tableName),
                 }));
             });
         }));
@@ -85,27 +86,27 @@ export default class SQLDatabase extends _Database {
      */
     async alterTable(tableName, newTableSchemaOrCallback, params = {}) {
 
-        var tableSchema = await this.getTableSchema(tableName),
+        var tableSchema = this.getTableSchema(tableName),
             newTableSchema;
         if (_isFunction(newTableSchemaOrCallback)) {
             // Modify existing schema
-            newTableSchema = this.cloneSchema(tableSchema);
+            newTableSchema = this.cloneTableSchema(tableSchema);
             await newTableSchemaOrCallback(newTableSchema);
-        } else if (_isObject(callback)) {
+        } else if (_isObject(newTableSchemaOrCallback)) {
             newTableSchema = newTableSchemaOrCallback;
         } else {
             throw new Error('Table/store modification expects only an object (new schema) or a function (callback that recieves existing schema).')
         }
 
-        var sqlStmt = [], actions = this.diffSchema({}, newTableSchema);
+        var sqlStmt = [], actions = this.diffTableSchema(tableSchema, newTableSchema);
         _each(actions, (changeName, changeDef) => {
             if (changeName !== 'renamedColumns') {
                 // "primaryKey", "columns", "foreignKeys", "indexes", "jsonColumns"
                 if (changeName === 'primaryKey') {
-                    if (changeDef.add) {
+                    if ((changeDef.add && changeDef.drop) || changeDef.alter) {
+                        sqlStmt.push(this.toSql[changeName](changeDef.alter, changeDef.add || changeDef.alter, 'alter'));
+                    } else if (changeDef.add) {
                         sqlStmt.push(this.toSql[changeName](changeDef.add, changeDef.add, 'add'));
-                    } else if (changeDef.alter) {
-                        sqlStmt.push(this.toSql[changeName](changeDef.alter, changeDef.alter, 'alter'));
                     } else if (changeDef.drop) {
                         sqlStmt.push(this.toSql[changeName](changeDef.drop, changeDef.drop, 'drop'));
                     }
@@ -129,17 +130,17 @@ export default class SQLDatabase extends _Database {
             }
         });
 
-        var sql = `ALTER TABLE ${params.ifExists ? 'IF EXISTS ' : ''}\`${tableName}\` (`;
+        var sql = `ALTER TABLE ${params.ifExists ? 'IF EXISTS ' : ''}\`${tableName}\``;
         sql += "\r\n\t" + Object.values(sqlStmt).join(",\r\n\t") + "\r\n";
-        sql += ');';
+        sql += ';';
         
         var conn = await this.driver.getConnection();
         return await (new Promise((resolve, reject) => {
             conn.query(sql, (err, result) => {
                 if (err) return reject(err);
-                this.def.schema[tableName] = newTableSchema;
+                this.setTableSchema(tableName, newTableSchema, actions.renamedColumns);
                 resolve(new SQLTable(this, tableName, {
-                    schema: newTableSchema,
+                    schema: this.getTableSchema(tableName),
                 }));
             });
         }));
@@ -156,19 +157,10 @@ export default class SQLDatabase extends _Database {
         return await (new Promise((resolve, reject) => {
             conn.query(sql, (err, result) => {
                 if (err) return reject(err);
-                delete this.def.schema[tableName];
+                this.unsetTableSchema(tableName);
                 resolve(result);
             });
         }));
-    }
-
-    /**
-     * @inheritdoc
-     */
-    async getTableSchema(tableName) {
-        if (this.def.schema) {
-            return this.def.schema[tableName];
-        }
     }
 
     // ----------------
@@ -255,7 +247,7 @@ export default class SQLDatabase extends _Database {
         },
     
         renamedColumns: (columnName, newColumnName) => {
-            return 'ALTER COLUMN `' + columnName + '` RENAME TO `' + newColumnName + '`';
+            return 'RENAME COLUMN `' + columnName + '` TO `' + newColumnName + '`';
         },
     
     }

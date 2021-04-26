@@ -90,12 +90,12 @@ export default class IDBDriver extends Driver {
             // Catch success
             dbOpenRequest.onsuccess = e => {
                 // ----------------
-                this.$.databases[databaseName] = {schema: {}, data: {}};
+                this.setDatabaseSchema(databaseName, {})
                 // ----------------
                 this.setDefaultDB(databaseName, params).then(() => {
                     resolve(new IDBDatabase(this, databaseName, {
                         database: e.target.result,
-                        ...this.$.databases[databaseName]
+                        schema: this.getDatabaseSchema(databaseName)
                     }, params));
                 });
             };
@@ -159,7 +159,7 @@ export default class IDBDriver extends Driver {
             // Catch success
             dbDeleteRequest.onsuccess = e => {
                 // ----------------
-                delete this.$.databases[databaseName];
+                this.unsetDatabaseSchema(databaseName)
                 // ----------------
                 resolve(true);
             };
