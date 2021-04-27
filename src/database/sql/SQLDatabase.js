@@ -57,7 +57,7 @@ export default class SQLDatabase extends _Database {
                 if (changeDef.add) {
                     sqlStmt.push(this.toSql[changeName](changeDef.add, changeDef.add));
                 }
-            } else {
+            } else if (changeName !== 'renameTo') {
                 _each(changeDef.add, (prop, def) => {
                     sqlStmt.push(this.toSql[changeName](prop, def));
                 });
@@ -98,9 +98,17 @@ export default class SQLDatabase extends _Database {
             throw new Error('Table/store modification expects only an object (new schema) or a function (callback that recieves existing schema).')
         }
 
-        var sqlStmt = [], actions = this.diffTableSchema(tableSchema, newTableSchema);
+        var sqlStmt = [], actions = this.diffTableSchema(tableSchema, newTableSchema, tableName);
         _each(actions, (changeName, changeDef) => {
-            if (changeName !== 'renamedColumns') {
+            if (changeName === 'renameTo') {
+                sqlStmt.push(this.toSql[changeName](changeDef));
+            } else if (changeName === 'renamedColumns') {
+                // "renamedColumns" actually comes last from source...
+                // and really should
+                _each(changeDef, (oldName, newName) => {
+                    sqlStmt.push(this.toSql[changeName](oldName, newName));
+                });
+            } else {
                 // "primaryKey", "columns", "foreignKeys", "indexes", "jsonColumns"
                 if (changeName === 'primaryKey') {
                     if ((changeDef.add && changeDef.drop) || changeDef.alter) {
@@ -121,12 +129,6 @@ export default class SQLDatabase extends _Database {
                         sqlStmt.push(this.toSql[changeName](prop, oldDef, 'drop'));
                     });
                 }
-            } else {
-                // "renamedColumns" actually comes last from source...
-                // and really should
-                _each(changeDef, (oldName, newName) => {
-                    sqlStmt.push(this.toSql[changeName](oldName, newName));
-                });
             }
         });
 
@@ -138,7 +140,7 @@ export default class SQLDatabase extends _Database {
         return await (new Promise((resolve, reject) => {
             conn.query(sql, (err, result) => {
                 if (err) return reject(err);
-                this.setTableSchema(tableName, newTableSchema, actions.renamedColumns);
+                this.setTableSchema(tableName, newTableSchema);
                 resolve(new SQLTable(this, tableName, {
                     schema: this.getTableSchema(tableName),
                 }));
@@ -171,6 +173,10 @@ export default class SQLDatabase extends _Database {
      * SQL translators.
      */
     toSql = {
+
+        renameTo: (newTableName) => {
+            return 'RENAME TO `' + newTableName + '`';
+        },
 
         primaryKey: (columnName, def, delta) => {
             if (delta === 'drop') {

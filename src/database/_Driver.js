@@ -160,7 +160,16 @@ export default class Driver {
      * @returns this
      */
     setDatabaseSchema(databaseName, databaseSchema) {
-        this.$.schema[databaseName] = databaseSchema;
+        const _databaseSchema = {};
+        _each(databaseSchema, (tablenName, tableSchema) => {
+            if (tableSchema.name && tableSchema.name !== tablenName) {
+                _databaseSchema[tableSchema.name] = tableSchema;
+                delete tableSchema.name;
+            } else {
+                _databaseSchema[tablenName] = tableSchema;
+            }
+        });
+        this.$.schema[databaseName] = _databaseSchema;
         return this;
     }
 

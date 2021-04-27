@@ -100,16 +100,24 @@ export default class _Database {
      * 
      * @param String            tableName
      * @param Object            schema
-     * @param Object            renameList
      * 
      * @return this
      */
-    setTableSchema(tableName, schema, renameList = {}) {
-        _each(renameList, (oldName, newName) => {
-            schema.columns[newName] = schema.columns[oldName];
-            delete schema.columns[oldName];
+    setTableSchema(tableName, schema) {
+        const schemaColumns = {};
+        _each(schema.columns, (columnName, columnDef) => {
+            if (columnDef.name && columnDef.name !== columnName) {
+                schemaColumns[columnDef.name] = columnDef;
+                delete columnDef.name;
+            } else {
+                schemaColumns[columnName] = columnDef;
+            }
         });
-        this.driver.getDatabaseSchema(this.databaseName)[tableName] = schema;
+        schema.columns = schemaColumns;
+        // ---------------
+        const databaseSchema = this.driver.getDatabaseSchema(this.databaseName);
+        databaseSchema[tableName] = schema;
+        this.driver.setDatabaseSchema(this.databaseName, databaseSchema);
         return this;
     }
 
@@ -154,7 +162,7 @@ export default class _Database {
      * 
      * @return Object
      */
-    diffTableSchema(prevSchema, newSchema) {
+    diffTableSchema(prevSchema, newSchema, tableName) {
 
         const schemaChanges = {
             columns: {add: {}, alter: {}, drop: {}},
@@ -163,13 +171,10 @@ export default class _Database {
             indexes: {add: {}, alter: {}, drop: {}},
             jsonColumns: {add: {}, alter: {}, drop: {}},
             renamedColumns: {},
+            renameTo: null,
         };
     
         const schemaChangeRecorders = {
-
-            // Name
-            name: () => {
-            },
     
             // Columns
             columns: (action, newColumnsDef, prevColumnsDef) => {
@@ -282,6 +287,16 @@ export default class _Database {
                         schemaChanges.jsonColumns.drop['json_check_constraint__' + columnName] = true;
                     }
                 });
+            },
+
+            // Name
+            name: (action, newTableName) => {
+                if (action === 'drop') {
+                    return;
+                }
+                if (newTableName !== tableName) {
+                    schemaChanges.renameTo = newTableName;
+                }
             },
     
             // Primary Key

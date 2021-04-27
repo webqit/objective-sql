@@ -14,7 +14,7 @@
   ],
   "homepage": "https://webqit.io/tooling/objective-sql",
   "icon": "https://webqit.io/icon.svg",
-  "version": "0.2.72",
+  "version": "0.2.73",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,8 +28,7 @@
   "scripts": {
     "test": "mocha --file test/setup.test.js --extension .test.js",
     "test:coverage": "c8 --reporter=text-lcov npm run test | coveralls",
-    "build": "webpack --config ./webpack.config.cjs",
-    "prepublish": "npm run build"
+    "build": "webpack --config ./webpack.config.cjs"
   },
   "dependencies": {
     "@webqit/subscript": "^1.1.3",
