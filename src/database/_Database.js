@@ -192,7 +192,7 @@ export default class _Database {
                         schemaChanges.primaryKey.add = columnName;
                     }
                     if (newColumnsDef[columnName].referencedEntity) {
-                        schemaChanges.foreignKeys.add['fk_index__' + columnName] = newColumnsDef[columnName].referencedEntity;
+                        schemaChanges.foreignKeys.add['fk_index__' + columnName] = {columnName, ...newColumnsDef[columnName].referencedEntity};
                     }
                     if (newColumnsDef[columnName].index) {
                         schemaChanges.indexes.add['index__' + columnName] = {keys: columnName, type: 'index'};

@@ -42,7 +42,7 @@ export const dbSchema = {
 	table3: {
 		name: 'table3',
 		primaryKey: 'id',
-		columns: {id: {type: 'int', autoIncrement: true}, parent: {nullable: true}, fname:{}, lname:{default:'Default Lname3'}, age:{type: 'int', default:0}, tablename:{default: 't3'}, time1:{type: 'timestamp', onupdate: 'CURRENT_TIMESTAMP'}, time2:{type: 'datetime', default: 'CURRENT_TIMESTAMP'}},
+		columns: {id: {type: 'int', autoIncrement: true}, parent: {type: 'int'}, fname:{}, lname:{default:'Default Lname3'}, age:{type: 'int', default:0}, tablename:{default: 't3'}, time1:{type: 'timestamp', onupdate: 'CURRENT_TIMESTAMP'}, time2:{type: 'datetime', default: 'CURRENT_TIMESTAMP'}},
 		indexes: {age: {keyPath: 'age', type: 'unique'}},
 	},
 	table4: {

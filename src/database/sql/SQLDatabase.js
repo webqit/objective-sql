@@ -195,7 +195,7 @@ export default class SQLDatabase extends _Database {
                 return 'DROP COLUMN `' + columnName + '`';
             }
             // Compose STRING
-            var columnSql = '`' + columnName + '` ' + (def.type ? def.type + (def.charlen ? ' (' + def.charlen + ')' : '') : (def.referencedEntity ? 'int' : 'varchar(255)')) + (!def.nullable ? ' NOT NULL' : '') + (def.autoIncrement ? ' AUTO_INCREMENT' : '');
+            var columnSql = '`' + columnName + '` ' + (def.type ? def.type + (def.charlen ? ' (' + def.charlen + ')' : '') : (def.referencedEntity ? 'int' : 'varchar(255)')) + (def.notNull ? ' NOT NULL' : '') + (def.autoIncrement ? ' AUTO_INCREMENT' : '');
             if ('default' in def) {
                 columnSql += ' DEFAULT ' + (!_isNull(def.default) ? (def.default === 'CURRENT_TIMESTAMP' ? def.default : '"' + def.default + '"') : 'NULL');
             }
@@ -208,11 +208,11 @@ export default class SQLDatabase extends _Database {
             return columnSql;
         },
     
-        foreignKeys: (columnName, def, delta) => {
+        foreignKeys: (alias, def, delta) => {
             if (delta === 'drop') {
-                return 'DROP CONSTRAINT `' + columnName + '`';
+                return 'DROP CONSTRAINT `' + alias + '`';
             }
-            var columnSql = 'CONSTRAINT FOREIGN KEY (`' + columnName + '`) REFERENCES ' + def.table + ' (`' + (def.column) + '`)';
+            var columnSql = 'CONSTRAINT `' + alias + '` FOREIGN KEY (`' + def.columnName + '`) REFERENCES ' + def.table + ' (`' + (def.column) + '`)';
             if (def.onupdate) {
                 columnSql += ' ON UPDATE ' + def.onupdate.replace(/_/g, ' ');
             }
