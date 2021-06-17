@@ -134,32 +134,29 @@ export default class ODBDatabase extends _Database {
     async getTableSchema(tableName) {
         return this.def.schema[tableName];
     }
-
-    // -------
-
-    applyToStore = {
-        primaryKey: (store, columnName, def, delta) => {},
-    
-        columns: (store, columnName, def, delta) => {},
-    
-        foreignKeys: (store, columnName, def, delta) => {},
-    
-        indexes: (store, alias, def, delta) => {
-            if (delta === 'drop') {
-                store.deleteIndex(alias);
-                return;
-            }
-            if (delta === 'alter' && store.indexNames.contains(alias)) {
-                store.deleteIndex(alias);
-            }
-            store.createIndex(alias, def.keyPath, {unique: def.type === 'unique'});
-        },
-    
-        jsonColumns: (store, alias, columnName, delta) => {},
-    
-        renamedColumns: (store, columnName, newColumnName) => {
-            return 'ALTER COLUMN `' + columnName + '` RENAME TO `' + newColumnName + '`';
-        },
-    }
-    
 }
+
+ODBDatabase.prototype.applyToStore = {
+    primaryKey: (store, columnName, def, delta) => {},
+
+    columns: (store, columnName, def, delta) => {},
+
+    foreignKeys: (store, columnName, def, delta) => {},
+
+    indexes: (store, alias, def, delta) => {
+        if (delta === 'drop') {
+            store.deleteIndex(alias);
+            return;
+        }
+        if (delta === 'alter' && store.indexNames.contains(alias)) {
+            store.deleteIndex(alias);
+        }
+        store.createIndex(alias, def.keyPath, {unique: def.type === 'unique'});
+    },
+
+    jsonColumns: (store, alias, columnName, delta) => {},
+
+    renamedColumns: (store, columnName, newColumnName) => {
+        return 'ALTER COLUMN `' + columnName + '` RENAME TO `' + newColumnName + '`';
+    },
+};
