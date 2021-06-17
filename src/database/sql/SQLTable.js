@@ -9,8 +9,8 @@ import _isNumeric from '@webqit/util/js/isNumeric.js';
 import _wrapped from '@webqit/util/str/wrapped.js';
 import _Table from '../_Table.js';
 import SQLCursor from './SQLCursor.js';
-import SQLInsertQueryInspector from './SQLInsertQueryInspector.js';
-import SQLDeleteQueryInspector from './SQLDeleteQueryInspector.js';
+import SQLInsertQueryInspector from './SQLInsertQueryResult.js';
+import SQLDeleteQueryInspector from './SQLDeleteQueryResult.js';
 
 /**
  * ---------------------------
