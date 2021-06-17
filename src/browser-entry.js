@@ -2,8 +2,8 @@
 /**
  * @imports
  */
-import ODB from './database/odb/ODBFactory.js';
-import IDB from './database/idb/IDBFactory.js';
+import ODB from './database/odb/ODBDriver.js';
+import IDB from './database/idb/IDBDriver.js';
 
 // As globals
 if (!window.WebQit) {
