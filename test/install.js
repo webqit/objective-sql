@@ -22,7 +22,7 @@ export { Parser };
 export const dbDriver = SQL.connect('mysql2', {
 	host: '127.0.0.1',
 	user: 'root',
-	password: '',
+	password: '3926',
 });
 export const dbSchema = {
 	table1: {

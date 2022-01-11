@@ -206,7 +206,16 @@ export default class SQLTable extends _Table {
  * --------
  */
 const isJSON = str => _wrapped(str, '{', '}') || _wrapped(str, '[', ']');
-const formatVal = val => val instanceof Date ? "'" + val.toISOString().split('.')[0] + "'" : (_isNumeric(val) ? val : (_isNull(val) ? 'NULL' : "'" + val + "'"));
+const formatVal = val => {
+	if (val instanceof Date) {
+		try {
+			return "'" + val.toISOString().split('.')[0] + "'";
+		} catch(e) {
+			return 'NULL';
+		}
+	}
+	return _isNumeric(val) ? val : (_isNull(val) ? 'NULL' : "'" + val + "'");
+};
 const formatAssignments = rowObj => Object.keys(rowObj).map(key => '`' + key + '` = ' + formatVal(rowObj[key])).join(', ');
 const formatAddRow = values => '(' + values.map(formatVal).join(', ') + ')';
 const formatPutRow = rowObj => {
