@@ -2,7 +2,7 @@
 /**
  * @imports
  */
-import { ExprInterface } from '@webqit/subscript/src/grammar.js';
+import ExprInterface from '../ExprInterface.js';
 
 /**
  * ---------------------------

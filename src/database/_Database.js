@@ -3,13 +3,11 @@
 /**
  * @imports
  */
-import _isObject from '@webqit/util/js/isObject.js';
-import _isArray from '@webqit/util/js/isArray.js';
-import _arrFrom from '@webqit/util/arr/from.js';
-import _each from '@webqit/util/obj/each.js';
-import _intersect from '@webqit/util/arr/intersect.js';
-import _unique from '@webqit/util/arr/unique.js';
-import _difference from '@webqit/util/arr/difference.js';
+import { _isObject, _isNumeric, _isBoolean } from '@webqit/util/js/index.js';
+import { _from as _arrFrom, _intersect, _unique, _difference } from '@webqit/util/arr/index.js';
+import CreateTable from '../statement/schema/CreateTable.js';
+import AlterTable from '../statement/schema/AlterTable.js';
+import DropTable from '../statement/schema/DropTable.js';
 
 /**
  * ---------------------------
@@ -22,406 +20,326 @@ export default class _Database {
 	/**
 	 * @constructor
 	 */
-	constructor(driver, databaseName, def) {
-		this.driver = driver;
-		this.databaseName = databaseName;
-		this.def = def;
+	constructor(client, dbName, params) {
+        this.$ = {
+            client,
+            schema: client.$.schemas.get(dbName),
+            params
+        };
 	}
+
+    /**
+     * @property Client
+     */
+    get client() { return this.$.client; }
+
+    /**
+     * @property String
+     */
+    get name() { return this.$.schema.name; }
+
+    /**
+     * @property Object
+     */
+    get params() { return this.$.params; }
 	
     /**
-     * @inheritdoc
+     * Returns list of tables.
+     * 
+     * @param Object            params
+     * 
+     * @return Array
      */
-     async tables() {}
+    async tables(params = {}) { return this.tablesCallback(() => ([]), ...arguments); }
 
     /**
-     * Drops a database.
+     * Describes table.
      * 
-     * @param String            tableName
+     * @param String            tblName
+     * @param Object            params
      * 
-     * @return Bool
+     * @return Object
      */
-    async table(tableName) {}
-
-    /**
-     * CREATE/ALTER/DROP
-     */
+    async describeTable(tblName, params = {}) { return this.describeTableCallback((tblName, params) => {}, ...arguments); }
 
     /**
      * Creates table.
      * 
-     * @param String            tableName
-     * @param Object            tableSchema
+     * @param String            tblName
+     * @param Object            tblSchema
      * @param Object            params
      * 
      * @return Object
      */
-    async createTable(tableName, tableSchema = {}, params = {}) {}
+    async createTable(tblName, tblSchema = {}, params = {}) { return this.createTableCallback(() => ([]), ...arguments); }
+
+    /**
+     * Forwards to: createTable().
+     * @with: params.ifNotExixts = true
+     */
+    async createTableIfNotExists(tblName, tblSchema = {}, params = {}) { return this.createTable(tblName, tblSchema, { ...params, ifNotExists: true }); }
 
     /**
      * Alters table.
      * 
-     * @param String            tableName
-     * @param Object|Function   newTableSchemaOrCallback
+     * @param String            tblName
+     * @param Object            tblSchema
      * @param Object            params
      * 
      * @return Bool
      */
-    async alterTable(tableName, newTableSchemaOrCallback, params = {}) {}
+    async alterTable(tblName, tblSchema, params = {}) { return this.alterTableCallback((tblName, tblSchema, params) => {}, ...arguments); }
 
     /**
      * Drops table.
      * 
-     * @param String            tableName
+     * @param String            tblName
      * @param Object            params
      * 
      * @return Bool
      */
-    async dropTable(tableName, params = {}) {}
+    async dropTable(tblName, params = {}) { return this.dropTableCallback((tblName, params) => {}, ...arguments); }
 
     /**
-     * ---------
-     * SCHEMA
-     * ---------
+     * Forwards to: dropTable().
+     * @with: params.ifExixts = true
      */
+    async dropTableIfExists(tblName, params = {}) { return this.dropTable(tblName, { ...params, ifNotExists: true }); }
 
     /**
-     * Returns a table schema.
+     * Returns a table instance.
      * 
-     * @param String            tableName
-     * 
-     * @return Object
-     */
-    getTableSchema(tableName) {
-        return this.driver.getDatabaseSchema(this.databaseName)[tableName];
-    }
-
-    /**
-     * Sets a table schema.
-     * 
-     * @param String            tableName
-     * @param Object            schema
-     * 
-     * @return this
-     */
-    setTableSchema(tableName, schema) {
-        const schemaColumns = {};
-        _each(schema.columns, (columnName, columnDef) => {
-            if (columnDef.name && columnDef.name !== columnName) {
-                schemaColumns[columnDef.name] = columnDef;
-                delete columnDef.name;
-            } else {
-                schemaColumns[columnName] = columnDef;
-            }
-        });
-        schema.columns = schemaColumns;
-        // ---------------
-        const databaseSchema = this.driver.getDatabaseSchema(this.databaseName);
-        databaseSchema[tableName] = schema;
-        this.driver.setDatabaseSchema(this.databaseName, databaseSchema);
-        return this;
-    }
-
-    /**
-     * Sets a table schema.
-     * 
-     * @param String            tableName
-     * 
-     * @return this
-     */
-    unsetTableSchema(tableName) {
-        delete this.driver.getDatabaseSchema(this.databaseName)[tableName];
-        return this;
-    }
-
-    /**
-     * Deep-clones a table schema.
-     * 
-     * @param Any               schema
-     * 
-     * @return Any
-     */
-     cloneTableSchema(schema) {
-        if (_isObject(schema)) {
-            var newSchema = {};
-            _each(schema, (name, value) => {
-                newSchema[name] = this.cloneTableSchema(value);
-            });
-            return newSchema;
-        }
-        if (_isArray(schema)) {
-            return schema.map(value => this.cloneTableSchema(value));
-        }
-        return schema;
-    }
-
-    /**
-     * Deep-diffs the given schema into action items.
-     * 
-     * @param Object            prevSchema
-     * @param Object            newSchema
-     * 
-     * @return Object
-     */
-    diffTableSchema(prevSchema, newSchema, tableName) {
-
-        const schemaChanges = {
-            columns: {add: {}, alter: {}, drop: {}},
-            primaryKey: {},
-            foreignKeys: {add: {}, alter: {}, drop: {}},
-            indexes: {add: {}, alter: {}, drop: {}},
-            jsonColumns: {add: {}, alter: {}, drop: {}},
-            renamedColumns: {},
-            renameTo: null,
-        };
-    
-        const schemaChangeRecorders = {
-    
-            // Columns
-            columns: (action, newColumnsDef, prevColumnsDef) => {
-                
-                // -------
-                // Identify added/altered/dropped keys
-                // -------
-                var currentColumns = Object.keys(action === 'drop' ? {} : newColumnsDef),
-                    prevColumns = Object.keys(action === 'add' ? {} : prevColumnsDef);
-    
-                _difference(currentColumns, prevColumns).forEach(columnName => {
-                    schemaChanges.columns.add[columnName] = newColumnsDef[columnName];
-                    // -------
-                    if (newColumnsDef[columnName].primaryKey) {
-                        schemaChanges.primaryKey.add = columnName;
-                    }
-                    if (newColumnsDef[columnName].referencedEntity) {
-                        schemaChanges.foreignKeys.add['fk_index__' + columnName] = {columnName, ...newColumnsDef[columnName].referencedEntity};
-                    }
-                    if (newColumnsDef[columnName].index) {
-                        schemaChanges.indexes.add['index__' + columnName] = {keys: columnName, type: 'index'};
-                    }
-                    if (newColumnsDef[columnName].unique) {
-                        schemaChanges.indexes.add['unique_index__' + columnName] = {keyPath: columnName, type: 'unique'};
-                    }
-                    if (newColumnsDef[columnName].fulltext) {
-                        schemaChanges.indexes.add['fulltext_index__' + columnName] = {keyPath: columnName, type: 'fulltext'};
-                    }
-                    // -------
-                    if ((newColumnsDef[columnName].type || '').toLowerCase() === 'json') {
-                        schemaChanges.jsonColumns.add['json_check_constraint__' + columnName] = columnName;
-                    }
-                });
-               _intersect(currentColumns, prevColumns).forEach(columnName => {
-                    // -------
-                    // Identify added/altered/dropped properties
-                    // -------
-                    var currentColumnProps = Object.keys(newColumnsDef[columnName]),
-                        prevColumnProps = Object.keys(prevColumnsDef[columnName]);
-    
-                    var changes = {
-                        current: newColumnsDef[columnName], 
-                        prev: prevColumnsDef[columnName],
-                        addedProps: _difference(currentColumnProps, prevColumnProps),
-                        alteredProps: _intersect(currentColumnProps, prevColumnProps).filter(prop => !isSame(newColumnsDef[columnName][prop], prevColumnsDef[columnName][prop])),
-                        droppedProps: _difference(prevColumnProps, currentColumnProps),
-                    };
-                    
-                    // -------
-                    if (_difference(_unique([].concat(changes.addedProps, changes.alteredProps, changes.droppedProps)), ['name', 'primaryKey', 'referencedEntity', 'index', 'unique', 'fulltext', ]).length) {
-                        schemaChanges.columns.alter[columnName] = changes;
-                    }
-                    // -------
-                    if (changes.addedProps.includes('name') || (changes.alteredProps.includes('name') && newColumnsDef[columnName].name !== columnName)) {
-                        schemaChanges.renamedColumns[columnName] = newColumnsDef[columnName].name;                        
-                    }
-                    if (changes.addedProps.includes('primaryKey') || (changes.alteredProps.includes('primaryKey') && newColumnsDef[columnName].primaryKey)) {
-                        schemaChanges.primaryKey.add = columnName;
-                    } else if (changes.droppedProps.includes('primaryKey') || (changes.alteredProps.includes('primaryKey') && !newColumnsDef[columnName].primaryKey)) {
-                        schemaChanges.primaryKey.drop = columnName;
-                    }
-                    if (changes.addedProps.includes('referencedEntity') || (changes.alteredProps.includes('referencedEntity') && newColumnsDef[columnName].referencedEntity)) {
-                        schemaChanges.foreignKeys.add['fk_index__' + columnName] = newColumnsDef[columnName].referencedEntity;
-                    } else if (changes.droppedProps.includes('referencedEntity') || (changes.alteredProps.includes('referencedEntity') && !newColumnsDef[columnName].referencedEntity)) {
-                        schemaChanges.foreignKeys.drop['fk_index__' + columnName] = prevColumnsDef[columnName].referencedEntity;
-                    }
-                    if (changes.addedProps.includes('index') || (changes.alteredProps.includes('index') && newColumnsDef[columnName].index)) {
-                        schemaChanges.indexes.add['index__' + columnName] = {keys: columnName, type: 'index'};
-                    } else if (changes.droppedProps.includes('index') || (changes.alteredProps.includes('index') && !newColumnsDef[columnName].index)) {
-                        schemaChanges.indexes.drop['index__' + columnName] = {keys: columnName, type: 'index'};
-                    }
-                    if (changes.addedProps.includes('unique') || (changes.alteredProps.includes('unique') && newColumnsDef[columnName].unique)) {
-                        schemaChanges.indexes.add['unique_index__' + columnName] = {keyPath: columnName, type: 'unique'};
-                    } else if (changes.droppedProps.includes('unique') || (changes.alteredProps.includes('unique') && !newColumnsDef[columnName].unique)) {
-                        schemaChanges.indexes.drop['unique_index__' + columnName] = {keyPath: columnName, type: 'unique'};
-                    }
-                    if (changes.addedProps.includes('fulltext') || (changes.alteredProps.includes('fulltext') && newColumnsDef[columnName].fulltext)) {
-                        schemaChanges.indexes.add['fulltext_index__' + columnName] = {keyPath: columnName, type: 'fulltext'};
-                    } else if (changes.droppedProps.includes('fulltext') || (changes.alteredProps.includes('fulltext') && !newColumnsDef[columnName].fulltext)) {
-                        schemaChanges.indexes.drop['fulltext_index__' + columnName] = {keyPath: columnName, type: 'fulltext'};
-                    }
-                    // -------
-                    if ((changes.addedProps.includes('type') || changes.alteredProps.includes('type')) && (newColumnsDef[columnName].type || '').toLowerCase() === 'json') {
-                        schemaChanges.jsonColumns.add['json_check_constraint__' + columnName] = columnName;
-                    } else if ((changes.droppedProps.includes('type') || changes.alteredProps.includes('type')) && (prevColumnsDef[columnName].type || '').toLowerCase() === 'json') {
-                        schemaChanges.jsonColumns.drop['json_check_constraint__' + columnName] = columnName;
-                    }
-                
-                });
-                _difference(prevColumns, currentColumns).forEach(columnName => {
-                    schemaChanges.columns.drop[columnName] = prevColumnsDef[columnName];
-                    // -------
-                    if (prevColumnsDef[columnName].primaryKey) {
-                        schemaChanges.primaryKey.drop = columnName;
-                    }
-                    if (prevColumnsDef[columnName].referencedEntity) {
-                        schemaChanges.foreignKeys.drop['fk_index__' + columnName] = prevColumnsDef[columnName].referencedEntity;
-                    }
-                    if (prevColumnsDef[columnName].index) {
-                        schemaChanges.indexes.drop['index__' + columnName] = {keys: columnName, type: 'index'};
-                    }
-                    if (prevColumnsDef[columnName].unique) {
-                        schemaChanges.indexes.drop['unique_index__' + columnName] = {keyPath: columnName, type: 'unique'};
-                    }
-                    if (prevColumnsDef[columnName].fulltext) {
-                        schemaChanges.indexes.drop['fulltext_index__' + columnName] = {keyPath: columnName, type: 'fulltext'};
-                    }
-                    // -------
-                    if ((prevColumnsDef[columnName].type || '').toLowerCase() === 'json') {
-                        schemaChanges.jsonColumns.drop['json_check_constraint__' + columnName] = true;
-                    }
-                });
-            },
-
-            // Name
-            name: (action, newTableName) => {
-                if (action === 'drop') {
-                    return;
-                }
-                if (newTableName !== tableName) {
-                    schemaChanges.renameTo = newTableName;
-                }
-            },
-    
-            // Primary Key
-            primaryKey: (action, newPrimaryKeyDef, prevPrimaryKeyDef) => {
-                var keyName = _arrFrom(newPrimaryKeyDef).join('___');
-                var prevKeyName = _arrFrom(prevPrimaryKeyDef).join('___');
-                if (keyName !== prevKeyName) {
-                    schemaChanges.primaryKey[action] = action === 'drop' ? prevPrimaryKeyDef : newPrimaryKeyDef;
-                }
-            },
-    
-            // Unique Keys
-            foreignKeys: (action, newKeysDef, prevKeysDef) => {
-                
-                // -------
-                // Identify added/altered/dropped keys
-                // -------
-                var currentKeys = Object.keys(action === 'drop' ? {} : newKeysDef),
-                    prevKeys = Object.keys(action === 'add' ? {} : prevKeysDef);
-    
-                _difference(currentKeys, prevKeys).forEach(keyName => {
-                    schemaChanges.foreignKeys.add[keyName] = newKeysDef[keyName];
-                });
-                _intersect(currentKeys, prevKeys).forEach(keyName => {
-                    schemaChanges.foreignKeys.alter[keyName] = {
-                        current: newKeysDef[keyName],
-                        prev: prevKeysDef[keyName],
-                    };
-                });
-                _difference(prevKeys, currentKeys).forEach(keyName => {
-                    schemaChanges.foreignKeys.drop[keyName] = prevKeysDef[keyName];
-                });
-    
-            },
-    
-            // Unique Keys
-            indexes: (action, newIndexesDef, prevIndexesDef) => {
-                
-                // -------
-                // Identify added/altered/dropped keys
-                // -------
-                var currentKeys = Object.keys(action === 'drop' ? {} : newIndexesDef),
-                    prevKeys = Object.keys(action === 'add' ? {} : prevIndexesDef);
-    
-                _difference(currentKeys, prevKeys).forEach(keyName => {
-                    schemaChanges.indexes.add[keyName] = newIndexesDef[keyName];
-                });
-                _intersect(currentKeys, prevKeys).forEach(keyName => {
-                    schemaChanges.indexes.alter[keyName] = {
-                        current: newIndexesDef[keyName], 
-                        prev: prevIndexesDef[keyName],
-                    };
-                });
-                _difference(prevKeys, currentKeys).forEach(keyName => {
-                    schemaChanges.indexes.drop[keyName] = prevIndexesDef[keyName];
-                });
-    
-            },
-    
-        };
-    
-        // ------------------
-        var currentProps = Object.keys(newSchema),
-            prevProps = Object.keys(prevSchema);
-        _difference(currentProps, prevProps).forEach(prop => {
-            // Add all these props
-            schemaChangeRecorders[prop]('add', newSchema[prop], null);
-        });
-        _intersect(currentProps, prevProps).forEach(prop => {
-            // Alter all these props
-            schemaChangeRecorders[prop]('alter', newSchema[prop], prevSchema[prop]);
-        });
-        _difference(prevProps, currentProps).forEach(prop => {
-            // Drop all these props
-            schemaChangeRecorders[prop]('drop', null, prevSchema[prop]);
-        });
-        // ------------------
-    
-        return schemaChanges;
-    }
-
-    /**
-     * Deep-validates the given schema.
-     * 
-     * @param Object schema
-     * @param Bool assert
+     * @param String            tblName
+     * @param Object            params
      * 
      * @return Bool
      */
-     validateSchema(schema, assert = false) {
-        try {
-            if (!_isObject(schema)) {
-                throw new Error('Table definition must be an object.');
-            }
-            if (!schema.name) {
-                throw new Error('Table must have a name.');
-            }
-            if (!_isObject(schema.columns)) {
-                throw new Error('Table must have a valid "columns" list.');
-            }
-            _each(schema.columns, (columnName, column) => {
-                if (!_isObject(column)) {
-                    throw new Error('Invalid column definition: "' + columnName + '" at "' + schema.name + '".');
-                }
-                if (column.referencedEntity
-                    && !(_isObject(column.referencedEntity) && column.referencedEntity.name)) {
-                    throw new Error('Invalid foreign key definition: "' + columnName + '" at "' + schema.name + '".');
-                }
+    table(tblName, params = {}) {
+        const tablesMap = this.$.schema.tables;
+        if (!tablesMap.has(tblName)) {
+            tablesMap.set(tblName, {
+                name: tblName,
+                inmem: true,
             });
-        } catch(e) {
-            if (assert) throw e;
-            return false;
         }
-        return true;
+        return new this.constructor.Table(this, ...arguments);
     }
 
+    /**
+     * BASE LOGICS
+     */
+
+    /**
+	 * Returns the database's current savepoint.
+	 * 
+     * @param Object params
+	 * 
+	 * @returns Object
+     */
+    async savepoint(params = {}) {
+        if (!this.$.schema.savepoint || params.force) {
+            const OBJ_INFOSCHEMA_DB = this.client.constructor.OBJ_INFOSCHEMA_DB;
+            if ((await this.client.databases({ name: OBJ_INFOSCHEMA_DB }))[0]) {
+                const result = await this.client.query(`SELECT id, name_snapshot, tables_snapshot, savepoint_desc, savepoint_date FROM ${ OBJ_INFOSCHEMA_DB }.database_savepoints WHERE current_name = '${ this.name }' AND rollback_date IS NULL ORDER BY savepoint_date DESC LIMIT 1`, [], { isStandardSql: true });
+                this.$.schema.savepoint = result[0];
+            }
+        }
+        return this.$.schema.savepoint;
+    }
+
+    /**
+     * Base logic for the tables() method.
+     * 
+     * @param Function callback
+     * @param Object filter
+     * 
+     * @return Array
+     */
+    async tablesCallback(callback, filter = {}) {
+        const tablesMap = this.$.schema.tables;
+        if (!tablesMap._touched || filter.force) {
+            tablesMap._touched = true;
+            for (let tbl of await callback()) {
+                if (typeof tbl === 'string') { tbl = { name: tbl }; }
+                if (tablesMap.has(tbl.name)) {
+                    delete tablesMap.get(tbl.name).inmem;
+                } else { tablesMap.set(tbl.name, { ...tbl }); }
+            }
+        }
+        let tblList = [...tablesMap.values()].filter(tbl => !tbl.inmem).map(tbl => tbl.name);
+        if (filter.name) { tblList = tblList.filter(tblName => tblName === filter.name); }
+        return tblList;
+    }
+
+    /**
+     * Base logic for describeTable()
+     * 
+     * @param String            tblName
+     * @param Function          callback
+     * @param Object            params
+     * 
+     * @return Object
+     */
+    async describeTableCallback(callback, tblName, params = {}) {
+        // First we validate operation
+        const tblFound = (await this.tables({ name: tblName }))[0];
+        if (!tblFound) { throw new Error(`Table ${ tblName } does not exist.`); }
+        const tablesMap = this.$.schema.tables;
+        if (!tablesMap.get(tblName)?.columns) {
+            const tblSchema = await callback(tblName, params); // Describe should always add constraint names
+            tablesMap.set(tblName, tblSchema);
+        }
+        return tablesMap.get(tblName);
+    }
+
+    /**
+     * Base logic for createTable()
+     * 
+     * @param Function          callback
+     * @param Object            tblSchema
+     * @param Object            params
+     */
+    async createTableCallback(callback, tblSchema, params = {}) {
+        await this.client.alterDatabase(this.name, async dbSchemaEdit => {
+            let tblCreateInstance;
+            if (tblSchema instanceof CreateTable) {
+                tblCreateInstance = tblSchema;
+                tblSchema = tblCreateInstance.toJson();
+            } else {
+                const tblFound = (await this.tables({ name: tblSchema.name }))[0];
+                if (tblFound) {
+                    if (params.ifNotExists) return;
+                    throw new Error(`Table ${ tblSchema.name } already exists.`);
+                }
+                if (tblSchema.database && tblSchema.database !== this.name) {
+                    throw new Error(`A table schema of database ${ tblSchema.database } is being passed to ${ this.name }.`);
+                }
+                tblCreateInstance = CreateTable.fromJson(tblSchema, { ...this.params/* global params */, database: this.name });
+            }
+            // Create savepoint
+            dbSchemaEdit.tablesSavepoints.add({
+                // Snapshot
+                name_snapshot: null,
+                columns_snapshot: JSON.stringify([]),
+                constraints_snapshot: JSON.stringify([]),
+                indexes_snapshot: JSON.stringify([]),
+                // New state
+                current_name: tblSchema.name
+            });
+            await callback(tblCreateInstance, params);
+            // Update original objects in place
+            const tablesMap = this.$.schema.tables;
+            if (tablesMap.get(tblSchema.name)?.inmem) {
+                delete tablesMap.get(tblSchema.name).inmem;
+            } else {
+                tablesMap.set(tblSchema.name, { name: tblSchema.name });
+            }
+        }, params);
+        return this.table(tblSchema.name, params);
+    }
+
+    /**
+     * Base logic for alterTable()
+     * 
+     * @param Function          callback
+     * @param String            tblName
+     * @param Function          editCallback
+     * @param Object            params
+     */
+    async alterTableCallback(callback, tblName, editCallback, params = {}) {
+        return this.client.alterDatabase(this.name, async dbSchemaEdit => {
+            let tblAltInstance, tblSchema;
+            if (tblName instanceof AlterTable) {
+                // Remap arguments
+                tblAltInstance = tblName;
+                tblName = tblAltInstance.name;
+                params = editCallback || {};
+                // Create savepount data
+                tblSchema = tblAltInstance.jsonA || await this.describeTable(tblName, params);
+            } else if (typeof editCallback === 'function') {
+                // First we validate operation
+                const tblFound = (await this.tables({ name: tblName }))[0];
+                if (!tblFound) throw new Error(`Table ${ tblName } does not exist.`);
+                // Singleton TBL schema
+                tblSchema = await this.describeTable(tblName, params);
+                // For recursive edits
+                if (tblSchema.schemaEdit) return await editCallback(tblSchema.schemaEdit);
+                // Fresh edit
+                tblSchema.schemaEdit = CreateTable.cloneSchema(tblSchema); // One global object
+                // ------
+                // Call for modification
+                await editCallback(tblSchema.schemaEdit);
+                // Diff into a AlterTable instance
+                tblAltInstance = AlterTable.fromDiffing(tblSchema, tblSchema.schemaEdit, this.client.params);
+                delete tblSchema.schemaEdit;
+            } else {
+                throw new Error(`Alter table "${ tblName }" called with invalid arguments.`);
+            }
+            if (tblAltInstance.nodeTypes.length) {
+                // Create savepoint
+                dbSchemaEdit.tablesSavepoints.add({
+                    // Snapshot
+                    name_snapshot: tblSchema.name,
+                    columns_snapshot: JSON.stringify(tblSchema.columns),
+                    constraints_snapshot: JSON.stringify(tblSchema.constraints),
+                    indexes_snapshot: JSON.stringify(tblSchema.indexes),
+                    // New state
+                    current_name: tblAltInstance.diffs.rename || tblAltInstance.name,
+                });
+                // Effect changes
+                await callback(tblAltInstance, params);
+            }
+            // Update original schema object in place
+            if (tblAltInstance.nodeTypes.includes('database')) {
+                tblSchema.database = tblAltInstance.diffs.relocate;
+            } else if (tblAltInstance.nodeTypes.includes('name')) {
+                tblSchema.name = tblAltInstance.diffs.rename;
+            }
+            // Unset from global location so that describeTable() knows to lookup remote db
+            this.$.schema.tables.delete(tblName);
+        }, params);
+    }
+
+    /**
+     * Base logic for dropTable()
+     * 
+     * @param Function          callback
+     * @param String            tblName
+     * @param Object            params
+     * 
+     * @return Object
+     */
+    async dropTableCallback(callback, tblName, params = {}) {
+        return this.client.alterDatabase(this.name, async dbSchemaEdit => {
+            let tblDropInstance;
+            if (tblName instanceof DropTable) {
+                tblDropInstance = tblName;
+                tblName = tblDropInstance.name;
+            } else {
+                // First we validate operation
+                const tblFound = (await this.tables({ name: tblName }))[0];
+                if (!tblFound) {
+                    if (params.ifExists) return;
+                    throw new Error(`Table ${ tblName } does not exist.`);
+                }
+                // Then forward the operation for execution
+                tblDropInstance = new DropTable(tblName, this.name, params);
+            }
+            // Create savepoint
+            const tblSchema = await this.describeTable(tblName, params);
+            if (tblSchema.schemaEdit) throw new Error(`Cannot delete table when already in edit mode.`);
+            dbSchemaEdit.tablesSavepoints.add({
+                // Snapshot
+                name_snapshot: tblSchema.name,
+                columns_snapshot: JSON.stringify(tblSchema.columns),
+                constraints_snapshot: JSON.stringify(tblSchema.constraints),
+                indexes_snapshot: JSON.stringify(tblSchema.indexes),
+                // New state
+                current_name: null, // How we know deleted
+            });
+            await callback(tblDropInstance, params);
+            // Then update original schema object in place
+            this.$.schema.tables.delete(tblName);
+        });
+    }
 }
-const isSame = (a, b) => {
-    if (a === b) return true;
-    if (_isArray(a) && _isArray(b) && a.length === b.length) {
-        return a.reduce((prev, v) => prev && b.includes(v), true);
-    }
-    var temp = {};
-    if (_isObject(a) && _isObject(b) && (temp.keys_a = Object.keys(a)).length === (temp.keys_b = Object.keys(b)).length) {
-        return temp.keys_a.reduce((prev, k) => prev && isSame(a[k], b[k]), true);
-    }
-    return false;
-};

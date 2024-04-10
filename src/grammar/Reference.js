@@ -2,18 +2,40 @@
 /**
  * @imports
  */
-import { Scope } from '@webqit/subscript';
-import { Reference as _Reference } from '@webqit/subscript/src/grammar.js';
-
-import _isArray from '@webqit/util/js/isArray.js';
+import _isUndefined from '@webqit/util/js/isUndefined.js';
+import _wrapped from '@webqit/util/str/wrapped.js';
+import _unwrap from '@webqit/util/str/unwrap.js';
+import Lexer from '@webqit/util/str/Lexer.js';
+import ReferenceInterface from './ReferenceInterface.js';
+import ExprInterface from '../ExprInterface.js';
+import Scope from '../Scope.js';
+import SyntaxError from '../SyntaxError.js';
 
 /**
  * ---------------------------
  * Reference class
  * ---------------------------
  */				
-export default class Reference extends _Reference {
-		
+
+export default class Reference extends ReferenceInterface {
+
+	/**
+	 * @inheritdoc
+	 */
+	constructor(context, name, backticks = false) {
+		super();
+		this.context = context;
+		this.name = name;
+		this.backticks = backticks;
+	}
+	 
+	/**
+	 * @inheritdoc
+	 */
+	toString() {
+		return this.stringify();
+	}
+				
 	/**
 	 * @inheritdoc
 	 */
@@ -25,9 +47,30 @@ export default class Reference extends _Reference {
 			return this.interpreted.stringify(params);
 		}
 		// -----------
-		return super.stringify(params);
+		return this._stringify(params);
 	}
 	
+	/**
+	 * @inheritdoc
+	 */
+	_stringify(params = {}) {
+		var name = this.name;
+		if (this.context) {
+			var subjectContext = this.context.stringify(params);
+			if (name instanceof ExprInterface) {
+				name = '[' + name.stringify(params) + ']';
+			} else if (this.backticks) {
+				name = '`' + name + '`';
+			}
+		} else {
+			var subjectContext = params.context;
+			if (this.backticks) {
+				name = '`' + name + '`';
+			}
+		}
+		return (subjectContext || '') + (subjectContext && !name.startsWith('[') ? Reference.separator : '') + name;
+	}
+
 	/**
 	 * @inheritdoc
 	 */
@@ -85,11 +128,44 @@ export default class Reference extends _Reference {
 		}
 		return this.getEval(tempRow, params).get();
 	}
-	
+
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, ...args) {
-		return super.parse(expr, ...args);
+	static async parse(expr, parseCallback, params = {}) {
+		if (!Lexer.match(expr.trim(), [' ']).length) {
+			var splits = Lexer.split(expr, []);
+			// ------------------------
+			// name, first
+			// ------------------------
+			var context, name = splits.pop(), backticks;
+			var nameSplit = Lexer.split(name.trim(), [this.separator], {preserveDelims:true});
+			if (nameSplit.length > 1) {
+				name = nameSplit.pop().substr(1);
+				splits = splits.concat(nameSplit);
+			}
+			if (_wrapped(name, '`', '`')) {
+				name = _unwrap(name, '`', '`');
+				backticks = true;
+			}
+			// ------------------------
+			// context, second
+			// ------------------------
+			if (splits.length) {
+				context = await parseCallback(splits.join(''), null, {role: 'CONTEXT'});
+			}
+			if (_wrapped(name, '[', ']')) {
+				if (!context) {
+					throw new SyntaxError(expr);
+				}
+				name = await parseCallback(_unwrap(name, '[', ']'));
+			}
+			return new this(context, name, backticks);
+		}
 	}
-}
+};
+
+/**
+ * @prop string
+ */
+Reference.separator = '.';

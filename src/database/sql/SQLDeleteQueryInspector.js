@@ -19,9 +19,7 @@ export default class SQLDeleteQueryInspector extends _DeleteQueryInspector {
      * @return Array
      */
     async getAffectedRows(withIDs = false) {
-        if (withIDs) {
-            throw new Error(`The "withIDs" argument is not supported for delete queries.`)
-        }
+        if (withIDs) { throw new Error(`The "withIDs" argument is not supported for delete queries.`) }
         return this.rawResultMeta.affectedRows;
     }
 }

@@ -94,20 +94,20 @@ export default class Window extends WindowInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}) {
+	static async parse(expr, parseCallback, params = {}) {
 		var dfn = {};
 		if (_wrapped(expr, '(', ')')) {
 			if (expr = _unwrap(expr, '(', ')')) {
 				var parse = Lexer.lex(expr, ['PARTITION[ ]+BY', 'ORDER[ ]+BY'], {useRegex:'i'});
 				dfn.name = parse.tokens.shift().trim();
-				parse.matches.forEach(clauseType => {
+				for (const clauseType of parse.matches) {
 					if (clauseType.toLowerCase().startsWith('partition')) {
-						dfn.partitionBy = Lexer.split(parse.tokens.shift().trim(), [','])
-							.map(expr => parseCallback(expr));
+						dfn.partitionBy = await Promise.all(Lexer.split(parse.tokens.shift().trim(), [','])
+							.map(expr => parseCallback(expr)));
 					} else if (clauseType.toLowerCase().startsWith('order')) {
-						dfn.orderBy = parseCallback(parse.tokens.shift().trim(), [OrderBy]);
+						dfn.orderBy = await parseCallback(parse.tokens.shift().trim(), [OrderBy]);
 					}
-				});
+				}
 			}
 		} else {
 			dfn.name = expr;

@@ -2,13 +2,13 @@
 /**
  * @imports
  */
-import { Call } from '@webqit/subscript/src/grammar.js';
 import _mixin from '@webqit/util/js/mixin.js';
 import _flatten from '@webqit/util/arr/flatten.js';
 import _find from '@webqit/util/obj/find.js';
 import _before from '@webqit/util/str/before.js';
 import _after from '@webqit/util/str/after.js';
 import Lexer from '@webqit/util/str/Lexer.js';
+import Call from './Call.js';
 import AggrInterface from './AggrInterface.js';
 import Window from './Window.js';
 
@@ -49,7 +49,7 @@ export default class Aggr extends _mixin(Call, AggrInterface) {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}) {
+	static async parse(expr, parseCallback, params = {}) {
 		var aggrMatch, funcFlagMatch, aggrFlag = '';
 		var aggrMatchRegex = _flatten(this.funcs).join("\\(|") + "\\(";
 		if (aggrMatch = expr.trim().match(new RegExp('^(' + aggrMatchRegex + ')', 'i'))) {
@@ -64,11 +64,11 @@ export default class Aggr extends _mixin(Call, AggrInterface) {
 			if (funcCategory === 'explicitOver' && splits.length === 1) {
 				throw new Error(aggrMatch[0] + '() requires an OVER clause!');
 			}
-			var instance = super.parse(splits.shift().trim(), parseCallback, params);
+			var instance = await super.parse(splits.shift().trim(), parseCallback, params);
 			instance.funcCategory = funcCategory;
 			instance.aggrFlag = aggrFlag.trim();
 			if (splits.length) {
-				instance.window = parseCallback(splits.pop().trim(), [Window]);
+				instance.window = await parseCallback(splits.pop().trim(), [Window]);
 			}
 			return instance;
 		}

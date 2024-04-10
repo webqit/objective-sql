@@ -2,18 +2,9 @@
 /**
  * @imports
  */
-import _isTypeObject from '@webqit/util/js/isTypeObject.js';
-import _isObject from '@webqit/util/js/isObject.js';
-import _isEmpty from '@webqit/util/js/isEmpty.js';
-import _isNull from '@webqit/util/js/isNull.js';
-import _isString from '@webqit/util/js/isString.js';
-import _isNumeric from '@webqit/util/js/isNumeric.js';
-import _isUndefined from '@webqit/util/js/isUndefined.js';
-import _arrFrom from '@webqit/util/arr/from.js';
-import _intersect from '@webqit/util/arr/intersect.js';
-import _all from '@webqit/util/arr/all.js';
-import _each from '@webqit/util/obj/each.js';
-import _wrapped from '@webqit/util/str/wrapped.js';
+import { _isTypeObject, _isNull, _isString, _isNumeric, _isUndefined, _isObject } from '@webqit/util/js/index.js';
+import { _from as _arrFrom, _intersect } from '@webqit/util/arr/index.js';
+import { _wrapped } from '@webqit/util/str/index.js';
 
 /**
  * ---------------------------
@@ -26,22 +17,46 @@ export default class _Table {
 	/**
 	 * @inheritdoc
 	 */
-	constructor(database, tableName, def, params = {}) {
-		// -----------------
-		this.database = database;
-		this.name = tableName;
-		this.def = def;
-		this.params = params;
-		// -----------------
-		if (_isEmpty(def.schema)) {
-			def.schema = {
-				primaryKey: '',
-				columns: {},
-				indexes: {},
-				derived: true,
-			};
-		}
+	constructor(database, tblName, params = {}) {
+        this.$ = {
+            database,
+            schema: database.$.schema.tables.get(tblName),
+            params
+        };
 	}
+
+    /**
+     * @property String
+     */
+    get name() { return this.$.schema.name; }
+
+    /**
+     * @property Database
+     */
+    get database() { return this.$.database; }
+
+    /**
+     * @property Object
+     */
+    get params() { return this.$.params; }
+
+    /**
+	 * Returns the table's current savepoint.
+	 * 
+     * @param Object params
+	 * 
+	 * @returns Object
+     */
+    async savepoint(params = {}) {
+        if (!this.$.schema.savepoint || params.force) {
+            const OBJ_INFOSCHEMA_DB = this.database.client.constructor.OBJ_INFOSCHEMA_DB;
+            if ((await this.database.client.databases({ name: OBJ_INFOSCHEMA_DB }))[0]) {
+                const result = await this.database.client.query(`SELECT tbl.name_snapshot, db.name_snapshot AS database_snapshot, tbl.columns_snapshot, tbl.constraints_snapshot, tbl.indexes_snapshot, tbl.savepoint_id, db.savepoint_desc, db.savepoint_date FROM ${ OBJ_INFOSCHEMA_DB }.table_savepoints AS tbl RIGHT JOIN ${ OBJ_INFOSCHEMA_DB }.database_savepoints AS db ON db.id = tbl.savepoint_id AND db.current_name = '${ this.database.name }' AND db.rollback_date IS NULL WHERE tbl.current_name = '${ this.name }' ORDER BY db.savepoint_date DESC LIMIT 1`, [], { isStandardSql: true });
+                this.$.schema.savepoint = result[0];
+            }
+        }
+        return this.$.schema.savepoint;
+    }
 
 	/**
 	 * ----------
@@ -55,9 +70,9 @@ export default class _Table {
 	 * @returns Array
 	 */
 	getKeyPathForPrimaryKey() {
-		var keyPath = Object.keys(this.def.schema.columns).filter(name => this.def.schema.columns[name].primaryKey);
-		if (!keyPath.length && this.def.schema.primaryKey) {
-			keyPath = _arrFrom(this.def.schema.primaryKey);
+		let keyPath = this.$.schema.columns.filter(col => col.primaryKey).map(col => col.name);
+		if (!keyPath.length) {
+			keyPath = this.$.schema.constraints.find(cons => cons.type === 'PRIMARY KEY')?.columns || [];
 		}
 		return keyPath;
 	}
@@ -70,7 +85,7 @@ export default class _Table {
 	 * @returns Array
 	 */
 	 getKeyPathsForIndex(type) {
-		var keyPaths = Object.keys(this.def.schema.columns).filter(name => this.def.schema.columns[name][type]);
+		let keyPaths = Object.keys(this.def.schema.columns).filter(name => this.def.schema.columns[name][type]);
 		if (this.def.schema.indexes) {
 			Object.keys(this.def.schema.indexes).filter(indexName => this.def.schema.indexes[indexName].type === type).forEach(indexName => {
 				keyPaths.push(_arrFrom(this.def.schema.indexes[indexName].keyPath));
@@ -92,16 +107,14 @@ export default class _Table {
 	 * 
 	 * @return Number
 	 */
-	async syncCursor(cursor) {
-		return await this.putAll(cursor.cache);
-	}
+	async syncCursor(cursor) { return await this.putAll(cursor.cache); }
 
 	/**
 	 * @inheritdoc
 	 */
 	async match(rowObj) {
 		// -----------
-		var primaryKey, existing;
+		let primaryKey, existing;
 		if (this.def.schema.primaryKey 
 		&& (primaryKey = readKeyPath(rowObj, this.def.schema.primaryKey)) 
 		&& (existing = await this.get(primaryKey))) {
@@ -115,9 +128,7 @@ export default class _Table {
 		var match, uniqueKeys = Object.keys(this.def.schema.indexes).filter(alias => this.def.schema.indexes[alias].type === 'unique');
 		if (uniqueKeys.length) {
 			(await this.getAll()).forEach((existingRow, i) => {
-				if (match) {
-					return;
-				}
+				if (match) return;
 				uniqueKeys.forEach(constraintName => {
 					var keyPath = this.def.schema.indexes[constraintName].keyPath;
 					if (existingRow && readKeyPath(rowObj, keyPath) === readKeyPath(existingRow, keyPath)) {
@@ -142,64 +153,43 @@ export default class _Table {
 	 * @inheritdoc
 	 */
 	async addAll(multiValues, columns = [], duplicateKeyCallback = null, forceAutoIncrement = false) {
-
-		var ongoingAdd;
-		var forUpdates = [];
-
-		var inserts = await Promise.all(multiValues.map(async (values, line) => {
-
-
-			var rowObj = {};
-			if (_isObject(values)) {
-				rowObj = values;
-			} else {
-				var _columns = columns.length ? columns : Object.keys(this.def.schema.columns);
-				if (_columns.length && _columns.length !== values.length) {
-					throw new Error('Column/values count mismatch at line ' + line + '!');
+		const inserts = [], forUpdates = [];
+		for (const values of multiValues) {
+			let rowObj = values;
+			if (Array.isArray(values)) {
+				const columnNames = columns.length ? columns : this.$.schema.columns.map(col => col.name);
+				if (columnNames.length && columnNames.length !== values.length) {
+					throw new Error(`Column/values count mismatch at line ${ multiValues.indexOf(values) }.`);
 				}
-				_columns.forEach((columnName, i) => {
-					rowObj[columnName] = values[i];
-				});
+				rowObj = columnNames.reduce((rowObj, name, i) => ({ ...rowObj, [name]: values[i], }), {});
 			}
-
 			// -------------
 			this.handleInput(rowObj, true);					
 			// -------------
-
 			if (this.shouldMatchInput(rowObj) || duplicateKeyCallback) {
-				ongoingAdd/* block next iteration */ = new Promise(async resolve => {
-					await ongoingAdd;/* wait prev iteration */
-
-					var match = await this.match(rowObj);
-					if (match && duplicateKeyCallback) {
-						var duplicateRow = {...match.row};
-						if (duplicateKeyCallback(duplicateRow, rowObj)) {
-							forUpdates.push(duplicateRow);
-						}
-						// The duplicate situation had been handled
-						// ...positive or negative
-						return resolve('0');
+				const match = await this.match(rowObj);
+				if (match && duplicateKeyCallback) {
+					const duplicateRow = { ...match.row };
+					if (duplicateKeyCallback(duplicateRow, rowObj)) {
+						forUpdates.push(duplicateRow);
 					}
-
-					// We're finally going to add!
-					// We must not do this earlier...
-					// as "onupdate" rows will erronously take on a new timestamp on this column
-					await this.beforeAdd(rowObj, match);
-					resolve(this.add(rowObj));
-				});
-
-				return ongoingAdd;
+					// The duplicate situation had been handled
+					// ...positive or negative
+					inserts.push('0');
+					continue;
+				}
+				// We're finally going to add!
+				// We must not do this earlier...
+				// as "onupdate" rows will erronously take on a new timestamp on this column
+				await this.beforeAdd(rowObj, match);
+				inserts.push(await this.add(rowObj));
+				continue;
 			}
-
 			await this.beforeAdd(rowObj);
-			return this.add(rowObj);
-		}));
-
-		// OnDuplicateKey updates
-		if (forUpdates.length) {
-			inserts = inserts.concat(await this.putAll(forUpdates));
+			inserts.push(await this.add(rowObj));
 		}
-
+		// OnDuplicateKey updates
+		if (forUpdates.length) { inserts = inserts.concat(await this.putAll(forUpdates)); }
 		return inserts.filter((n, i) => n !== 0 && inserts.indexOf(n) === i);
 	}
 		
@@ -207,40 +197,32 @@ export default class _Table {
 	 * @inheritdoc
 	 */
 	async beforeAdd(rowObj, match) {
-		var timestamp = (new Date).toISOString();
-		_each(this.def.schema.columns || {}, (name, field) => {
-			if ((field.type === 'datetime' || field.type === 'timestamp') && field.default === 'CURRENT_TIMESTAMP') {
-				rowObj[name] = timestamp;
+		const timestamp = (new Date).toISOString();
+		for (const column of this.$.schema.columns) {
+			const columnType = _isObject(column.type) ? column.type.name : column.type;
+			if ((columnType === 'datetime' || columnType === 'timestamp') && column.default === 'CURRENT_TIMESTAMP') {
+				rowObj[column.name] = timestamp;
 			}
-		});
+		}
 	}
 	 
 	/**
 	 * @inheritdoc
 	 */
 	async putAll(multiRows) {
-		var ongoingPut;
-		var updates = await Promise.all(multiRows.map(async rowObj => {
-
+		const updates = [];
+		for (const rowObj of multiRows) {
 			// -------------
 			this.handleInput(rowObj);					
 			// -------------
 			if (this.shouldMatchInput(rowObj)) {
-				ongoingPut/* block next iteration */ = new Promise(async resolve => {
-					await ongoingPut;/* wait prev iteration */
-
-					await this.beforePut(rowObj, await this.match(rowObj));
-					resolve(this.put(rowObj));
-
-				});
-
-				return ongoingPut;
+				await this.beforePut(rowObj, await this.match(rowObj));
+				updates.push(await this.put(rowObj));
+				continue;
 			}
-
 			await this.beforePut(rowObj);
-			return this.put(rowObj);
-		}));
-
+			updates.push(await this.put(rowObj));
+		}
 		return updates;
 	}
 		
@@ -248,13 +230,14 @@ export default class _Table {
 	 * @inheritdoc
 	 */
 	async beforePut(rowObj, match) {
-		if (match && !_all(Object.keys(rowObj), key => rowObj[key] === match.row[key])) {
-			var timestamp = (new Date).toISOString();
-			_each(this.def.schema.columns || {}, (name, field) => {
-				if ((field.type === 'datetime' || field.type === 'timestamp') && field.onupdate === 'CURRENT_TIMESTAMP') {
-					rowObj[name] = timestamp;
+		if (match && !Object.keys(rowObj).every(key => rowObj[key] === match.row[key])) {
+			const timestamp = (new Date).toISOString();
+			for (const column of this.$.schema.columns) {
+				const columnType = _isObject(column.type) ? column.type.name : column.type;
+				if ((columnType === 'datetime' || columnType === 'timestamp') && column.onupdate === 'CURRENT_TIMESTAMP') {
+					rowObj[column.name] = timestamp;
 				}
-			});
+			}
 		}
 	}
 	 
@@ -262,10 +245,10 @@ export default class _Table {
 	 * @inheritdoc
 	 */
 	async deleteAll(multiIDs) {
-		var deletes = await Promise.all(multiIDs.map(async primaryKey => {
-			return this.delete(await this.beforeDelete(primaryKey));
-		}));
-
+		const deletes = [];
+		for (const primaryKey of multiIDs) {
+			deletes.push(this.delete(await this.beforeDelete(primaryKey)));
+		}
 		return deletes;
 	}
 		
@@ -284,44 +267,43 @@ export default class _Table {
 	 * @inheritdoc
 	 */
 	handleInput(rowObj, applyDefaults = false) {
-		var rowObjColumns = Object.keys(rowObj);
-		var schemaColumns = Object.keys(this.def.schema.columns);
+		const rowObjColumns = Object.keys(rowObj);
+		const schemaColumns = this.$.schema.columns.map(col => col.name);
 		// ------------------
-		var unknownFields = rowObjColumns.filter(col => schemaColumns.indexOf(col) === -1);
-		if (unknownFields.length) {
-			throw new Error('Unknown column: ' + unknownFields[0]);
-		}
+		const unknownFields = rowObjColumns.filter(col => schemaColumns.indexOf(col) === -1);
+		if (unknownFields.length) { throw new Error(`Unknown column: ${ unknownFields[0] }`); }
 		// ------------------
 		schemaColumns.forEach(columnName => {
-			var value = rowObj[columnName];
-			var field = _isObject(this.def.schema.columns[columnName]) ? this.def.schema.columns[columnName] : {};
+			const value = rowObj[columnName];
+			const column = this.$.schema.columns.find(col => col.name === columnName) || {};
 			if (rowObjColumns.includes(columnName)) {
+				const columnType = _isObject(column.type) ? column.type.name : column.type;
 				// TODO: Validate supplied value
-				if (field.type === 'json') {
-					if (!_isTypeObject(_value) && (!_isString(value) || (!_wrapped(value, '[', ']') && !_wrapped(value, '{', '}')))) {
+				if (columnType === 'json') {
+					if (!_isTypeObject(value) && (!_isString(value) || (!_wrapped(value, '[', ']') && !_wrapped(value, '{', '}')))) {
 					}
-				} else if (['char', 'tinytext', 'smalltext', 'text', 'bigtext', 'varchar'].includes(field.type)) {
+				} else if (['char', 'tinytext', 'smalltext', 'text', 'bigtext', 'varchar'].includes(columnType)) {
 					if (!_isString(value)) {
 					}
-				} else if (['bit', 'tinyint', 'smallint', 'int', 'bigint', 'decimal', 'number', 'float', 'real'].includes(field.type)) {
+				} else if (['bit', 'tinyint', 'smallint', 'int', 'bigint', 'decimal', 'number', 'float', 'real'].includes(columnType)) {
 					if (!_isNumeric(value)) {
 					}
-				} else if (['enum', 'set'].includes(field.type)) {
+				} else if (['enum', 'set'].includes(columnType)) {
 					if (!_isNumeric(value)) {
 					}
-				} else if (['date', 'datetime', 'timestamp'].includes(field.type)) {
+				} else if (['date', 'datetime', 'timestamp'].includes(columnType)) {
 					if (!_isString(value)) {
 					}
 				}
-			} else if (applyDefaults && !_intersect(_arrFrom(columnName), _arrFrom(this.def.schema.primaryKey)).length) {
+			} else if (applyDefaults && !_intersect([columnName], this.getKeyPathForPrimaryKey()).length) {
 				// DONE: Apply defaults...
-				rowObj[columnName] = ('default' in field) && !(['date', 'datetime', 'timestamp'].includes(field.type) && field.default === 'CURRENT_TIMESTAMP') 
-					? field.default 
+				rowObj[columnName] = ('default' in column) && !(['date', 'datetime', 'timestamp'].includes(columnType) && column.default === 'CURRENT_TIMESTAMP') 
+					? column.default 
 					: null;
 			}
 			// Non-nullable
-			if (field.nullable === false && (_isNull(rowObj[columnName]) || _isUndefined(rowObj[columnName]))) {
-				throw new Error('Inserting NULL on non-nullable column: ' + columnName);
+			if (column.notNull && (_isNull(rowObj[columnName]) || _isUndefined(rowObj[columnName]))) {
+				throw new Error(`Inserting NULL on non-nullable column: ${ columnName }.`);
 			}
 		});
 	}
@@ -330,11 +312,12 @@ export default class _Table {
 	 * @inheritdoc
 	 */
 	shouldMatchInput(rowObj) {
-		return Object.keys(this.def.schema.columns).filter(name => {
-			var field = this.def.schema.columns[name];
-			return ['datetime', 'timestamp'].includes(field.type) 
-				&& (field.default === 'CURRENT_TIMESTAMP' || field.onupdate === 'CURRENT_TIMESTAMP')
-		}).length;
+		return this.$.schema.columns.some(column => {
+			const columnType = _isObject(column.type) ? column.type.name : column.type;
+			return ['datetime', 'timestamp'].includes(columnType) && (
+				column.default === 'CURRENT_TIMESTAMP' || column.onupdate === 'CURRENT_TIMESTAMP'
+			);
+		});
 	}
 }
 

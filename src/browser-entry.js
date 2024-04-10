@@ -2,14 +2,14 @@
 /**
  * @imports
  */
-import ODB from './database/odb/ODBDriver.js';
-import IDB from './database/idb/IDBDriver.js';
+import ODB from './database/odb/ODBClient.js';
+import IDB from './database/idb/IDBClient.js';
+import SQL from './database/sql/SQLClient.js';
 
 // As globals
-if (!window.WebQit) {
-	window.WebQit = {};
-}
-window.WebQit.ObjectiveSQL = {
+if (!self.webqit) { self.webqit = {}; }
+self.webqit.ObjectiveSQL = {
 	ODB,
-	IDB
+	IDB,
+	SQL
 };

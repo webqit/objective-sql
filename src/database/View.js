@@ -26,9 +26,7 @@ export default class View extends _Table {
 	 * 
 	 * @return Cursor
 	 */
-	getCursor() {
-		return new _Cursor((this.def.data || []).filter(row => row));
-	}
+	getCursor() { return new _Cursor((this.def.data || []).filter(row => row)); }
 
 	/**
 	 * Syncs cursors at the base.
@@ -37,7 +35,5 @@ export default class View extends _Table {
 	 * 
 	 * @return Number
 	 */
-	async syncCursor(cursor) {
-		return this.stmt.base.syncCursors();
-	}
+	async syncCursor(cursor) { return this.stmt.base.syncCursors(); }
 }

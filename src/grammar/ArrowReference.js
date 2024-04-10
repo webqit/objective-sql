@@ -21,23 +21,22 @@ export default class ArrowReference extends ArrowReferenceInterface {
 	 * Gets the immediate target in a reference path.
 	 * 
 	 * @param {Object} schema1
-	 * @param {Object} dbDriver
+	 * @param {Object} dbClient
 	 * 
 	 * @return {Object}
 	 */
-	process(schema1, dbDriver = null) {
+	async process(schema1, dbClient = null) {
 		var reference = this.interpreted ? this.interpreted.toString() : this.toString();
-		return ArrowReference.process(schema1, reference.replace(/`/g, ''), dbDriver);
+		return await ArrowReference.process(schema1, reference.replace(/`/g, ''), dbClient);
 	}
 
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}) {
+	static async parse(expr, parseCallback, params = {}) {
 		if (this.isReference(expr)) {
-			var parse = super.parse(expr, parseCallback, params);
-			if (parse)
-			parse.backticks = true;
+			var parse = await super.parse(expr, parseCallback, params);
+			if (parse) { parse.backticks = true; }
 			return parse;
 		}
 	}
@@ -94,13 +93,13 @@ export default class ArrowReference extends ArrowReferenceInterface {
 	 * 
 	 * @param {Object} schema1 
 	 * @param {String} reference 
-	 * @param {Object} dbDriver 
+	 * @param {Object} dbClient 
 	 * 
 	 * @return {Object}
 	 */
-    static process(schema1, reference, dbDriver = null) {
+    static async process(schema1, reference, dbClient = null) {
 		var schema2,
-			SCHEMAS = (schema1 ? dbDriver.getDatabaseSchema(schema1.databaseName) : dbDriver.getDatabaseSchema()) || {columns: {}};
+			SCHEMAS = (schema1 ? await dbClient.getDatabaseSchema(schema1.databaseName) : await dbClient.getDatabaseSchema()) || {columns: {}};
 		if (this.isIncoming(reference)) {
 			// reference === actingKey<-...
 			var actingKey = _before(reference, this.arrLeft),
@@ -116,7 +115,7 @@ export default class ArrowReference extends ArrowReferenceInterface {
 			// --------------------------
 			if (this.isIncoming(sourceTable)) {
 				// reference === actingKey<-actingKey2<-table->?...
-				schema2 = this.process(null, sourceTable/* as new reference */, dbDriver).a.table;
+				schema2 = (await this.process(null, sourceTable/* as new reference */, dbClient)).a.table;
 				var select = sourceTable;
 			} else {
 				// reference === actingKey<-table->?...

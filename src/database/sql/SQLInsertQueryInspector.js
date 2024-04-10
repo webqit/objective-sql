@@ -83,11 +83,11 @@ export default class SQLInsertQueryInspector extends _InsertQueryInspector {
             }
         }
         if (whereAll || whereEach) {
-            var conn = await this.table.database.driver.getConnection();
+            var driver = this.table.database.client.params.driver;
             return new Promise((resolve, reject) => {
                 var whereSql = whereAll && whereEach ? `${whereAll} AND (${whereEach})` : whereAll || whereEach;
                 var query = `SELECT ${!withIDs ? `COUNT(*) AS count` : primaryKey} FROM ${this.table.name} WHERE ${whereSql} ORDER BY ${primaryKey} ASC`;
-                conn.query(query, (err, result) => {
+                driver.query(query, (err, result) => {
                     if (err) return reject(err);
                     if (!withIDs) {
                         return resolve(result[0].count);

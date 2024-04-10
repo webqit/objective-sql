@@ -21,21 +21,34 @@ export default class IDBDatabase extends _Database {
     /**
      * @inheritdoc
      */
-     async tables() {
-        return _arrFrom(this.def.objectStoreNames);
-     }
+    constructor(client, databaseName, $api, params = {}) {
+        super(client, databaseName, params);
+        this.$api = $api;
+        this.$api.onversionchange = () => {
+            // We must close the database. This allows the other page to upgrade the database.
+            // If you don't do this then the upgrade won't happen until the user closes the tab.
+            this.$api.close();
+            this.client.userPrompt('A new version of this page is ready. Please reload or close this tab!');
+        };
+    }
 
     /**
      * @inheritdoc
      */
-    async table(tableName, params = {}) {
-        var getStore = _mode => {
-            var transaction = this.def.transaction([tableName], _mode || params.mode);
+     async tables(params = {}) {
+        return this.client.applyFilters(_arrFrom(this.$api.objectStoreNames), params);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    table(tableName, params = {}) {
+        const getStore = _mode => {
+            const transaction = this.$api.transaction([tableName], _mode || params.mode);
             // We can worry not about onerror, onabort, oncomplete
             return transaction.objectStore(tableName);
         };
 		return new IDBStore(this, tableName, {
-            schema: await this.getTableSchema(tableName),
             getStore,
         }, params);
     }
@@ -48,94 +61,92 @@ export default class IDBDatabase extends _Database {
      * @inheritdoc
      */
     async createTable(tableName, tableSchema, params = {}) {
-        return this.driver.alterDatabase(this.name, database => {
-            if (_arrFrom(database.objectStoreNames).includes(tableName)) {
-                if (params.ifNotExists) {
-                    return;
-                }
-                throw new Error(`Store name "${tableName}" already exists!`);
+        if (_arrFrom(this.$api.objectStoreNames).includes(tableName)) {
+            if (params.ifNotExists) return;
+            throw new Error(`Store name "${tableName}" already exists!`);
+        }
+        const storeParams = {};
+        // ...with primary key
+        var primaryKeyColumn = Object.keys(tableSchema.columns).filter(name => tableSchema.columns[name].primaryKey)[0];
+        var autoIncrementColumn = Object.keys(tableSchema.columns).filter(name => tableSchema.columns[name].autoIncrement)[0];
+        if (primaryKeyColumn) {
+            storeParams.keyPath = primaryKeyColumn;
+            if (primaryKeyColumn === autoIncrementColumn) {
+                storeParams.autoIncrement = true;
             }
-            var storeParams = {};
-            // ...with primary key
-            var primaryKeyColumn = Object.keys(tableSchema.columns).filter(name => tableSchema.columns[name].primaryKey)[0];
-            var autoIncrementColumn = Object.keys(tableSchema.columns).filter(name => tableSchema.columns[name].autoIncrement)[0];
-            if (primaryKeyColumn) {
-                storeParams.keyPath = primaryKeyColumn;
-                if (primaryKeyColumn === autoIncrementColumn) {
-                    storeParams.autoIncrement = true;
-                }
-            }
-            var store = database.createObjectStore(tableName, storeParams);
-            _each(this.diffSchema({}, tableSchema), (changeName, changeDef) => {
-                if (changeName === 'primaryKey') {
-                    return;
-                }
-                _each(changeDef.add, (prop, def) => {
-                    this.applyToStore[changeName](store, prop, def);
-                });
+        }
+        const store = this.$api.createObjectStore(tableName, storeParams);
+        _each(this.diffSchema({}, tableSchema), (changeName, changeDef) => {
+            if (changeName === 'primaryKey') return;
+            _each(changeDef.add, (prop, def) => {
+                this.applyToStore[changeName](store, prop, def);
             });
-            this.def.schema[tableName] = tableSchema;
-            return new IDBStore(this, tableName, {
-                schema: tableSchema,
-                getStore: () => store,
-            }, {});
         });
+        this.client.$.schemas[this.name][tableName] = tableSchema;
+        return new IDBStore(this, tableName, {
+            getStore: () => store,
+        }, params);
     }
 
     /**
      * @inheritdoc
      */
     async alterTable(tableName, newTableSchemaOrCallback, params = {}) {
-
-        var tableSchema = await this.getTableSchema(tableName),
-            newTableSchema;
+        const tableSchema = await this.describeTable(tableName);
+        let newTableSchema;
         if (_isFunction(newTableSchemaOrCallback)) {
             // Modify existing schema
             newTableSchema = this.cloneSchema(tableSchema);
             await newTableSchemaOrCallback(newTableSchema);
-        } else if (_isObject(callback)) {
+        } else if (_isObject(newTableSchemaOrCallback)) {
             newTableSchema = newTableSchemaOrCallback;
         } else {
             throw new Error('Table/store modification expects only an object (new schema) or a function (callback that recieves existing schema).')
         }
-
-        return this.driver.alterDatabase(this.name, database => {
-            if (!_arrFrom(database.objectStoreNames).includes(tableName)) {
-                if (params.ifExists) {
-                    return;
-                }
-                throw new Error(`Store name "${tableName}" does not exist!`);
+        // ---------
+        if (!_arrFrom(this.$api.objectStoreNames).includes(tableName)) {
+            if (params.ifExists) return;
+            throw new Error(`Store name "${tableName}" does not exist!`);
+        }
+        // ---------
+        const transaction = this.$api.transaction([tableName], 'readwrite');
+        const store = transaction.objectStore(tableName);
+        _each(this.diffSchema(tableSchema, newTableSchema), (changeName, changeDef) => {
+            if (changeName !== 'renamedColumns') {
+                // "primaryKey", "columns", "foreignKeys", "indexes", "jsonColumns"
+                _each(changeDef.add, (prop, def) => {
+                    this.applyToStore[changeName](store, prop, def, 'add');
+                });
+                _each(changeDef.alter, (prop, changes) => {
+                    this.applyToStore[changeName](store, prop, changes.current, 'alter');
+                });
+                _each(changeDef.drop, (prop, oldDef) => {
+                    this.applyToStore[changeName](store, prop, oldDef, 'drop');
+                });
+            } else {
+                // "renamedColumns" actually comes last from source...
+                // and really should
+                _each(changeDef, (oldName, newName) => {
+                    this.applyToStore[changeName](store, oldName, newName);
+                });
             }
-
-            var transaction = database.transaction([tableName], 'readwrite');
-            var store = transaction.objectStore(tableName);
-            _each(this.diffSchema(tableSchema, newTableSchema), (changeName, changeDef) => {
-                if (changeName !== 'renamedColumns') {
-                    // "primaryKey", "columns", "foreignKeys", "indexes", "jsonColumns"
-                    _each(changeDef.add, (prop, def) => {
-                        this.applyToStore[changeName](store, prop, def, 'add');
-                    });
-                    _each(changeDef.alter, (prop, changes) => {
-                        this.applyToStore[changeName](store, prop, changes.current, 'alter');
-                    });
-                    _each(changeDef.drop, (prop, oldDef) => {
-                        this.applyToStore[changeName](store, prop, oldDef, 'drop');
-                    });
-                } else {
-                    // "renamedColumns" actually comes last from source...
-                    // and really should
-                    _each(changeDef, (oldName, newName) => {
-                        this.applyToStore[changeName](store, oldName, newName);
-                    });
-                }
-            });
-            this.def.schema[tableName] = newTableSchema;
-            return new IDBStore(this, tableName, {
-                schema: tableSchema,
-                getStore: () => store,
-            }, {});
-    
         });
+        this.client.$.schemas[this.name][tableName] = newTableSchema;
+        return new IDBStore(this, tableName, {
+            getStore: () => store,
+        }, params);
+    }
+
+    /**
+     * Describes table.
+     * 
+     * @param String tableName
+     * @param Object params
+     * 
+     * @return Object
+     */
+    async describeTable(tableName, params = {}) {
+        return this.client.$.schemas[this.name][tableName];
     }
 
     /**
@@ -147,23 +158,12 @@ export default class IDBDatabase extends _Database {
      * @return Bool
      */
     async dropTable(tableName, params = {}) {
-        return this.driver.alterDatabase(this.name, database => {
-            if (_arrFrom(database.objectStoreNames).includes(tableName)) {
-                if (params.ifExists) {
-                    return;
-                }
-                throw new Error(`Store name "${tableName}" does not exist!`);
-            }
-            delete this.def.schema[tableName];
-            database.deleteObjectStore(tableName);
-        });
-    }
-
-    /**
-     * @inheritdoc
-     */
-    async getTableSchema(tableName) {
-        return this.def.schema[tableName];
+        if (_arrFrom(this.$api.objectStoreNames).includes(tableName)) {
+            if (params.ifExists) return;
+            throw new Error(`Store name "${ tableName }" does not exist!`);
+        }
+        delete this.client.$.schemas[this.name][tableName];
+        return this.$api.deleteObjectStore(tableName);
     }
 }
 

@@ -17,31 +17,35 @@ import IDBProgressiveCursor from './IDBProgressiveCursor.js';
  */				
 
 export default class IDBStore extends _Table {
+	
+    /**
+     * @inheritdoc
+     */
+    constructor(database, tableName, $api, params = {}) {
+        super(database, tableName, params);
+        this.$api = $api;
+    }
 
 	/**
 	 * Returns a cursor.
 	 * 
 	 * @return IDBCursor
 	 */
-	getCursor() {
-		return new IDBCursor(this.def.getStore());
-	}
+	getCursor() { return new IDBCursor(this.$api.getStore()); }
 
 	/**
 	 * Returns a cursor.
 	 * 
 	 * @return IDBProgressiveCursor
 	 */
-	getProgressiveCursor() {
-		return new IDBProgressiveCursor(this.def.getStore());
-	}
+	getProgressiveCursor() { return new IDBProgressiveCursor(this.$api.getStore()); }
 	 
 	/**
 	 * @inheritdoc
 	 */
 	getAll() {
 		return new Promise(async (resolve, reject) => {
-			var getAllRequest = (this.tx_store || this.def.getStore('readonly')).getAll();
+			const getAllRequest = (this.tx_store || this.$api.getStore('readonly')).getAll();
 			getAllRequest.onsuccess = e => resolve(_arrFrom(e.target.result));
 			getAllRequest.onerror = e => reject(e.target.error);
 		});
@@ -54,7 +58,7 @@ export default class IDBStore extends _Table {
 		return new Promise(async (resolve, reject) => {
 			// Now this is very important
 			primaryKey = _isNumeric(primaryKey) ? parseInt(primaryKey) : primaryKey;
-			var getRequest = (this.tx_store || this.def.getStore('readonly')).get(primaryKey);
+			const getRequest = (this.tx_store || this.$api.getStore('readonly')).get(primaryKey);
 			getRequest.onsuccess = e => resolve(e.target.result);
 			getRequest.onerror = e => reject(e.target.error);
 		});
@@ -65,7 +69,7 @@ export default class IDBStore extends _Table {
 	 */
 	count(...query) {
 		return new Promise(async (resolve, reject) => {
-			var countRequest = this.def.getStore().count(...query);
+			const countRequest = this.$api.getStore().count(...query);
 			countRequest.onsuccess = e => resolve(e.target.result);
 			countRequest.onerror = e => reject(e.target.error);
 		});
@@ -75,7 +79,7 @@ export default class IDBStore extends _Table {
 	 * @inheritdoc
 	 */
 	addAll(multiValues, columns = [], duplicateKeyCallback = null) {
-		this.tx_store = this.def.getStore();
+		this.tx_store = this.$api.getStore();
 		return super.addAll(...arguments);
 	}
 
@@ -84,10 +88,10 @@ export default class IDBStore extends _Table {
 	 */
 	add(rowObj) {
 		return new Promise(async (resolve, reject) => {
-			var addRequest = (this.tx_store || this.def.getStore()).add(rowObj);
+			const addRequest = (this.tx_store || this.$api.getStore()).add(rowObj);
 			addRequest.onsuccess = e => resolve(e.target.result);
 			addRequest.onerror = e => {
-				var error = e.target.error;
+				const error = e.target.error;
 				if (error.name === 'ConstraintError') {
 					reject(new DuplicateKeyViolationError(error.message));
 				} else {
@@ -101,7 +105,7 @@ export default class IDBStore extends _Table {
 	 * @inheritdoc
 	 */
 	putAll(rowObj) {
-		this.tx_store = this.def.getStore();
+		this.tx_store = this.$api.getStore();
 		return super.putAll(...arguments);
 	}
 
@@ -110,7 +114,7 @@ export default class IDBStore extends _Table {
 	 */
 	put(rowObj) {
 		return new Promise(async (resolve, reject) => {
-			var putRequest = (this.tx_store || this.def.getStore()).put(rowObj);
+			const putRequest = (this.tx_store || this.$api.getStore()).put(rowObj);
 			putRequest.onsuccess = e => resolve(e.target.result);
 			putRequest.onerror = e => reject(e.target.error);
 		});
@@ -120,7 +124,7 @@ export default class IDBStore extends _Table {
 	 * @inheritdoc
 	 */
 	deleteAll(primaryKey) {
-		this.tx_store = this.def.getStore();
+		this.tx_store = this.$api.getStore();
 		return super.deleteAll(...arguments);
 	}
 
@@ -129,15 +133,13 @@ export default class IDBStore extends _Table {
 	 */
 	delete(primaryKey) {
 		if (_isArray(primaryKey)) {
-			if (primaryKey.length > 1) {
-				throw new Error('IDB does not support Composite Primary Keys');
-			}
+			if (primaryKey.length > 1) { throw new Error('IDB does not support Composite Primary Keys'); }
 			primaryKey = primaryKey[0];
 		}
 		// Now this is very important
 		primaryKey = _isNumeric(primaryKey) ? parseInt(primaryKey) : primaryKey;
 		return new Promise(async (resolve, reject) => {
-			var delRequest = (this.tx_store || this.def.getStore()).delete(primaryKey);
+			const delRequest = (this.tx_store || this.$api.getStore()).delete(primaryKey);
 			delRequest.onsuccess = e => resolve(primaryKey);
 			delRequest.onerror = e => reject(e.target.error);
 		});

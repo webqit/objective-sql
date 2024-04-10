@@ -70,18 +70,18 @@ export default class OrderBy extends OrderByInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}) {
+	static async parse(expr, parseCallback, params = {}) {
 		var columns = [];
 		var withRollup = false;
 		var parse = Lexer.lex(expr, ['WITH[ ]+ROLLUP'], {useRegex:'i'});
-		columns = Lexer.split(parse.tokens.shift().trim(), [',']).map(c => {
+		columns = await Promise.all(Lexer.split(parse.tokens.shift().trim(), [',']).map(async c => {
 			var order = c.match(/ASC|DESC/, 'i');
 			if (order) {
 				order = order[0];
 				c = _beforeLast(c, order).trim();
 			}
-			return {expr:parseCallback(c), order:order};
-		});
+			return { expr: await parseCallback(c), order: order };
+		}));
 		if (parse.matches.length === 1) {
 			withRollup = true;
 		}

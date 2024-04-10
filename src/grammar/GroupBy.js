@@ -91,21 +91,21 @@ export default class GroupBy extends GroupByInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}) {
-		var parse = Lexer.lex(expr, ['WITH[ ]+ROLLUP', 'HAVING'], {useRegex:'i'});
-		var columns = Lexer.split(parse.tokens.shift().trim(), [',']).map(
+	static async parse(expr, parseCallback, params = {}) {
+		var parse = Lexer.lex(expr, ['WITH[ ]+ROLLUP', 'HAVING'], { useRegex:'i' });
+		var columns = await Promise.all(Lexer.split(parse.tokens.shift().trim(), [',']).map(
 			c => parseCallback(c.trim())
-		);
+		));
 		var having = null;
 		var withRollup = false;
-		parse.matches.forEach(clauseType => {
+		for (const clauseType of parse.matches) {
 			if (clauseType.toLowerCase().startsWith('with')) {
 				withRollup = true;
 				parse.tokens.shift();
 			} else if (clauseType.toLowerCase().startsWith('having')) {
-				having = parseCallback(parse.tokens.shift().trim());
+				having = await parseCallback(parse.tokens.shift().trim());
 			}
-		});
+		}
 		return new this(columns, having, withRollup);
 	}
 }

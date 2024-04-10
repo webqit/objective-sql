@@ -74,14 +74,14 @@ export default class Join extends JoinInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}) {
+	static async parse(expr, parseCallback, params = {}) {
 		var parse = Lexer.lex(expr, Join.clauses);
 		if (parse.tokens.length === 2) {
 			var clause = parse.matches[0];
-			var table = parseCallback(parse.tokens[0], [Table]);
+			var table = await parseCallback(parse.tokens[0], [Table]);
 			var condition = clause.trim().toUpperCase() === 'USING' 
-				? parseCallback(parse.tokens[1], [Literal])
-				: parseCallback(parse.tokens[1]);
+				? await parseCallback(parse.tokens[1], [Literal])
+				: await parseCallback(parse.tokens[1]);
 			return new this(
 				table,
 				condition, 

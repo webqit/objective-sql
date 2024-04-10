@@ -2,11 +2,9 @@
 /**
  * @imports
  */
-import {
-	Condition as _Condition
-} from '@webqit/subscript/src/grammar.js';
 import Lexer from '@webqit/util/str/Lexer.js';
 import _unwrap from '@webqit/util/str/unwrap.js';
+import ConditionInterface from './ConditionInterface.js';
 
 /**
  * ---------------------------
@@ -14,8 +12,9 @@ import _unwrap from '@webqit/util/str/unwrap.js';
  * ---------------------------
  */				
 
-export default class Condition extends _Condition {
+export default class Condition extends ConditionInterface {
 	
+
 	/**
 	 * @inheritdoc
 	 */
@@ -47,13 +46,22 @@ export default class Condition extends _Condition {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}) {
+	eval(context = null, params = {}) {
+		return this.assertion.eval(context, params) 
+			? this.onTrue.eval(context, params) 
+			: this.onFalse.eval(context, params);
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static async parse(expr, parseCallback, params = {}) {
 		if (expr.match(/^if[ ]*?\(/i)) {
 			var tokens = Lexer.split(_unwrap(expr.trim().substr(2).trim(), '(', ')'), [',']);
 			if (tokens.length !== 3) {
 				throw new Error('Malformed condition expression: ' + expr + '!');
 			}
-			return new this(...tokens.map(expr => parseCallback(expr.trim())));
+			return new this(...(await Promise.all(tokens.map(expr => parseCallback(expr.trim())))));
 		}
 	}
-}
+};

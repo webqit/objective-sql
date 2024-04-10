@@ -20,16 +20,15 @@ export default class ODBDatabase extends _Database {
     /**
      * @inheritdoc
      */
-    async tables() {
-        return Object.keys(this.def.schema);
+    async tables(params = {}) {
+        return this.client.applyFilters(Object.keys(this.def.schemas), params);
     }
 
     /**
      * @inheritdoc
      */
-    async table(tableName, params = {}) {
+    table(tableName, params = {}) {
         return new ODBStore(this, tableName, {
-            schema: this.def.schema[tableName], 
             data: this.def.data[tableName],
         }, params);
     }
@@ -43,15 +42,12 @@ export default class ODBDatabase extends _Database {
      */
     async createTable(tableName, tableSchema, params = {}) {
         if ((await this.tables()).includes(tableName)) {
-            if (params.ifNotExists) {
-                return;
-            }
-            throw new Error(`Store name "${tableName}" already exists!`);
+            if (params.ifNotExists) return;
+            throw new Error(`Store name "${ tableName }" already exists!`);
         }
-        this.def.schema[tableName] = tableSchema;
+        this.def.schemas[tableName] = tableSchema;
         this.def.data[tableName] = [];
         return new ODBStore(this, tableName, {
-            schema: this.def.schema[tableName],
             data: this.def.data[tableName],
         });
     }
@@ -61,7 +57,7 @@ export default class ODBDatabase extends _Database {
      */
     async alterTable(tableName, newTableSchemaOrCallback, params = {}) {
 
-        var tableSchema = await this.getTableSchema(tableName),
+        var tableSchema = await this.describeTable(tableName),
             newTableSchema;
         if (_isFunction(newTableSchemaOrCallback)) {
             // Modify existing schema
@@ -74,10 +70,8 @@ export default class ODBDatabase extends _Database {
         }
 
         if (!(await this.tables()).includes(tableName)) {
-            if (params.ifExists) {
-                return;
-            }
-            throw new Error(`Store name "${tableName}" does not exist!`);
+            if (params.ifExists) return;
+            throw new Error(`Store name "${ tableName }" does not exist!`);
         }
 
         var store = this.def.data[tableName];
@@ -103,10 +97,21 @@ export default class ODBDatabase extends _Database {
         });
 
         return new ODBStore(this, tableName, {
-            schema: this.def.schema[tableName],
             data: store,
         }, {});
 
+    }
+
+    /**
+     * Describes table.
+     * 
+     * @param String tableName
+     * @param Object params
+     * 
+     * @return Object
+     */
+    async describeTable(tableName) {
+        return this.client.$.schemas[this.name][tableName];
     }
 
     /**
@@ -119,20 +124,11 @@ export default class ODBDatabase extends _Database {
      */
     async dropTable(tableName, params = {}) {
         if (!(await this.tables()).includes(tableName)) {
-            if (params.ifExists) {
-                return;
-            }
-            throw new Error(`Store name "${tableName}" does not exist!`);
+            if (params.ifExists) return;
+            throw new Error(`Store name "${ tableName }" does not exist!`);
         }
-        delete this.def.schema[tableName];
+        delete this.def.schemas[tableName];
         delete this.def.data[tableName];
-    }
-
-    /**
-     * @inheritdoc
-     */
-    async getTableSchema(tableName) {
-        return this.def.schema[tableName];
     }
 }
 

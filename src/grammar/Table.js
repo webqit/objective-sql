@@ -17,11 +17,11 @@ import _objFrom from '@webqit/util/obj/from.js';
 import _objFirst from '@webqit/util/obj/first.js';
 import _each from '@webqit/util/obj/each.js';
 import Lexer from '@webqit/util/str/Lexer.js';
-import LiteralInterface from '../grammar/LiteralInterface.js';
-import Literal from '../grammar/Literal.js';
+import Literal from './Literal.js';
+import LiteralInterface from './LiteralInterface.js';
 import TableInterface from './TableInterface.js';
 import View from '../database/View.js';
-import _Driver from '../database/_Driver.js';
+import _Client from '../database/_Client.js';
 import _Database from '../database/_Database.js';
 
 /**
@@ -61,9 +61,7 @@ export default class Table extends TableInterface {
 	/**
 	 * @inheritdoc
 	 */
-	getDatabaseName() {
-		return (this.expr + "").split('.').slice(0, -1)[0] || '';
-	}
+	getDatabaseName() { return (this.expr + "").split('.').slice(0, -1)[0] || ''; }
 	
 	/**
 	 * @inheritdoc
@@ -80,27 +78,21 @@ export default class Table extends TableInterface {
 	/**
 	 * @inheritdoc
 	 */
-	getAlias() {
-		return this.alias || this.getName();
-	}
+	getAlias() { return this.alias || this.getName(); }
 
 	/**
 	 * Tells if this is a derived query
 	 * 
 	 * @return Bool
 	 */
-	isDerivedQuery() {
-		return this.expr instanceof AbstractionInterface;
-	}
+	isDerivedQuery() { return this.expr instanceof AbstractionInterface; }
 
 	/**
 	 * Returns the derived query
 	 * 
 	 * @return Bool
 	 */
-	getDerivedQuery() {
-		return this.expr/*ABS*/.expr/*SELECT*/;
-	}
+	getDerivedQuery() { return this.expr/*ABS*/.expr/*SELECT*/; }
 
 	/**
 	 * Associates a Reference
@@ -109,18 +101,14 @@ export default class Table extends TableInterface {
 	 * 
 	 * @return void
 	 */
-	associateReference(reference) {
-		return this.associatedReferences.push(reference);
-	}
+	associateReference(reference) { return this.associatedReferences.push(reference); }
 
 	/**
 	 * Returns the associated References
 	 * 
 	 * @return Array
 	 */
-	getAssociateReferences() {
-		return this.associatedReferences;
-	}
+	getAssociateReferences() { return this.associatedReferences; }
 
 	/**
 	 * @inheritdoc
@@ -174,7 +162,7 @@ export default class Table extends TableInterface {
 			});
 			// ---------------------
 			// ENGINE
-			derivedSchema.driver = MAIN_SCHEMA.driver;
+			derivedSchema.client = MAIN_SCHEMA.client;
 
 			// Cache
 			this.schema = derivedSchema;
@@ -186,27 +174,21 @@ export default class Table extends TableInterface {
 	/**
 	 * @inheritdoc
 	 */
-	eval(dbDriver = null, params = {}) {
+	eval(dbClient = null, params = {}) {
 
-		if (this.interpreted) {
-			return this.interpreted.eval(dbDriver, params);
-		}
+		if (this.interpreted) { return this.interpreted.eval(dbClient, params); }
 
 		// --------------------------
 
-		if (!dbDriver) {
-			throw new Error('Context must be provided!');
-		}
+		if (!dbClient) { throw new Error('Context must be provided!'); }
 
 		const getDatabase = databaseName => {
 			return Promise.resolve().then(() => {
-				if (dbDriver instanceof _Driver) {
-					return databaseName ? dbDriver.database(databaseName) : dbDriver.database();
+				if (dbClient instanceof _Client) {
+					return databaseName ? dbClient.database(databaseName) : dbClient.database();
 				}
-				if (databaseName) {
-					throw new Error('[' + this.expr + ']: For tables that are fully-qualified with a database name, a database factory must be provided as context.');
-				}
-				return dbDriver;
+				if (databaseName) { throw new Error('[' + this.expr + ']: For tables that are fully-qualified with a database name, a database factory must be provided as context.'); }
+				return dbClient;
 			})
 		};
 		// --------------------------
@@ -215,8 +197,8 @@ export default class Table extends TableInterface {
 		if (this.isDerivedQuery()) {
 			var derivedName = this.getAlias(),
 				derivedQuery = this.getDerivedQuery(),
-				derivedSchema = this.getSchema(dbDriver);
-			return derivedQuery.eval(dbDriver, params).then(async derivedStore => {
+				derivedSchema = this.getSchema();
+			return derivedQuery.eval(dbClient, params).then(async derivedStore => {
 				var database = await getDatabase();
 				var _params = {...params};
 				_params.alias = derivedName;
@@ -240,9 +222,7 @@ export default class Table extends TableInterface {
 	/**
 	 * @inheritdoc
 	 */
-	toString() {
-		return this.stringify();
-	}
+	toString() { return this.stringify(); }
 	
 	/**
 	 * @inheritdoc
@@ -259,11 +239,11 @@ export default class Table extends TableInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}) {
+	static async parse(expr, parseCallback, params = {}) {
 		var parse = Lexer.lex(expr, [' (as )?'], {useRegex:'i'});
 		if (parse.tokens.length < 3) {
 			var SCHEMA;
-			var tableParse = parseCallback(parse.tokens[0], [Abstraction, Literal]);
+			var tableParse = await parseCallback(parse.tokens[0], [Abstraction, Literal]);
 			var alias = (parse.tokens[1] || '').trim(), 
 				claused = (parse.matches[0] || '').trim();
 
@@ -275,7 +255,7 @@ export default class Table extends TableInterface {
 				var fullTableName = tableParse.toString().split('.'),
 					tableName = fullTableName.pop(),
 					databaseName = fullTableName.pop(),
-					DB_SCHEMA = params.dbDriver.getDatabaseSchema(databaseName);
+					DB_SCHEMA = await params.dbClient.getDatabaseSchema(databaseName);
 				// -----------
 				if (DB_SCHEMA && DB_SCHEMA[tableName]) {
 					SCHEMA = DB_SCHEMA[tableName];

@@ -43,7 +43,7 @@ export default class Literal extends LiteralInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback = null, params = {}) {
+	static async parse(expr, parseCallback = null, params = {}) {
 		return new this(expr);
 	}
 }

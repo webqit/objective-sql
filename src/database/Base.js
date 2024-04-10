@@ -56,15 +56,13 @@ export default class Base {
 	/**
 	 * @inheritdoc
 	 */
-	onfinish(callback) {this._onfinish.push(callback);}
+	onfinish(callback) { this._onfinish.push(callback); }
 
 	/**
 	 * @inheritdoc
 	 */
 	async fetch() {
-		if (this.eof) {
-			return;
-		}
+		if (this.eof) return;
 
 		var rowComposition, rowCompositionRejection;
 		// -----------

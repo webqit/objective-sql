@@ -200,7 +200,7 @@ export default class Query {
 export function createParams(params, tableSpecifiers = []) {
     // --------------
     var UAC_PARAMS = _merge({
-        dbDriver: params.dbDriver,
+        dbClient: params.dbClient,
         SCHEMAS: {},
     }, params.UAC || {});
     // --------------
@@ -213,7 +213,7 @@ export function createParams(params, tableSpecifiers = []) {
         var tableNameSplit = fullTableName.split('.');
         var tableName = tableNameSplit.pop(),
             databaseName = tableNameSplit.pop();
-        UAC_PARAMS.SCHEMAS[tableSpecifier] = (UAC_PARAMS.dbDriver.getSchema(databaseName) || {})[tableName];
+        UAC_PARAMS.SCHEMAS[tableSpecifier] = (UAC_PARAMS.dbClient.getDatabaseSchema(databaseName) || {})[tableName];
     });
     // --------------
     return UAC_PARAMS;

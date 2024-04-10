@@ -21,13 +21,13 @@ export default class _Cursor {
 	/**
 	 * @inheritdoc
 	 */
-	onfinish(callback) {this._onfinish.push(callback);}
+	onfinish(callback) { this._onfinish.push(callback); }
 	 
 	/**
 	 * @inheritdoc
 	 */
 	next() {
-		if (!this.cache.length || this.key === this.cache.length - 1) {
+		if (this.eof()) {
 			this.__eof = true;
 			this._onfinish.forEach(callback => callback());
 			this.key = 0;
@@ -39,16 +39,13 @@ export default class _Cursor {
 	/**
 	 * @inheritdoc
 	 */
-	eof() {
-		return !this.cache.length || this.key === this.cache.length - 1;
-	}
+	eof() { return !this.cache.length || this.key === this.cache.length - 1; }
 	 
 	/**
 	 * @inheritdoc
 	 */
 	async fetch() {
-		if (this.key < this.cache.length) {
-			return this.cache[this.key];
-		}
+		if (this.eof()) return;
+		return this.cache[this.key];
 	}
 }

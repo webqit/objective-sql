@@ -2,10 +2,10 @@
 /**
  * @imports
  */
+import _all from '@webqit/util/arr/all.js';
 import _isEmpty from '@webqit/util/js/isEmpty.js';
 import _isArray from '@webqit/util/js/isArray.js';
 import _isNumeric from '@webqit/util/js/isNumeric.js';
-import _all from '@webqit/util/arr/all.js';
 import _UpdateQueryInspector from '../_UpdateQueryInspector.js';
 
 /**
@@ -83,15 +83,13 @@ export default class SQLUpdateQueryInspector extends _UpdateQueryInspector {
             }
         }
         if (whereAll || whereEach) {
-            var conn = await this.table.database.driver.getConnection();
+            var driver = this.table.database.client.params.driver;
             return new Promise((resolve, reject) => {
                 var whereSql = whereAll && whereEach ? `${whereAll} AND (${whereEach})` : whereAll || whereEach;
                 var query = `SELECT ${!withIDs ? `COUNT(*) AS count` : primaryKey} FROM ${this.table.name} WHERE ${whereSql} ORDER BY ${primaryKey} ASC`;
-                conn.query(query, (err, result) => {
+                driver.query(query, (err, result) => {
                     if (err) return reject(err);
-                    if (!withIDs) {
-                        return resolve(result[0].count);
-                    }
+                    if (!withIDs) { return resolve(result[0].count); }
                     resolve(result.map(row => row[primaryKey]));
                 });
             });

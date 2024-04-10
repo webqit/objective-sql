@@ -163,7 +163,7 @@ export default class Field extends FieldInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}) {
+	static async parse(expr, parseCallback, params = {}) {
 		var splits = Lexer.split(expr, [' (as )?'], {useRegex:'i', preserveDelims:true});
 		var exprParse = null;
 		var alias = splits.pop().trim();
@@ -172,19 +172,19 @@ export default class Field extends FieldInterface {
 			// With an "AS" clause, its easy to obtain the alias...
 			// E.g: SELECT first_name AS fname, 4 + 5 AS result, 5 + 5
 			alias = alias.substr(3).trim();
-			exprParse = parseCallback(splits.join('').trim());
+			exprParse = await parseCallback(splits.join('').trim());
 		} else if (splits.length && (!alias.match(/[^0-9a-zA-Z_]/) || _wrapped(alias, '`', '`'))) {
 			// Without an "AS" clause, its hard to determine if an expression is actually aliased...
 			// E.g: In the statement SELECT first_name fname, 4 + 5 result, 5 + 5 FROM ...,
 			// we can only assume that the last space-separated expr is rhe alias.
 			// When that fails, then it is most-likely there is no alias. 
 			try {
-				exprParse = parseCallback(splits.join('').trim());
+				exprParse = await parseCallback(splits.join('').trim());
 			} catch(e) {}
 		}
 		if (!exprParse) {
 			alias = null;
-			exprParse = parseCallback(expr);
+			exprParse = await parseCallback(expr);
 		}
 		exprParse.isFieldName = true;
 		return new this(exprParse, alias, claused);

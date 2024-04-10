@@ -54,7 +54,7 @@ export default class Placeholder extends PlaceholderInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static parse(expr, parseCallback, params = {}) {
+	static async parse(expr, parseCallback, params = {}) {
 		if (expr.startsWith('?') || expr.startsWith(':')) {
 			return new this(expr.substr(1), expr.substr(0, 1));
 		}

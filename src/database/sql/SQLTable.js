@@ -8,9 +8,9 @@ import _arrFrom from '@webqit/util/arr/from.js';
 import _isNumeric from '@webqit/util/js/isNumeric.js';
 import _wrapped from '@webqit/util/str/wrapped.js';
 import _Table from '../_Table.js';
+import SQLInsertQueryInspector from './SQLInsertQueryInspector.js';
+import SQLDeleteQueryInspector from './SQLDeleteQueryInspector.js';
 import SQLCursor from './SQLCursor.js';
-import SQLInsertQueryInspector from './SQLInsertQueryResult.js';
-import SQLDeleteQueryInspector from './SQLDeleteQueryResult.js';
 
 /**
  * ---------------------------
@@ -25,19 +25,16 @@ export default class SQLTable extends _Table {
 	 * 
 	 * @return SQLCursor
 	 */
-	getCursor() {
-		return new SQLCursor(this);
-	}
+	getCursor() { return new SQLCursor(this); }
 	 
 	/**
 	 * @inheritdoc
 	 */
 	async getAll() {
-		var conn = await this.database.driver.getConnection();
 		return new Promise((resolve, reject) => {
-			conn.query('SELECT * FROM ' + this.name, (err, result) => {
+			this.database.client.driver.query(`SELECT * FROM ${ this.database.name }.${ this.name }`, (err, result) => {
 				if (err) return reject(err);
-				resolve(result);
+				resolve((result.rows || result));
 			});
 		});
 	}
@@ -46,15 +43,14 @@ export default class SQLTable extends _Table {
 	 * @inheritdoc
 	 */
 	async get(primaryKey) {
-		var conn = await this.database.driver.getConnection();
-		var primaryKeyColumns = this.getPrimaryKeyColumns();
+		const primaryKeyColumns = this.getPrimaryKeyColumns();
 		if (primaryKeyColumns.length !== 1) {
 			throw new Error('Cannot find records by primary key on a table with zero or multiple primary keys.');
 		}
 		return new Promise((resolve, reject) => {
-			conn.query('SELECT * FROM ' + this.name + ' WHERE `' + primaryKeyColumns[0] + '` = ?', [primaryKey], (err, result) => {
+			this.database.client.driver.query(`SELECT * FROM ${ this.database.name }.${ this.name } WHERE ${ primaryKeyColumns[0] } = ?`, [primaryKey], (err, result) => {
 				if (err) return reject(err);
-				resolve(result[0]);
+				resolve((result.rows || result)[0]);
 			});
 		});
 	}
@@ -63,11 +59,10 @@ export default class SQLTable extends _Table {
 	 * @inheritdoc
 	 */
 	async count(query = '*') {
-		var conn = await this.database.driver.getConnection();
 		return new Promise((resolve, reject) => {
-			conn.query('SELECT COUNT(' + query + ') AS c FROM ' + this.name, (err, result) => {
+			this.database.client.driver.query(`SELECT COUNT(${ query }) AS c FROM ${ this.database.name }.${ this.name }`, (err, result) => {
 				if (err) return reject(err);
-				resolve(result[0].c);
+				resolve((result.rows || result)[0].c);
 			});
 		});
 	}
@@ -76,26 +71,24 @@ export default class SQLTable extends _Table {
 	 * @inheritdoc
 	 */
 	async addAll(entries, columns = [], duplicateKeyCallback = null) {
-		if (!entries.length) {
-			return;
-		}
+		if (!entries.length) return;
 		var duplicateKeyUpdateObj = {};
 		if (!columns.length) {
 			if (_isObject(entries[0])) {
 				columns = Object.keys(entries[0]);
 			} else {
-				columns = Object.keys(this.def.schema.columns);
+				const schema = await this.database.describeTable(this.name);
+				columns = Object.keys(schema.columns);
 			}
 		}		
-		var conn = await this.database.driver.getConnection();
 		return new Promise((resolve, reject) => {
-			var insertSql = 'INSERT INTO `' + this.name + '`' + "\r\n" + (columns.length ? '(`' + columns.join('`, `') + '`)' + "\r\n" : '');
+			let insertSql = `INSERT INTO ${ this.database.name }.${ this.name }\n\t${ columns.length ? `(${ columns.join(',') })\n\t` : '' }`;
 			insertSql += 'VALUES' + "\r\n" + entries.map(row => formatAddRow(Object.values(row))).join(",\r\n") + "\r\n";
 			if (duplicateKeyCallback) {
 				duplicateKeyCallback(duplicateKeyUpdateObj);
 				insertSql += ' ON DUPLICATE KEY UPDATE ' + formatAssignments(duplicateKeyUpdateObj);
 			}
-			conn.query(insertSql, (err, result) => {
+			this.database.client.driver.query(insertSql, (err, result) => {
 				if (err) return reject(err);
 				resolve(new SQLInsertQueryInspector(
 					this, 
@@ -112,15 +105,14 @@ export default class SQLTable extends _Table {
 	 * @inheritdoc
 	 */
 	async add(rowObj) {
-		var conn = await this.database.driver.getConnection();
 		return new Promise((resolve, reject) => {
-			var insertSql = 'INSERT INTO `' + this.name + '`' + "\r\n" + '(`' + Object.keys(rowObj).join('`, `') + '`)' + "\r\n";
-			insertSql += 'VALUES' + "\r\n" + formatAddRow(Object.values(rowObj));
-			conn.query(insertSql, (err, result) => {
+			let insertSql = `INSERT INTO ${ this.database.name }.${ this.name }\n\t(${ Object.keys(rowObj).join(',') })\n\t`;
+			insertSql += `VALUES\n\t${ formatAddRow(Object.values(rowObj)) }`;
+			this.database.client.driver.query(insertSql, (err, result) => {
 				if (err) return reject(err);
 				resolve(new SQLInsertQueryInspector(
-					this, 
-					result, 
+					this,
+					result,
 					Object.keys(rowObj), 
 					Object.values(rowObj), 
 				));
@@ -145,10 +137,9 @@ export default class SQLTable extends _Table {
 	 * @inheritdoc
 	 */
 	async put(rowObj) {
-		var conn = await this.database.driver.getConnection();
 		return new Promise((resolve, reject) => {
-			var putSql = 'INSERT INTO `' + this.name + '`' + "\r\n" + formatPutRow(rowObj);
-			conn.query(putSql, (err, result) => {
+			const putSql = `INSERT INTO ${ this.database.name }.${ this.name }\n\t${ formatPutRow(rowObj) }`;
+			this.database.client.driver.query(putSql, (err, result) => {
 				if (err) return reject(err);
 				resolve(new SQLInsertQueryInspector(
 					this, 
@@ -164,10 +155,10 @@ export default class SQLTable extends _Table {
 	 * @inheritdoc
 	 */
 	async deleteAll(IDs = []) {
-		var conn = await this.database.driver.getConnection();
+		const driver = this.database.client.driver;
 		return new Promise((resolve, reject) => {
-			var deleteSql = 'DELETE FROM `' + this.name + '`' + (IDs.length ? ' WHERE id in (' + IDs.join(', ') + ')' : '');
-			conn.query(deleteSql, (err, result) => {
+			const deleteSql = `DELETE FROM ${ this.database.name }.${ this.name }${ IDs.length ? ` WHERE id in (${ IDs.join(', ') })` : ''}`;
+			this.database.client.driver.query(deleteSql, (err, result) => {
 				if (err) return reject(err);
 				resolve(new SQLDeleteQueryInspector(
 					this,
@@ -181,14 +172,13 @@ export default class SQLTable extends _Table {
 	 * @inheritdoc
 	 */
 	async delete(primaryKey) {
-		var conn = await this.database.driver.getConnection();
-		var primaryKeyColumns = this.getPrimaryKeyColumns();
+		const primaryKeyColumns = this.getPrimaryKeyColumns();
 		if (primaryKeyColumns.length !== 1) {
 			throw new Error('Cannot delete records by primary key on a table with zero or multiple primary keys.');
 		}
 		return new Promise((resolve, reject) => {
-			var deleteSql = 'DELETE FROM `' + this.name + '` WHERE `' + primaryKeyColumns[0] + '` = ?';
-			conn.query(deleteSql, [primaryKey], (err, result) => {
+			const deleteSql = `DELETE FROM ${ this.database.name }.${ this.name } WHERE ${ primaryKeyColumns[0] } = ?`;
+			this.database.client.driver.query(deleteSql, [primaryKey], (err, result) => {
 				if (err) return reject(err);
 				resolve(new SQLDeleteQueryInspector(
 					this,

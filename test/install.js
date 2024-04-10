@@ -2,28 +2,33 @@
 /**
  * @imports
  */
-import Parser from '../src/index.js';
+import Parser from '../src/Parser.js';
 import ODB from '../src/database/odb/ODBDriver.js';
 import SQL from '../src/database/sql/SQLDriver.js';
 
-/**
-import SQL from '../src/database/sql/SQLDriver.js';
-
-await SQL.connect('mysql', {
-	host: 'localhost',
-	user: 'root',
-	password: '',
-});
-var Client = SQL;
- */
-
 export { Parser };
-//export const dbDriver = new ODB;
-export const dbDriver = SQL.connect('mysql2', {
+
+const SqlClient = await import(this.sqlClient);
+var driver = SqlClient.createConnection({
+	host: this.params.host,
+	user: this.params.user,
+	password: this.params.password,
+});
+this.driver = new Promise((resolve, reject) => {
+	driver.connect(err => {
+		if (err) return reject(err);
+	});
+});
+
+/*
+export const dbDriver = new ODB;
+*/
+export const dbDriver = new SQL('mysql2', {
 	host: '127.0.0.1',
 	user: 'root',
 	password: '3926',
 });
+
 export const dbSchema = {
 	table1: {
 		name: 'table1',
