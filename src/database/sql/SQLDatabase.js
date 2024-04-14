@@ -32,7 +32,6 @@ export default class SQLDatabase extends _Database {
     async tables(params = {}) {
         return this.tablesCallback(() => {
             return new Promise((resolve, reject) => {
-                // const sql = `SHOW TABLES FROM '${ this.name }'`; Not support in PostgreSQL
                 const sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = '${ this.name }'`;
                 return this.client.driver.query(sql, (err, result) => {
                     if (err) return reject(err);
@@ -45,21 +44,22 @@ export default class SQLDatabase extends _Database {
      /**
      * Describes table.
      * 
-     * @param String            tblName
+     * @param String|Array      tblName_s
      * @param Object            params
      * 
      * @return Object
      */
-    describeTable(tblName, params = {}) {
-        return this.describeTableCallback((tblName, params) => {
+    describeTable(tblName_s, params = {}) {
+        return this.describeTableCallback((tblNames, params) => {
             return new Promise((resolve, reject) => {
                 const driver = this.client.driver;
-                const [ sql0, sql1 ] = this.getDescribeTableSql(tblName);
+                const [ sql0, sql1 ] = this.getDescribeTableSql(tblNames);
                 return driver.query(sql0, (err, columns) => {
                     if (err) return reject(err);
                     return driver.query(sql1, (err, constraints) => {
                         if (err) return reject(err);
-                        resolve(this.formatDescribeTableResult(tblName, (columns.rows || columns), (constraints.rows || constraints)));
+                        const tblSchemas = this.formatDescribeTableResult(tblNames, (columns.rows || columns), (constraints.rows || constraints), []);
+                        resolve(tblSchemas);
                     });
                 });
             });
@@ -75,9 +75,9 @@ export default class SQLDatabase extends _Database {
      * @return Object
      */
     async createTable(tblSchema, params = {}) {
-        return this.createTableCallback((tblCreateInstance, params) => {
+        return this.createTableCallback((tblCreateRequest, params) => {
             return new Promise((resolve, reject) => {
-                return this.client.driver.query(tblCreateInstance.toString(), (err, result) => {
+                return this.client.driver.query(tblCreateRequest.toString(), (err, result) => {
                     if (err) return reject(err);
                     resolve(this.formatSideEffectResult(result));
                 });
@@ -95,10 +95,10 @@ export default class SQLDatabase extends _Database {
      * @return Bool
      */
     async alterTable(tblName, schemaCallback, params = {}) {
-        return this.alterTableCallback((tblAlterInstance, params) => {
-            if (!tblAlterInstance.nodeTypes.length) return;
+        return this.alterTableCallback((tblAlterRequest, params) => {
+            if (!tblAlterRequest.actions.length) return;
             return new Promise((resolve, reject) => {
-                return this.client.driver.query(tblAlterInstance.toString(), (err, result) => {
+                return this.client.driver.query(tblAlterRequest.toString(), (err, result) => {
                     if (err) return reject(err);
                     resolve(this.formatSideEffectResult(result));
                 });
@@ -115,9 +115,9 @@ export default class SQLDatabase extends _Database {
      * @return Bool
      */
     async dropTable(tblName, params = {}) {
-        return this.dropTableCallback((tblDropInstance, params) => {
+        return this.dropTableCallback((tblDropRequest, params) => {
             return new Promise((resolve, reject) => {
-                return this.client.driver.query(tblDropInstance.toString(), (err, result) => {
+                return this.client.driver.query(tblDropRequest.toString(), (err, result) => {
                     if (err) return reject(err);
                     resolve(this.formatSideEffectResult(result));
                 });
@@ -128,15 +128,16 @@ export default class SQLDatabase extends _Database {
     /**
      * Composes the SQL for a SHOW TABLE operation.
      * 
-     * @param String tblName
+     * @param Array tblNames
      * 
      * @returns Array
      */
-    getDescribeTableSql(tblName) {
+    getDescribeTableSql(tblNames) {
         // SHOW CREATE TABLE isn't supported by postgreSql, plus we need that would add auto-added constraint names that the querying the information_schema adds
         const sql0 = `
         SELECT
             COLUMNS.column_name,
+            COLUMNS.table_name,
             COLUMNS.ordinal_position,
             COLUMNS.column_default,
             COLUMNS.is_nullable,
@@ -157,7 +158,7 @@ export default class SQLDatabase extends _Database {
         FROM INFORMATION_SCHEMA.COLUMNS AS COLUMNS
 
         WHERE COLUMNS.TABLE_SCHEMA='${ this.name }'
-            AND COLUMNS.TABLE_NAME = '${ tblName }'
+            ${ tblNames.length && tblNames[0] !== '*' ? `AND COLUMNS.TABLE_NAME IN ('${ tblNames.join(`','`) }')` : '' }
         ORDER BY COLUMNS.ordinal_position
         `;
 
@@ -166,6 +167,7 @@ export default class SQLDatabase extends _Database {
 
         const sql1 = `
         SELECT
+            ${ ANY_VALUE(`TABLE_CONSTRAINTS.table_name`) } AS table_name,
             ${ GROUP_CONCAT(`TABLE_CONSTRAINTS_DETAILS.column_name`, `TABLE_CONSTRAINTS_DETAILS.ordinal_position`) } AS column_name,
             TABLE_CONSTRAINTS.constraint_name AS constraint_name,
             ${ ANY_VALUE(`TABLE_CONSTRAINTS.constraint_type`) } AS constraint_type,
@@ -210,7 +212,7 @@ export default class SQLDatabase extends _Database {
             ` }
 
         WHERE TABLE_CONSTRAINTS.CONSTRAINT_SCHEMA = '${ this.name }'
-            AND TABLE_CONSTRAINTS.TABLE_NAME = '${ tblName }'
+            ${ tblNames.length && tblNames[0] !== '*' ? `AND TABLE_CONSTRAINTS.TABLE_NAME IN ('${ tblNames.join(`','`) }')` : '' }
         GROUP BY (TABLE_CONSTRAINTS.constraint_name)
         `;
 
@@ -220,28 +222,14 @@ export default class SQLDatabase extends _Database {
     /**
      * Builds a schema object from the results of querying the information schema.
      * 
-     * @param String tblName
+     * @param Array tblNames
      * @param Array columns
      * @param Array constraints
      * @param Array indexes
      * 
      * @returns Object
      */
-    formatDescribeTableResult(tblName, columns, constraints, indexes) {
-        const normalizeCheckConstraint = key => {
-            // Which columns are referenced in the check expr? We first eliminate all quoted strings, obtain all literals, and intersect with columnNames
-            const literals = (key.check_clause.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, '').match( /\w+/g ) || []).map(s => s.toLowerCase());
-            key.columns = _intersect(columnNames, literals);
-            return key;
-        };
-        const columnNames = columns.map(col => col.column_name);
-        let [ primaryKey, uniqueKeys, foreignKeys, checks ] = constraints.reduce(([ primarys, uniques, foreigns, checks ], key) => {
-            if (key.constraint_type === 'PRIMARY KEY') return [ primarys.concat(key), uniques, foreigns, checks ];
-            if (key.constraint_type === 'UNIQUE') return [ primarys, uniques.concat(key), foreigns, checks ];
-            if (key.constraint_type === 'FOREIGN KEY') return [ primarys, uniques, foreigns.concat(key), checks ];
-            if (key.constraint_type === 'CHECK' && !(this.client.params.dialect === 'postgres' && /^[\d_]+not_null/.test(key.constraint_name))) return [ primarys, uniques, foreigns, checks.concat(normalizeCheckConstraint(key)) ];
-            return [ primarys, uniques, foreigns, checks ];
-        }, [[], [], [], []]);
+    formatDescribeTableResult(tblNames, columns, constraints, indexes) {
         // PG likes using verbose data types
         const dataType = val => val === 'character varying' ? 'varchar' : (val === 'integer' ? 'int' : val);
         const formatRelation = (key, tableScope = false) => ({
@@ -253,57 +241,77 @@ export default class SQLDatabase extends _Database {
             updateRule: key.update_rule,
             deleteRule: key.delete_rule,
         });
-        // Build schema
-        const schema = {
-            name: tblName,
-            database: this.name,
-            columns: columns.reduce((cols, col) => {
-                const temp = {};
-                return cols.concat({
-                    name: col.column_name,
-                    type: col.character_maximum_length ? { name: dataType(col.data_type), maxLen: col.character_maximum_length } : dataType(col.data_type),
-                    ...(primaryKey.length === 1 && primaryKey[0].column_name === col.column_name && (temp.pKeys = primaryKey.pop()) ? {
-                        primaryKey: { constraintName: temp.pKeys.constraint_name }
-                    } : {}),
-                    ...((temp.uKeys = uniqueKeys.filter(key => key.column_name === col.column_name)).length === 1 && (uniqueKeys = uniqueKeys.filter(key => key !== temp.uKeys[0])) ? {
-                        uniqueKey: { constraintName: temp.uKeys[0].constraint_name }
-                    } : {}),
-                    ...((temp.fKeys = foreignKeys.filter(key => key.column_name === col.column_name)).length === 1 && (foreignKeys = foreignKeys.filter(key => key !== temp.fKeys[0])) ? {
-                        references: formatRelation(temp.fKeys[0])
-                    } : {}),
-                    ...((temp.cKeys = checks.filter(key => key.check_constraint_level !== 'Table' && key.columns.length === 1 && key.columns[0] === col.column_name)).length === 1 && (checks = checks.filter(key => key !== temp.cKeys[0])) ? {
-                        check: { constraintName: temp.cKeys[0].constraint_name, expr: temp.cKeys[0].check_clause }
-                    } : {}),
-                    ...(col.is_identity !== 'NO' ? {
-                        identity: { always: col.identity_generation === 'ALWAYS' }
-                    } : {}),
-                    ...(col.is_generated !== 'NEVER' ? {
-                        generated: { always: col.is_generated === 'ALWAYS', expr: col.generation_expression }
-                    } : {}),
-                    ...(col.is_nullable === 'NO' ? {
-                        notNull: true
-                    } : {}),
-                    ...(col.default ? {
-                        default: col.default
-                    } : {}),
-                });
-            }, []),
-            constraints: [],
-            indexes: [],
-        };
-        schema.constraints.push(...[...primaryKey, ...uniqueKeys, ...foreignKeys].map(key => ({
-            constraintName: key.constraint_name,
-            type: key.constraint_type,
-            columns: key.column_name.split(',').map(col => col.trim()),
-            ...(key.constraint_type === 'FOREIGN KEY' ? { references: formatRelation(key, true) } : {}),
-        })));
-        schema.constraints.push(...checks.map(key => ({
-            constraintName: key.constraint_name,
-            type: key.constraint_type,
-            columns: key.columns,
-            expr: key.check_clause,
-        })));
-        return schema;
+        return (tblNames.length && tblNames[0] !== '*' ? tblNames : [...new Set(columns.map(col => col.table_name))]).map(tblName => {
+            const $columns = columns.filter(col => col.table_name === tblName);
+            const $constraints = constraints.filter(constr => constr.table_name === tblName);
+            const $indexes = indexes.filter(constr => constr.table_name === tblName);
+            // -----
+            const columnNames = $columns.map(col => col.column_name);
+            const normalizeCheckConstraint = key => {
+                // Which columns are referenced in the check expr? We first eliminate all quoted strings, obtain all literals, and intersect with columnNames
+                const literals = (key.check_clause.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, '').match( /\w+/g ) || []).map(s => s.toLowerCase());
+                key.columns = _intersect(columnNames, literals);
+                return key;
+            };
+            let [ primaryKey, uniqueKeys, foreignKeys, checks ] = $constraints.reduce(([ primarys, uniques, foreigns, checks ], key) => {
+                if (key.constraint_type === 'PRIMARY KEY') return [ primarys.concat(key), uniques, foreigns, checks ];
+                if (key.constraint_type === 'UNIQUE') return [ primarys, uniques.concat(key), foreigns, checks ];
+                if (key.constraint_type === 'FOREIGN KEY') return [ primarys, uniques, foreigns.concat(key), checks ];
+                if (key.constraint_type === 'CHECK' && !(this.client.params.dialect === 'postgres' && /^[\d_]+not_null/.test(key.constraint_name))) return [ primarys, uniques, foreigns, checks.concat(normalizeCheckConstraint(key)) ];
+                return [ primarys, uniques, foreigns, checks ];
+            }, [[], [], [], []]);
+            // -----
+            const schema = {
+                name: tblName,
+                database: this.name,
+                columns: $columns.reduce((cols, col) => {
+                    const temp = {};
+                    return cols.concat({
+                        name: col.column_name,
+                        type: col.character_maximum_length ? { name: dataType(col.data_type), maxLen: col.character_maximum_length } : dataType(col.data_type),
+                        ...(primaryKey.length === 1 && primaryKey[0].column_name === col.column_name && (temp.pKeys = primaryKey.pop()) ? {
+                            primaryKey: { constraintName: temp.pKeys.constraint_name }
+                        } : {}),
+                        ...((temp.uKeys = uniqueKeys.filter(key => key.column_name === col.column_name)).length === 1 && (uniqueKeys = uniqueKeys.filter(key => key !== temp.uKeys[0])) ? {
+                            uniqueKey: { constraintName: temp.uKeys[0].constraint_name }
+                        } : {}),
+                        ...((temp.fKeys = foreignKeys.filter(key => key.column_name === col.column_name)).length === 1 && (foreignKeys = foreignKeys.filter(key => key !== temp.fKeys[0])) ? {
+                            references: formatRelation(temp.fKeys[0])
+                        } : {}),
+                        ...((temp.cKeys = checks.filter(key => key.check_constraint_level !== 'Table' && key.columns.length === 1 && key.columns[0] === col.column_name)).length === 1 && (checks = checks.filter(key => key !== temp.cKeys[0])) ? {
+                            check: { constraintName: temp.cKeys[0].constraint_name, expr: temp.cKeys[0].check_clause }
+                        } : {}),
+                        ...(col.is_identity !== 'NO' ? {
+                            identity: { always: col.identity_generation === 'ALWAYS' }
+                        } : {}),
+                        ...(col.is_generated !== 'NEVER' ? {
+                            generated: { always: col.is_generated === 'ALWAYS', expr: col.generation_expression }
+                        } : {}),
+                        ...(col.is_nullable === 'NO' ? {
+                            notNull: true
+                        } : {}),
+                        ...(col.default ? {
+                            default: col.default
+                        } : {}),
+                    });
+                }, []),
+                constraints: [],
+                indexes: [],
+            };
+            schema.constraints.push(...[...primaryKey, ...uniqueKeys, ...foreignKeys].map(key => ({
+                constraintName: key.constraint_name,
+                type: key.constraint_type,
+                columns: key.column_name.split(',').map(col => col.trim()),
+                ...(key.constraint_type === 'FOREIGN KEY' ? { references: formatRelation(key, true) } : {}),
+            })));
+            schema.constraints.push(...checks.map(key => ({
+                constraintName: key.constraint_name,
+                type: key.constraint_type,
+                columns: key.columns,
+                expr: key.check_clause,
+            })));
+            return schema;
+        });
     }
 
     /**

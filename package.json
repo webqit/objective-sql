@@ -28,20 +28,21 @@
   "main": "./src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./odb": "./src/database/odb/ODBDriver.js",
-    "./idb": "./src/database/idb/IDBDriver.js",
-    "./sql": "./src/database/sql/SQLDriver.js"
+    "./odb": "./src/database/odb/ODBClient.js",
+    "./idb": "./src/database/idb/IDBClient.js",
+    "./sql": "./src/database/sql/SQLClient.js"
   },
   "scripts": {
-    "test": "mocha --file test/setup.test.js --extension .test.js --exit",
+    "test": "mocha --extension .pg.test.js --exit",
     "test:coverage": "c8 --reporter=text-lcov npm run test | coveralls",
-    "build": "esbuild main=src/browser-entry.js odb=src/database/odb/ODBDriver.js idb=src/database/idb/IDBDriver.js sql=src/database/sql/SQLDriver.js --bundle --minify --sourcemap --outdir=dist",
+    "build": "esbuild main=src/browser-entry.js odb=src/database/odb/ODBClient.js idb=src/database/idb/IDBClient.js sql=src/database/sql/SQLClient.js --bundle --minify --sourcemap --outdir=dist",
     "preversion": "npm run test && npm run build && git add -A dist",
     "postversion": "npm publish",
     "postpublish": "git push && git push --tags"
   },
   "dependencies": {
-    "@webqit/util": "^0.7.1"
+    "@webqit/util": "^0.7.1",
+    "mocha": "^10.3.0"
   },
   "devDependencies": {
     "chai": "^4.3.4",

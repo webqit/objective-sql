@@ -13,12 +13,16 @@ export default class TableLevelConstraint extends ConstraintInterface {
     /**
 	 * @constructor
 	 */
-    constructor(constraintName, type, columns, value, params = {}) {
+    constructor(constraintName, type, columns, detail, params = {}) {
         super();
         this.constraintName = constraintName;
         this.type = type;
         this.columns = columns;
-        this[ type === 'FOREIGN KEY' ? 'references' : (type === 'CHECK' ? 'expr' : 'value' ) ] = value;
+		if (type === 'FOREIGN KEY') {
+			this.references = detail;
+		} else if (type === 'CHECK') {
+			this.expr = detail;
+		}
 		this.params = params;
     }
 
@@ -56,14 +60,17 @@ export default class TableLevelConstraint extends ConstraintInterface {
 			// Either of the below
 			...(this.references ? { references: { ...this.references } } : {}),
 			...(this.expr ? { expr: this.expr } : {}),
-			...(this.value ? { value: this.value } : {}),
 		};
 	}
 
 	/**
 	 * @inheritdoc
 	 */
-	static fromJson(json, params = {}) { return new this(json.constraintName, json.type?.replace(/UNIQUE[ ]+KEY/i, 'UNIQUE'), json.columns, json.references || json.expr || json.value, params); }
+	static fromJson(json, params = {}) {
+		if (json.constraintName || (typeof json.type === 'string' && json.type.match(/PRIMARY[ ]+KEY|UNIQUE([ ]+KEY)?|CHECK|FOREIGN[ ]+KEY/i))) {
+			return new this(json.constraintName, json.type.replace(/UNIQUE[ ]+KEY/i, 'UNIQUE'), json.columns, json.references || json.expr || json.value, params);
+		}
+	}
 
 	/**
 	 * @inheritdoc
@@ -71,9 +78,9 @@ export default class TableLevelConstraint extends ConstraintInterface {
 	static fromColumnLevelConstraint(columnLevelConstraint, columnName) {
 		return new this(
 			columnLevelConstraint.constraintName, 
-			columnLevelConstraint.type === 'REFERENCES' ? 'FOREIGN KEY' : columnLevelConstraint.type, 
+			columnLevelConstraint.attribute === 'REFERENCES' ? 'FOREIGN KEY' : columnLevelConstraint.attribute, 
 			[columnName], 
-			columnLevelConstraint.detail || columnLevelConstraint.expr || columnLevelConstraint.value,
+			columnLevelConstraint.attribute === 'CHECK' ? columnLevelConstraint.detail.expr : columnLevelConstraint.detail,
 			columnLevelConstraint.params
 		);
 	}
@@ -86,10 +93,10 @@ export default class TableLevelConstraint extends ConstraintInterface {
 		if (idMatch) { expr = _after(expr, idMatch); }
 		// PRIMARY KEY
 		const [ primaryKeyMatch, columns ] = (new RegExp(`^${ this.primaryKeyRe.source }`, 'i')).exec(expr) || [];
-		if (primaryKeyMatch) return new this(constraintName.trim(), 'PRIMARY KEY', columns.split(',').map(s => s.trim()), true, params);
+		if (primaryKeyMatch) return new this(constraintName.trim(), 'PRIMARY KEY', columns.split(',').map(s => s.trim()), null, params);
 		// UNIQUE KEY
 		const [ uniqueKeyMatch, _columns ] = (new RegExp(`^${ this.uniqueKeyRe.source }`, 'i')).exec(expr) || [];
-		if (uniqueKeyMatch) return new this(constraintName.trim(), 'UNIQUE', _columns.split(',').map(s => s.trim()), true, params);
+		if (uniqueKeyMatch) return new this(constraintName.trim(), 'UNIQUE', _columns.split(',').map(s => s.trim()), null, params);
 		// CHECK
 		const [ checkMatch, _expr ] = (new RegExp(`^${ this.checkRe.source }`, 'i')).exec(expr) || [];
 		if (checkMatch) return new this(constraintName.trim(), 'CHECK', [], _expr, params);

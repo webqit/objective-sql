@@ -13,15 +13,11 @@ export default class ColumnLevelConstraint extends ConstraintInterface {
     /**
 	 * @constructor
 	 */
-    constructor(constraintName, type, value, params) {
+    constructor(constraintName, attribute, detail, params) {
         super();
         this.constraintName = constraintName;
-        this.type = type;
-		// Set value
-		if (type === 'DEFAULT') { this[ /\W/i.test(value) ? 'expr' : 'value' ] = value; }
-		else if (type === 'CHECK') { this.expr = value; }
-		else if (['REFERENCES', 'IDENTITY', 'EXPRESSION'].includes(type)) { this.detail = value; }
-		else { this.value = value; }
+        this.attribute = attribute;
+        this.detail = detail;
         this.params = params;
     }
 
@@ -34,26 +30,26 @@ export default class ColumnLevelConstraint extends ConstraintInterface {
 	 * @inheritdoc
 	 */
 	stringify() {
-        let sql = `${ this.constraintName?.match(/[a-zA-Z]+/i) ? `CONSTRAINT ${ this.constraintName } ` : '' }${ ['IDENTITY', 'EXPRESSION'].includes(this.type) ? 'GENERATED' : this.type }`;
-		if (this.type === 'REFERENCES') {
+        let sql = `${ this.constraintName?.match(/[a-zA-Z]+/i) ? `CONSTRAINT ${ this.constraintName } ` : '' }${ ['IDENTITY', 'EXPRESSION'].includes(this.attribute) ? 'GENERATED' : this.attribute }`;
+		if (this.attribute === 'REFERENCES') {
 			const database = this.detail.database || this.params.database;
 			sql += ` ${ database ? `${ database }.` : `` }${ this.detail.table } (${ this.detail.columns.join(',') })`;
 			if (this.detail.matchRule) { sql += ` MATCH ${ this.detail.matchRule }`; }
 			if (this.detail.updateRule) { sql += ` ON UPDATE ${ serializeReferentialRule(this.detail.updateRule) }`; }
 			if (this.detail.deleteRule) { sql += ` ON DELETE ${ serializeReferentialRule(this.detail.deleteRule) }`; }
 		}
-		if (this.type === 'DEFAULT') {
-			sql += (this.expr ? ` (${ this.expr })` : ` ${ this.value }`);
-		} else if (['IDENTITY', 'EXPRESSION'].includes(this.type)) {
+		if (this.attribute === 'DEFAULT') {
+			sql += (this.detail.expr ? ` (${ this.detail.expr })` : ` ${ this.detail.value }`);
+		} else if (['IDENTITY', 'EXPRESSION'].includes(this.attribute)) {
 			sql += ` ${ this.detail.always ? 'ALWAYS' : 'BY DEFAULT' }`;
-			if (this.type === 'IDENTITY') {
+			if (this.attribute === 'IDENTITY') {
 				sql += ` AS IDENTITY`;
 			} else if (this.detail.expr) {
 				// The AS clause could be unavailable when in an alter column statement (pg): ALTER [ COLUMN ] column_name { SET GENERATED { ALWAYS | BY DEFAULT } | SET sequence_option | RESTART [ [ WITH ] restart ] } [...]
 				sql += ` AS (${ this.detail.expr }) STORED`;
 			}
-		} else if (this.type === 'CHECK') {
-			sql += ` (${ this.expr })`;
+		} else if (this.attribute === 'CHECK') {
+			sql += ` (${ this.detail.expr })`;
 		}
 		return sql;
 	}
@@ -61,35 +57,14 @@ export default class ColumnLevelConstraint extends ConstraintInterface {
 	/**
 	 * @inheritdoc
 	 */
-	toJson() {
-		const attrEquivalents = this.constructor.attrEquivalents;
-		const attrName = Object.keys(attrEquivalents).find(attr => attrEquivalents[attr] === this.type);
-		let value;
-		if (['REFERENCES', 'IDENTITY', 'EXPRESSION'].includes(this.type)) {
-			value = { constraintName: this.constraintName, ...this.detail };
-		} else if (this.constraintName) {
-			value = this.expr
-				?/* check, default */ { constraintName: this.constraintName, expr: this.expr } 
-				:/* primaryKey, uniqueKey, notNull, autoIncrement, default */ { constraintName: this.constraintName, value: this.value };
-		} else {
-			// primaryKey, uniqueKey, notNull, autoIncrement, check, default
-			value = this.expr || this.value;
-		}
-		return [ attrName, value ];
-	}
+	toJson() { return { constraintName: this.constraintName, attribute: this.attribute, detail: this.detail }; }
 
 	/**
 	 * @inheritdoc
 	 */
-	static fromJson(attr, value, params = {}) {
-		let constraintName, type = this.attrEquivalents[attr], expr;
-		if (!type) return;
-		if (_isObject(value)) {
-			if (['REFERENCES', 'IDENTITY', 'EXPRESSION'].includes(type)) {
-				({ constraintName, ...value } = value);
-			} else { ({ constraintName, expr, value } = value); }
-		}
-		return new this(constraintName, type, expr || value, params);
+	static fromJson(json, params = {}) {
+		if (!Object.values(this.attrEquivalents).includes(json.attribute)) return;
+		return new this(json.constraintName, json.attribute, json.detail, params);
 	}
 
     /**
@@ -99,13 +74,13 @@ export default class ColumnLevelConstraint extends ConstraintInterface {
 		const regex = constraintName => new RegExp(`${ this.constraintNameRe.source }${ this[ constraintName ].source }`, 'i');
 		// PRIMARY KEY
 		const [ primaryKeyMatch, constraintName0 = '' ] = regex('primaryKeyRe').exec(expr) || [];
-		if (primaryKeyMatch) return new this(constraintName0.trim(), 'PRIMARY KEY', true, { ...params, wholeMatch: primaryKeyMatch });
+		if (primaryKeyMatch) return new this(constraintName0.trim(), 'PRIMARY KEY', {}, { ...params, wholeMatch: primaryKeyMatch });
 		// UNIQUE KEY
 		const [ uniqueKeyMatch, constraintName2 = '' ] = regex('uniqueKeyRe').exec(expr) || [];
-		if (uniqueKeyMatch) return new this(constraintName2.trim(), 'UNIQUE', true, { ...params, wholeMatch: uniqueKeyMatch });
+		if (uniqueKeyMatch) return new this(constraintName2.trim(), 'UNIQUE', {}, { ...params, wholeMatch: uniqueKeyMatch });
 		// CHECK
 		const [ checkMatch, constraintName3 = '', _expr ] = regex('checkRe').exec(expr) || [];
-		if (checkMatch) return new this(constraintName3.trim(), 'CHECK', _expr, { ...params, wholeMatch: checkMatch });
+		if (checkMatch) return new this(constraintName3.trim(), 'CHECK', { expr: _expr }, { ...params, wholeMatch: checkMatch });
 		// REFERENCES
 		const [ referencesMatch, constraintName1 = '', referencedDb, referencedTable, referencedColumns, referentialRules = '' ] = regex('referencesRe').exec(expr) || [];
 		if (referencesMatch) return new this(constraintName1.trim(), 'REFERENCES', {
@@ -124,10 +99,10 @@ export default class ColumnLevelConstraint extends ConstraintInterface {
 		if (expressionMatch) return new this(constraintName4b.trim(), 'EXPRESSION', { always: $$expr || /^ALWAYS$/i.test(altGenerationFn) ? true : false, expr: $$expr }, { ...params, wholeMatch: expressionMatch });
 		// DEFAULT; Must appear after "identity" and "expression" for correct parsing of the keyword "DEFAULT"
 		const [ defaultMatch, constraintName5 = '', literal, $expr ] = regex('defaultRe').exec(expr) || [];
-		if (defaultMatch) return new this(constraintName5.trim(), 'DEFAULT', literal || $expr, { ...params, wholeMatch: defaultMatch });
+		if (defaultMatch) return new this(constraintName5.trim(), 'DEFAULT', literal ? { value: literal } : { expr: $expr }, { ...params, wholeMatch: defaultMatch });
 		// OTHER; Would have been fine as first, but interfares with CHECK(col is NOT NULL)
-		const [ otherMatch, constraintName6 = '', type ] = regex('otherRe').exec(expr) || [];
-		if (otherMatch) return new this(constraintName6.trim(), type.replace(/\s+/g, ' ').toUpperCase(), true, { ...params, wholeMatch: otherMatch });
+		const [ otherMatch, constraintName6 = '', attribute ] = regex('otherRe').exec(expr) || [];
+		if (otherMatch) return new this(constraintName6.trim(), attribute.replace(/\s+/g, ' ').toUpperCase(), {}, { ...params, wholeMatch: otherMatch });
 	}
 
     /**

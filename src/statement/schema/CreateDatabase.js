@@ -25,6 +25,11 @@ export default class CreateDatabase extends CreateInterface {
 	 * @inheritdoc
 	 */
 	async eval() {}
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() { return { name: this.name }; }
 	
 	/**
 	 * @inheritdoc
@@ -34,20 +39,7 @@ export default class CreateDatabase extends CreateInterface {
 	/**
 	 * @inheritdoc
 	 */
-	stringify(params = {}) { return `CREATE ${ this.params.dialect === 'postgres' ? 'SCHEMA' : 'DATABASE' }${ this.params.ifNotExists ? ' IF NOT EXISTS' : '' } ${ this.name }`; }
-	
-	/**
-	 * @inheritdoc
-	 */
-	toJson() { return { name: this.name }; }
-
-	/**
-	 * @inheritdoc
-	 */
-	static fromJson(json, params = {}) {
-		if (!json.name || !json.name.match(/[a-zA-Z]+/i)) throw new Error(`Could not assertain database name or database name invalid.`);
-		return new this(json.name, params);
-	}
+	stringify(params = {}) { return `CREATE SCHEMA${ this.params.ifNotExists ? ' IF NOT EXISTS' : '' } ${ this.name }`; }
 
 	/**
 	 * @inheritdoc
@@ -57,6 +49,14 @@ export default class CreateDatabase extends CreateInterface {
 		if (!dbName) return;
 		if (ifNotExists) { params = { ...params, ifNotExists: true }; }
 		return new this(dbName, params);
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(json, params = {}) {
+		if (!json.name || !json.name.match(/[a-zA-Z]+/i)) throw new Error(`Could not assertain database name or database name invalid.`);
+		return new this(json.name, params);
 	}
 
 	/**

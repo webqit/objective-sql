@@ -34,21 +34,6 @@ export default class CreateTable extends CreateInterface {
 	 * @inheritdoc
 	 */
 	async eval() {}
-	
-	/**
-	 * @inheritdoc
-	 */
-	toString() { return this.stringify(); }
-	
-	/**
-	 * @inheritdoc
-	 */
-	stringify() {
-		const defs = [ this.columns.map(col => col.stringify()).join(',\n\t') ];
-		if (this.constraints.length) { defs.push(this.constraints.map(cnst => cnst.stringify()).join(',\n\t')); }
-		if (this.indexes.length) { defs.push(this.indexes.map(ndx => ndx.stringify()).join(',\n\t')); }
-		return `CREATE TABLE${ this.params.ifNotExists ? ' IF NOT EXISTS' : '' } ${ this.database ? `${ this.database }.` : `` }${ this.name } (\n\t${ defs.join(',\n\t') }\n)`;
-	}
 
 	/**
 	 * @inheritdoc
@@ -63,6 +48,29 @@ export default class CreateTable extends CreateInterface {
         }
         return json;
     }
+	
+	/**
+	 * @inheritdoc
+	 */
+	toString() { return this.stringify(); }
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify() {
+		const defs = [ this.columns.map(col => col.stringify()).join(',\n\t') ];
+		const constraints = this.constraints.slice(0);
+		if (this.params.dialect === 'mysql') {
+			constraints.push(...this.columns.reduce((constraints, col) => {
+				const constraint = col.constraints.find(c => c.attribute === 'REFERENCES');
+				if (constraint) return constraints.concat(TableLevelConstraint.fromColumnLevelConstraint(constraint, col.name, this.params));
+				return constraints;
+			}, []));
+		}
+		if (constraints.length) { defs.push(constraints.map(cnst => cnst.stringify()).join(',\n\t')); }
+		if (this.indexes.length) { defs.push(this.indexes.map(ndx => ndx.stringify()).join(',\n\t')); }
+		return `CREATE TABLE${ this.params.ifNotExists ? ' IF NOT EXISTS' : '' } ${ this.database ? `${ this.database }.` : `` }${ this.name } (\n\t${ defs.join(',\n\t') }\n)`;
+	}
 	
 	/**
 	 * @inheritdoc
@@ -103,9 +111,10 @@ export default class CreateTable extends CreateInterface {
 	 */
 	static cloneSchema(json) {
 		const jsonClone = structuredClone(json);
+		// ----------------
 		const rebase = (obj, key) => {
 			const value = obj[key];
-			Object.defineProperty(obj, `$${ key }`, { get: () => value });
+			Object.defineProperty(obj, `$${ key }`, { get: () => value, configurable: true });
 		};
 		rebase(jsonClone, 'name');
 		for (const column of jsonClone.columns || []) {
@@ -114,6 +123,20 @@ export default class CreateTable extends CreateInterface {
 		}
 		for (const constraint of jsonClone.constraints || []) { rebase(constraint, 'constraintName'); }
 		for (const index of jsonClone.indexes || []) { rebase(index, 'indexName'); }
+		// ----------------
+		const redefine = (obj, key, nameKey) => {
+			const arr = obj[key];
+			Object.defineProperty(obj, key, { get() { return arr; } });
+			Object.defineProperties(arr, {
+				get: { value: name => arr.find(x => x[nameKey] === name), configurable: true },
+				has: { value: name => arr.get(name) ? true : false, configurable: true },
+				delete: { value: name => arr.splice(arr.findIndex(x => x[nameKey] === name), 1), configurable: true },
+			});
+		};
+		redefine(jsonClone, 'columns', 'name');
+		redefine(jsonClone, 'constraints', 'constraintName');
+		redefine(jsonClone, 'indexes', 'indexName');
+		// ----------------
 		return jsonClone;
 	}
 

@@ -45,7 +45,7 @@ export default class SQLClient extends _Client {
      * 
      * @var Array
 	 */
-    static systemDBs = [ 'information_schema', 'mysql', 'performance_schema', 'sys', 'pg_catalog', 'pg_toast', 'public' ];
+    static systemDBs = [ 'information_schema', 'mysql', 'performance_schema', 'sys', 'pg_catalog', 'pg_toast' ];
 
 	/**
 	 * Sets default database.
@@ -124,7 +124,7 @@ export default class SQLClient extends _Client {
      */
     async alterDatabase(dbName, schemaCallback, params = {}) {
         return this.alterDatabaseCallback(async (dbAlterInstance, handleTables, params) => {
-            if (!dbAlterInstance.nodeTypes.length) return;
+            if (!dbAlterInstance.actions.length) return;
             await handleTables(); // Handle tables before rename DB
             return new Promise((resolve, reject) => {
                 return this.driver.query(dbAlterInstance.toString(), (err, result) => {

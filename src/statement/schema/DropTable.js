@@ -30,6 +30,11 @@ export default class DropTable extends DropInterface {
 	/**
 	 * @inheritdoc
 	 */
+	toJson() { return { name: this.name, database: this.database }; }
+	
+	/**
+	 * @inheritdoc
+	 */
 	toString() { return this.stringify(); }
 	
 	/**
@@ -46,4 +51,13 @@ export default class DropTable extends DropInterface {
 		if (ifExists) { params = { ...params, ifExists: true }; }
 		return new this(tblName, dbName, params);
 	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(json, params = {}) {
+		if (!json.name || !json.name.match(/[a-zA-Z]+/i)) throw new Error(`Could not assertain table name or table name invalid.`);
+		return new this(json.name, json.database, params);
+	}
+
 }

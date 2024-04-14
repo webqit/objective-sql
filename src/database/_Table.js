@@ -41,6 +41,16 @@ export default class _Table {
     get params() { return this.$.params; }
 
     /**
+     * @property Bool
+     */
+    get dropped() { return this.$.schema.hiddenAs === 'dropped'; }
+
+	/**
+     * @returns Object
+     */
+	async schema() { return await this.database.describeTable(this.name); }
+
+    /**
 	 * Returns the table's current savepoint.
 	 * 
      * @param Object params
@@ -51,7 +61,7 @@ export default class _Table {
         if (!this.$.schema.savepoint || params.force) {
             const OBJ_INFOSCHEMA_DB = this.database.client.constructor.OBJ_INFOSCHEMA_DB;
             if ((await this.database.client.databases({ name: OBJ_INFOSCHEMA_DB }))[0]) {
-                const result = await this.database.client.query(`SELECT tbl.name_snapshot, db.name_snapshot AS database_snapshot, tbl.columns_snapshot, tbl.constraints_snapshot, tbl.indexes_snapshot, tbl.savepoint_id, db.savepoint_desc, db.savepoint_date FROM ${ OBJ_INFOSCHEMA_DB }.table_savepoints AS tbl RIGHT JOIN ${ OBJ_INFOSCHEMA_DB }.database_savepoints AS db ON db.id = tbl.savepoint_id AND db.current_name = '${ this.database.name }' AND db.rollback_date IS NULL WHERE tbl.current_name = '${ this.name }' ORDER BY db.savepoint_date DESC LIMIT 1`, [], { isStandardSql: true });
+                const result = await this.database.client.query(`SELECT tbl.name_snapshot, db.name_snapshot AS database_snapshot, tbl.columns_snapshot, tbl.constraints_snapshot, tbl.indexes_snapshot, tbl.savepoint_id, db.savepoint_desc, db.savepoint_date, db.rollback_date FROM ${ OBJ_INFOSCHEMA_DB }.table_savepoints AS tbl RIGHT JOIN ${ OBJ_INFOSCHEMA_DB }.database_savepoints AS db ON db.id = tbl.savepoint_id AND '${ this.database.name }' IN (db.name_snapshot,db.current_name) AND db.rollback_date ${ params.direction === 'forward' ? 'IS NOT NULL' : 'IS NULL' } WHERE '${ this.name }' IN (tbl.name_snapshot,tbl.current_name) ORDER BY db.savepoint_date ${ params.direction === 'forward' ? 'ASC' : 'DESC' } LIMIT 1`, [], { isStandardSql: true });
                 this.$.schema.savepoint = result[0];
             }
         }
@@ -65,34 +75,39 @@ export default class _Table {
 	 */
 
 	/**
+	 * Get columns that have given indexType.
+	 * 
+	 * @param String indexType
+	 * 
+	 * @returns Array
+	 */
+	async columnsForIndex(indexType) {
+		const schema = await this.database.describeTable(this.name);
+		if (schema.indexes.length) { return schema.indexes.filter(index => index.type === indexType).reduce((cols, index) => cols.concat(index.columns)); }
+		return [];
+	}
+
+	/**
+	 * Get columns that have given constraintType.
+	 * 
+	 * @param String constraintType
+	 * 
+	 * @returns Array
+	 */
+	async columnsForConstraint(constraintType) {
+		const schema = await this.database.describeTable(this.name);
+		const inlineConstraintTypesMap = { 'PRIMARY KEY': 'primaryKey', 'UNIQUE': 'uniqueKey', 'CHECK': 'check', 'FOREIGN KEY': 'references' };
+		let columns = !(constraintType in inlineConstraintTypesMap) ? [] : schema.columns.filter(col => col[inlineConstraintTypesMap[constraintType]]).map(col => col.name);
+		if (schema.constraints.length) { columns = columns.concat(schema.constraints.filter(cnst => cnst.type === constraintType).reduce((cols, cnst) => cols.concat(cnst.columns))); }
+		return columns;
+	}
+
+	/**
 	 * Get Primary Key columns from schema.
 	 * 
 	 * @returns Array
 	 */
-	getKeyPathForPrimaryKey() {
-		let keyPath = this.$.schema.columns.filter(col => col.primaryKey).map(col => col.name);
-		if (!keyPath.length) {
-			keyPath = this.$.schema.constraints.find(cons => cons.type === 'PRIMARY KEY')?.columns || [];
-		}
-		return keyPath;
-	}
-
-	/**
-	 * Get Index columns from schema.
-	 * 
-	 * @param String type
-	 * 
-	 * @returns Array
-	 */
-	 getKeyPathsForIndex(type) {
-		let keyPaths = Object.keys(this.def.schema.columns).filter(name => this.def.schema.columns[name][type]);
-		if (this.def.schema.indexes) {
-			Object.keys(this.def.schema.indexes).filter(indexName => this.def.schema.indexes[indexName].type === type).forEach(indexName => {
-				keyPaths.push(_arrFrom(this.def.schema.indexes[indexName].keyPath));
-			});
-		}
-		return keyPaths;
-	}
+	async primaryKeyColumns() { return await this.columnsForConstraint('PRIMARY KEY'); }
 
 	/**
 	 * ----------
@@ -157,16 +172,16 @@ export default class _Table {
 		for (const values of multiValues) {
 			let rowObj = values;
 			if (Array.isArray(values)) {
-				const columnNames = columns.length ? columns : this.$.schema.columns.map(col => col.name);
+				const columnNames = columns.length ? columns : (await this.schema()).columns.map(col => col.name);
 				if (columnNames.length && columnNames.length !== values.length) {
 					throw new Error(`Column/values count mismatch at line ${ multiValues.indexOf(values) }.`);
 				}
 				rowObj = columnNames.reduce((rowObj, name, i) => ({ ...rowObj, [name]: values[i], }), {});
 			}
 			// -------------
-			this.handleInput(rowObj, true);					
+			await this.handleInput(rowObj, true);					
 			// -------------
-			if (this.shouldMatchInput(rowObj) || duplicateKeyCallback) {
+			if (await this.shouldMatchInput(rowObj) || duplicateKeyCallback) {
 				const match = await this.match(rowObj);
 				if (match && duplicateKeyCallback) {
 					const duplicateRow = { ...match.row };
@@ -198,7 +213,7 @@ export default class _Table {
 	 */
 	async beforeAdd(rowObj, match) {
 		const timestamp = (new Date).toISOString();
-		for (const column of this.$.schema.columns) {
+		for (const column of (await this.schema()).columns) {
 			const columnType = _isObject(column.type) ? column.type.name : column.type;
 			if ((columnType === 'datetime' || columnType === 'timestamp') && column.default === 'CURRENT_TIMESTAMP') {
 				rowObj[column.name] = timestamp;
@@ -213,9 +228,9 @@ export default class _Table {
 		const updates = [];
 		for (const rowObj of multiRows) {
 			// -------------
-			this.handleInput(rowObj);					
+			await this.handleInput(rowObj);					
 			// -------------
-			if (this.shouldMatchInput(rowObj)) {
+			if (await this.shouldMatchInput(rowObj)) {
 				await this.beforePut(rowObj, await this.match(rowObj));
 				updates.push(await this.put(rowObj));
 				continue;
@@ -232,7 +247,7 @@ export default class _Table {
 	async beforePut(rowObj, match) {
 		if (match && !Object.keys(rowObj).every(key => rowObj[key] === match.row[key])) {
 			const timestamp = (new Date).toISOString();
-			for (const column of this.$.schema.columns) {
+			for (const column of (await this.schema()).columns) {
 				const columnType = _isObject(column.type) ? column.type.name : column.type;
 				if ((columnType === 'datetime' || columnType === 'timestamp') && column.onupdate === 'CURRENT_TIMESTAMP') {
 					rowObj[column.name] = timestamp;
@@ -266,16 +281,17 @@ export default class _Table {
 	/**
 	 * @inheritdoc
 	 */
-	handleInput(rowObj, applyDefaults = false) {
+	async handleInput(rowObj, applyDefaults = false) {
 		const rowObjColumns = Object.keys(rowObj);
-		const schemaColumns = this.$.schema.columns.map(col => col.name);
+		const schema = await this.schema();
+		const schemaColumns = schema.columns.map(col => col.name);
 		// ------------------
 		const unknownFields = rowObjColumns.filter(col => schemaColumns.indexOf(col) === -1);
 		if (unknownFields.length) { throw new Error(`Unknown column: ${ unknownFields[0] }`); }
 		// ------------------
-		schemaColumns.forEach(columnName => {
+		for (const columnName of schemaColumns) {
 			const value = rowObj[columnName];
-			const column = this.$.schema.columns.find(col => col.name === columnName) || {};
+			const column = schema.columns.find(col => col.name === columnName) || {};
 			if (rowObjColumns.includes(columnName)) {
 				const columnType = _isObject(column.type) ? column.type.name : column.type;
 				// TODO: Validate supplied value
@@ -295,7 +311,7 @@ export default class _Table {
 					if (!_isString(value)) {
 					}
 				}
-			} else if (applyDefaults && !_intersect([columnName], this.getKeyPathForPrimaryKey()).length) {
+			} else if (applyDefaults && !_intersect([columnName], await this.primaryKeyColumns()).length) {
 				// DONE: Apply defaults...
 				rowObj[columnName] = ('default' in column) && !(['date', 'datetime', 'timestamp'].includes(columnType) && column.default === 'CURRENT_TIMESTAMP') 
 					? column.default 
@@ -305,14 +321,14 @@ export default class _Table {
 			if (column.notNull && (_isNull(rowObj[columnName]) || _isUndefined(rowObj[columnName]))) {
 				throw new Error(`Inserting NULL on non-nullable column: ${ columnName }.`);
 			}
-		});
+		}
 	}
 		
 	/**
 	 * @inheritdoc
 	 */
-	shouldMatchInput(rowObj) {
-		return this.$.schema.columns.some(column => {
+	async shouldMatchInput(rowObj) {
+		return (await this.schema()).columns.some(column => {
 			const columnType = _isObject(column.type) ? column.type.name : column.type;
 			return ['datetime', 'timestamp'].includes(columnType) && (
 				column.default === 'CURRENT_TIMESTAMP' || column.onupdate === 'CURRENT_TIMESTAMP'

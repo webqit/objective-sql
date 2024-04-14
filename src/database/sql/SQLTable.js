@@ -2,11 +2,7 @@
 /**
  * @imports
  */
-import _isObject from '@webqit/util/js/isObject.js';
-import _isNull from '@webqit/util/js/isNull.js';
-import _arrFrom from '@webqit/util/arr/from.js';
-import _isNumeric from '@webqit/util/js/isNumeric.js';
-import _wrapped from '@webqit/util/str/wrapped.js';
+import { _isObject, _isNull, _isNumeric } from '@webqit/util/js/index.js';
 import _Table from '../_Table.js';
 import SQLInsertQueryInspector from './SQLInsertQueryInspector.js';
 import SQLDeleteQueryInspector from './SQLDeleteQueryInspector.js';
@@ -43,12 +39,10 @@ export default class SQLTable extends _Table {
 	 * @inheritdoc
 	 */
 	async get(primaryKey) {
-		const primaryKeyColumns = this.getPrimaryKeyColumns();
-		if (primaryKeyColumns.length !== 1) {
-			throw new Error('Cannot find records by primary key on a table with zero or multiple primary keys.');
-		}
+		const primaryKeyColumns = await this.primaryKeyColumns();
+		if (!primaryKeyColumns.length) throw new Error(`Table has no primary key defined.`);
 		return new Promise((resolve, reject) => {
-			this.database.client.driver.query(`SELECT * FROM ${ this.database.name }.${ this.name } WHERE ${ primaryKeyColumns[0] } = ?`, [primaryKey], (err, result) => {
+			this.database.client.driver.query(`SELECT * FROM ${ this.database.name }.${ this.name } WHERE ? IN (${ primaryKeyColumns.join(',') })`, [primaryKey], (err, result) => {
 				if (err) return reject(err);
 				resolve((result.rows || result)[0]);
 			});
@@ -72,21 +66,21 @@ export default class SQLTable extends _Table {
 	 */
 	async addAll(entries, columns = [], duplicateKeyCallback = null) {
 		if (!entries.length) return;
-		var duplicateKeyUpdateObj = {};
+		let duplicateKeyUpdateObj = {};
 		if (!columns.length) {
 			if (_isObject(entries[0])) {
 				columns = Object.keys(entries[0]);
 			} else {
 				const schema = await this.database.describeTable(this.name);
-				columns = Object.keys(schema.columns);
+				columns = schema.columns.map(col => col.name);
 			}
 		}		
 		return new Promise((resolve, reject) => {
-			let insertSql = `INSERT INTO ${ this.database.name }.${ this.name }\n\t${ columns.length ? `(${ columns.join(',') })\n\t` : '' }`;
-			insertSql += 'VALUES' + "\r\n" + entries.map(row => formatAddRow(Object.values(row))).join(",\r\n") + "\r\n";
+			let insertSql = `INSERT INTO ${ this.database.name }.${ this.name }\n\t${ columns.length ? `(${ columns.join(',') })\n\t` : `` }`;
+			insertSql += `VALUES\n\t${ entries.map(row => formatAddRow(Object.values(row), this.database.client.params.dialect)).join(`,\n\t`) }`;
 			if (duplicateKeyCallback) {
 				duplicateKeyCallback(duplicateKeyUpdateObj);
-				insertSql += ' ON DUPLICATE KEY UPDATE ' + formatAssignments(duplicateKeyUpdateObj);
+				insertSql += ` ${ this.database.client.params.dialect === 'mysql' ? 'ON DUPLICATE KEY UPDATE' : /*postgres*/'ON CONFLICT DO UPDATE SET' } ${ formatAssignments(duplicateKeyUpdateObj, this.database.client.params.dialect) }`;
 			}
 			this.database.client.driver.query(insertSql, (err, result) => {
 				if (err) return reject(err);
@@ -107,7 +101,8 @@ export default class SQLTable extends _Table {
 	async add(rowObj) {
 		return new Promise((resolve, reject) => {
 			let insertSql = `INSERT INTO ${ this.database.name }.${ this.name }\n\t(${ Object.keys(rowObj).join(',') })\n\t`;
-			insertSql += `VALUES\n\t${ formatAddRow(Object.values(rowObj)) }`;
+			insertSql += `VALUES\n\t${ formatAddRow(Object.values(rowObj), this.database.client.params.dialect) }\n\t`;
+			insertSql += 'RETURNING *';
 			this.database.client.driver.query(insertSql, (err, result) => {
 				if (err) return reject(err);
 				resolve(new SQLInsertQueryInspector(
@@ -138,7 +133,7 @@ export default class SQLTable extends _Table {
 	 */
 	async put(rowObj) {
 		return new Promise((resolve, reject) => {
-			const putSql = `INSERT INTO ${ this.database.name }.${ this.name }\n\t${ formatPutRow(rowObj) }`;
+			const putSql = `INSERT INTO ${ this.database.name }.${ this.name }\n\t${ formatPutRow(rowObj, this.database.client.params.dialect) }`;
 			this.database.client.driver.query(putSql, (err, result) => {
 				if (err) return reject(err);
 				resolve(new SQLInsertQueryInspector(
@@ -155,10 +150,11 @@ export default class SQLTable extends _Table {
 	 * @inheritdoc
 	 */
 	async deleteAll(IDs = []) {
-		const driver = this.database.client.driver;
+		const primaryKeyColumns = await this.primaryKeyColumns();
+		if (!primaryKeyColumns.length) throw new Error(`Table has no primary key defined.`);
 		return new Promise((resolve, reject) => {
-			const deleteSql = `DELETE FROM ${ this.database.name }.${ this.name }${ IDs.length ? ` WHERE id in (${ IDs.join(', ') })` : ''}`;
-			this.database.client.driver.query(deleteSql, (err, result) => {
+			const deleteSql = `DELETE FROM ${ this.database.name }.${ this.name }${ IDs.length ? ` WHERE ${ IDs.map(() => `? in (${ primaryKeyColumns.join(',') })`).join(' OR ') }` : ''}`;
+			this.database.client.driver.query(deleteSql, IDs, (err, result) => {
 				if (err) return reject(err);
 				resolve(new SQLDeleteQueryInspector(
 					this,
@@ -172,12 +168,10 @@ export default class SQLTable extends _Table {
 	 * @inheritdoc
 	 */
 	async delete(primaryKey) {
-		const primaryKeyColumns = this.getPrimaryKeyColumns();
-		if (primaryKeyColumns.length !== 1) {
-			throw new Error('Cannot delete records by primary key on a table with zero or multiple primary keys.');
-		}
+		const primaryKeyColumns = await this.primaryKeyColumns();
+		if (!primaryKeyColumns.length) throw new Error(`Table has no primary key defined.`);
 		return new Promise((resolve, reject) => {
-			const deleteSql = `DELETE FROM ${ this.database.name }.${ this.name } WHERE ${ primaryKeyColumns[0] } = ?`;
+			const deleteSql = `DELETE FROM ${ this.database.name }.${ this.name } WHERE ? IN (${ primaryKeyColumns.join(',') })`;
 			this.database.client.driver.query(deleteSql, [primaryKey], (err, result) => {
 				if (err) return reject(err);
 				resolve(new SQLDeleteQueryInspector(
@@ -195,21 +189,17 @@ export default class SQLTable extends _Table {
  * HELPERS
  * --------
  */
-const isJSON = str => _wrapped(str, '{', '}') || _wrapped(str, '[', ']');
-const formatVal = val => {
+const formatVal = (val, dialect) => {
 	if (val instanceof Date) {
-		try {
-			return "'" + val.toISOString().split('.')[0] + "'";
-		} catch(e) {
-			return 'NULL';
-		}
+		try { return `'${ val.toISOString().split('.')[0] }'`; }
+		catch(e) { return 'NULL'; }
 	}
-	return _isNumeric(val) ? val : (_isNull(val) ? 'NULL' : "'" + val + "'");
+	return _isNumeric(val) ? val : (_isNull(val) ? 'NULL' : (dialect === 'mysql' ? `'${ val.replace(/'/g, `\\'`) }'` : `'${ val.replace(/'/g, `''`) }'`));
 };
-const formatAssignments = rowObj => Object.keys(rowObj).map(key => '`' + key + '` = ' + formatVal(rowObj[key])).join(', ');
-const formatAddRow = values => '(' + values.map(formatVal).join(', ') + ')';
-const formatPutRow = rowObj => {
-	var assignments = formatAssignments(rowObj);
-	return 'SET ' + assignments + ' ON DUPLICATE KEY UPDATE ' + assignments;
+const formatAddRow = (values, dialect) => '(' + values.map(val => formatVal(val, dialect)).join(',') + ')';
+const formatAssignments = (rowObj, dialect) => Object.keys(rowObj).map(key => `${ key } = ${ formatVal(rowObj[key], dialect) }`).join(',');
+const formatPutRow = (rowObj, dialect) => {
+	const assignments = formatAssignments(rowObj, dialect);
+	return `SET ${ assignments } ${ dialect === 'mysql' ? 'ON DUPLICATE KEY UPDATE' : /*postgres*/'ON CONFLICT DO UPDATE SET' } ${ assignments }`;
 };
 

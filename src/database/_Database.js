@@ -1,5 +1,4 @@
 
-
 /**
  * @imports
  */
@@ -8,6 +7,7 @@ import { _from as _arrFrom, _intersect, _unique, _difference } from '@webqit/uti
 import CreateTable from '../statement/schema/CreateTable.js';
 import AlterTable from '../statement/schema/AlterTable.js';
 import DropTable from '../statement/schema/DropTable.js';
+import Savepoint from '../statement/schema/Savepoint.js';
 
 /**
  * ---------------------------
@@ -42,6 +42,11 @@ export default class _Database {
      * @property Object
      */
     get params() { return this.$.params; }
+
+    /**
+     * @property Bool
+     */
+    get dropped() { return this.$.schema.hiddenAs === 'dropped'; }
 	
     /**
      * Returns list of tables.
@@ -119,15 +124,11 @@ export default class _Database {
         if (!tablesMap.has(tblName)) {
             tablesMap.set(tblName, {
                 name: tblName,
-                inmem: true,
+                hiddenAs: 'inmemory',
             });
         }
         return new this.constructor.Table(this, ...arguments);
     }
-
-    /**
-     * BASE LOGICS
-     */
 
     /**
 	 * Returns the database's current savepoint.
@@ -137,11 +138,17 @@ export default class _Database {
 	 * @returns Object
      */
     async savepoint(params = {}) {
-        if (!this.$.schema.savepoint || params.force) {
+        if (!this.$.schema.savepoint || this.$.schema.savepoint.isRolledback || params.direction === 'forward' || params.force) {
             const OBJ_INFOSCHEMA_DB = this.client.constructor.OBJ_INFOSCHEMA_DB;
             if ((await this.client.databases({ name: OBJ_INFOSCHEMA_DB }))[0]) {
-                const result = await this.client.query(`SELECT id, name_snapshot, tables_snapshot, savepoint_desc, savepoint_date FROM ${ OBJ_INFOSCHEMA_DB }.database_savepoints WHERE current_name = '${ this.name }' AND rollback_date IS NULL ORDER BY savepoint_date DESC LIMIT 1`, [], { isStandardSql: true });
-                this.$.schema.savepoint = result[0];
+                const dbName = `${ OBJ_INFOSCHEMA_DB }.database_savepoints`;
+                const sql = params.direction === 'forward'
+                    ? `SELECT following.* FROM ${ dbName } AS active LEFT JOIN ${ dbName } AS following ON following.name_snapshot = active.current_name WHERE '${ this.name }' IN (active.name_snapshot,active.current_name) AND active.rollback_date IS NOT NULL ORDER BY active.savepoint_date ASC LIMIT 1`
+                    : `SELECT preceding.*, active.id AS id_active FROM ${ dbName } AS preceding LEFT JOIN ${ dbName } AS active ON active.name_snapshot = preceding.current_name WHERE '${ this.name }' IN (preceding.name_snapshot,preceding.current_name) AND preceding.rollback_date IS NULL ORDER BY preceding.savepoint_date DESC LIMIT 1`;
+                const result = await this.client.query(sql, [], { isStandardSql: true });
+                const savepoint = result[0] && new Savepoint(this.client, result[0], params.direction);
+                if (params.direction === 'forward') return savepoint; // No cache
+                this.$.schema.savepoint = savepoint;
             }
         }
         return this.$.schema.savepoint;
@@ -162,11 +169,11 @@ export default class _Database {
             for (let tbl of await callback()) {
                 if (typeof tbl === 'string') { tbl = { name: tbl }; }
                 if (tablesMap.has(tbl.name)) {
-                    delete tablesMap.get(tbl.name).inmem;
+                    delete tablesMap.get(tbl.name).hiddenAs;
                 } else { tablesMap.set(tbl.name, { ...tbl }); }
             }
         }
-        let tblList = [...tablesMap.values()].filter(tbl => !tbl.inmem).map(tbl => tbl.name);
+        let tblList = [...tablesMap.values()].filter(tbl => !tbl.hiddenAs).map(tbl => tbl.name);
         if (filter.name) { tblList = tblList.filter(tblName => tblName === filter.name); }
         return tblList;
     }
@@ -174,22 +181,31 @@ export default class _Database {
     /**
      * Base logic for describeTable()
      * 
-     * @param String            tblName
      * @param Function          callback
+     * @param String|Array      tblName_s
      * @param Object            params
      * 
      * @return Object
      */
-    async describeTableCallback(callback, tblName, params = {}) {
-        // First we validate operation
-        const tblFound = (await this.tables({ name: tblName }))[0];
-        if (!tblFound) { throw new Error(`Table ${ tblName } does not exist.`); }
+    async describeTableCallback(callback, tblName_s, params = {}) {
+        const isMultiple = Array.isArray(tblName_s);
+        const tblNames = isMultiple ? tblName_s : [tblName_s];
+        const isAll = tblNames.length === 1 && tblNames[0] === '*';
+        if (this.dropped) return isAll || isMultiple ? [] : undefined;
         const tablesMap = this.$.schema.tables;
-        if (!tablesMap.get(tblName)?.columns) {
-            const tblSchema = await callback(tblName, params); // Describe should always add constraint names
-            tablesMap.set(tblName, tblSchema);
+        const requestList = isAll ? ['*'] : tblNames.filter(tblName => !tablesMap.get(tblName)?.columns && !tablesMap.get(tblName)?.hiddenAs);
+        if (requestList.length) {
+            const tblSchemas = await callback(requestList, params); // Describe should always add constraint names
+            for (const tblSchema of tblSchemas) {
+                if (tablesMap.has(tblSchema.name)) {
+                    delete tablesMap.get(tblSchema.name).hiddenAs;
+                    Object.assign(tablesMap.get(tblSchema.name), tblSchema);
+                } else { tablesMap.set(tblSchema.name, tblSchema); }
+            }
         }
-        return tablesMap.get(tblName);
+        if (isAll) return [...tablesMap.values()].filter(tbl => !tbl.hiddenAs);
+        if (isMultiple) return tblNames.map(tblName => tablesMap.get(tblName)).filter(tbl => !tbl.hiddenAs);
+        return !tablesMap.get(tblName_s)?.hiddenAs ? tablesMap.get(tblName_s) : undefined;
     }
 
     /**
@@ -201,10 +217,10 @@ export default class _Database {
      */
     async createTableCallback(callback, tblSchema, params = {}) {
         await this.client.alterDatabase(this.name, async dbSchemaEdit => {
-            let tblCreateInstance;
+            let tblCreateRequest;
             if (tblSchema instanceof CreateTable) {
-                tblCreateInstance = tblSchema;
-                tblSchema = tblCreateInstance.toJson();
+                tblCreateRequest = tblSchema;
+                tblSchema = tblCreateRequest.toJson();
             } else {
                 const tblFound = (await this.tables({ name: tblSchema.name }))[0];
                 if (tblFound) {
@@ -214,7 +230,7 @@ export default class _Database {
                 if (tblSchema.database && tblSchema.database !== this.name) {
                     throw new Error(`A table schema of database ${ tblSchema.database } is being passed to ${ this.name }.`);
                 }
-                tblCreateInstance = CreateTable.fromJson(tblSchema, { ...this.params/* global params */, database: this.name });
+                tblCreateRequest = CreateTable.fromJson(tblSchema, { ...this.params/* global params */, database: this.name });
             }
             // Create savepoint
             dbSchemaEdit.tablesSavepoints.add({
@@ -226,15 +242,15 @@ export default class _Database {
                 // New state
                 current_name: tblSchema.name
             });
-            await callback(tblCreateInstance, params);
+            await callback(tblCreateRequest, params);
             // Update original objects in place
             const tablesMap = this.$.schema.tables;
-            if (tablesMap.get(tblSchema.name)?.inmem) {
-                delete tablesMap.get(tblSchema.name).inmem;
+            if (tablesMap.get(tblSchema.name)?.hiddenAs) {
+                delete tablesMap.get(tblSchema.name).hiddenAs; // This does really exist now
             } else {
                 tablesMap.set(tblSchema.name, { name: tblSchema.name });
             }
-        }, params);
+        }, { savepointDesc: 'Table create', ...params });
         return this.table(tblSchema.name, params);
     }
 
@@ -248,14 +264,14 @@ export default class _Database {
      */
     async alterTableCallback(callback, tblName, editCallback, params = {}) {
         return this.client.alterDatabase(this.name, async dbSchemaEdit => {
-            let tblAltInstance, tblSchema;
+            let tblAlterRequest, tblSchema;
             if (tblName instanceof AlterTable) {
                 // Remap arguments
-                tblAltInstance = tblName;
-                tblName = tblAltInstance.name;
+                tblAlterRequest = tblName;
+                tblName = tblAlterRequest.target.name;
                 params = editCallback || {};
                 // Create savepount data
-                tblSchema = tblAltInstance.jsonA || await this.describeTable(tblName, params);
+                tblSchema = tblAlterRequest.target.columns ? tblAlterRequest.target : await this.describeTable(tblName, params);
             } else if (typeof editCallback === 'function') {
                 // First we validate operation
                 const tblFound = (await this.tables({ name: tblName }))[0];
@@ -270,34 +286,44 @@ export default class _Database {
                 // Call for modification
                 await editCallback(tblSchema.schemaEdit);
                 // Diff into a AlterTable instance
-                tblAltInstance = AlterTable.fromDiffing(tblSchema, tblSchema.schemaEdit, this.client.params);
+                tblAlterRequest = AlterTable.fromDiffing(tblSchema, tblSchema.schemaEdit, this.client.params);
                 delete tblSchema.schemaEdit;
             } else {
                 throw new Error(`Alter table "${ tblName }" called with invalid arguments.`);
             }
-            if (tblAltInstance.nodeTypes.length) {
+            const newTblName = tblAlterRequest.actions.find(action => action.type === 'RENAME' && !action.reference)?.argument;
+            const newTblLocation = tblAlterRequest.actions.find(action => action.type === 'RELOCATE')?.argument;
+            if (tblAlterRequest.actions.length) {
                 // Create savepoint
+                for (const action of tblAlterRequest.actions) {
+                    if (action.type === 'RENAME' && action.reference) {
+                        const listName = action.reference.type === 'CONSTRAINT' ? 'constraints' : (action.reference.type === 'INDEX' ? 'indexes' : 'columns');
+                        const nameKey = listName === 'constraints' ? 'constraintName' : (listName === 'indexes' ? 'indexName' : 'name');
+                        tblSchema[listName].find(obj => obj[nameKey] === action.reference.name)[`$${ nameKey }`] = action.argument;
+                    }
+                }
                 dbSchemaEdit.tablesSavepoints.add({
                     // Snapshot
                     name_snapshot: tblSchema.name,
                     columns_snapshot: JSON.stringify(tblSchema.columns),
-                    constraints_snapshot: JSON.stringify(tblSchema.constraints),
-                    indexes_snapshot: JSON.stringify(tblSchema.indexes),
+                    constraints_snapshot: JSON.stringify(tblSchema.constraints || []),
+                    indexes_snapshot: JSON.stringify(tblSchema.indexes || []),
                     // New state
-                    current_name: tblAltInstance.diffs.rename || tblAltInstance.name,
+                    current_name: newTblName || tblName,
                 });
                 // Effect changes
-                await callback(tblAltInstance, params);
+                await callback(tblAlterRequest, params);
             }
             // Update original schema object in place
-            if (tblAltInstance.nodeTypes.includes('database')) {
-                tblSchema.database = tblAltInstance.diffs.relocate;
-            } else if (tblAltInstance.nodeTypes.includes('name')) {
-                tblSchema.name = tblAltInstance.diffs.rename;
+            // This lets describeTable() know to lookup remote db
+            const tablesMap = this.$.schema.tables;
+            delete tablesMap.get(tblName).columns;
+            if (newTblName) { tblSchema.name = newTblName; }
+            if (newTblLocation) {
+                tblSchema.database = newTblLocation;
+                tablesMap.delete(tblName);
             }
-            // Unset from global location so that describeTable() knows to lookup remote db
-            this.$.schema.tables.delete(tblName);
-        }, params);
+        }, { savepointDesc: 'Table alter', ...params });
     }
 
     /**
@@ -311,10 +337,10 @@ export default class _Database {
      */
     async dropTableCallback(callback, tblName, params = {}) {
         return this.client.alterDatabase(this.name, async dbSchemaEdit => {
-            let tblDropInstance;
+            let tblDropRequest;
             if (tblName instanceof DropTable) {
-                tblDropInstance = tblName;
-                tblName = tblDropInstance.name;
+                tblDropRequest = tblName;
+                tblName = tblDropRequest.name;
             } else {
                 // First we validate operation
                 const tblFound = (await this.tables({ name: tblName }))[0];
@@ -323,7 +349,7 @@ export default class _Database {
                     throw new Error(`Table ${ tblName } does not exist.`);
                 }
                 // Then forward the operation for execution
-                tblDropInstance = new DropTable(tblName, this.name, params);
+                tblDropRequest = new DropTable(tblName, this.name, params);
             }
             // Create savepoint
             const tblSchema = await this.describeTable(tblName, params);
@@ -337,9 +363,13 @@ export default class _Database {
                 // New state
                 current_name: null, // How we know deleted
             });
-            await callback(tblDropInstance, params);
+            await callback(tblDropRequest, params);
             // Then update original schema object in place
-            this.$.schema.tables.delete(tblName);
-        });
+            const tablesMap = this.$.schema.tables;
+            tablesMap.get(tblName).hiddenAs = 'dropped';
+            delete tablesMap.get(tblName).columns;
+            delete tablesMap.get(tblName).constraints;
+            delete tablesMap.get(tblName).indexes;
+        }, { savepointDesc: 'Table drop', ...params });
     }
 }

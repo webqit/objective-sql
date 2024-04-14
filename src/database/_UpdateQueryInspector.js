@@ -36,18 +36,18 @@ export default class _UpdateQueryInspector {
      * 
      * @return Object
 	 */
-    getAffectedRowsPointers() {
+    async getAffectedRowsPointers() {
         if (!_isArray(this.columns) || !_isArray(this.entries)) {
             return;
         }
 		var keyPaths = [], wheres = { all: {}, each: [], };
-		var primaryKeyColumns = this.table.getKeyPathForPrimaryKey();
+		var primaryKeyColumns = await this.table.primaryKeyColumns();
 		if (_any(primaryKeyColumns, columnName => this.columns.includes(columnName))) {
 			keyPaths = [primaryKeyColumns];
 			wheres.by = 'primaryKey';
 		} else {
-			var uniqueColumnsKeyPaths = this.table.getKeyPathsForIndex('unique');
-			keyPaths = uniqueColumnsKeyPaths.filter(keyPath => _any(keyPath, columnName => this.columns.includes(columnName)));
+			var uniqueColumns = this.table.columnsForConstraint('UNIQUE');
+			keyPaths = uniqueColumns.filter(keyPath => _any(keyPath, columnName => this.columns.includes(columnName)));
 			wheres.by = 'uniqueKeys';
 		}
 		if (keyPaths.length) {

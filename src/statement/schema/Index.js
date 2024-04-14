@@ -45,7 +45,11 @@ export default class Index extends IndexInterface {
 	/**
 	 * @inheritdoc
 	 */
-	static fromJson(json, params = {}) { return new this(json.indexName, json.type, json.columns, params); }
+	static fromJson(json, params = {}) {
+		if (json.indexName || (typeof json.type === 'string' && json.type.match(/INDEX|KEY|FULLTEXT/i))) {
+			return new this(json.indexName, json.type, json.columns, params);
+		}
+	}
 
     /**
 	 * @inheritdoc

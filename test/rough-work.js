@@ -27,9 +27,12 @@ const mysqlClient = await mysql.createConnection({
 });
 */
 
+const globalParams = {};
 const client = {
     query(sql, ...args) {
-        console.log('------------------SQL:', sql);
+        if (globalParams.showSql) {
+            console.log('SQL:', sql);
+        }
         return pgClient.query(sql, ...args);
     }
 };
@@ -147,11 +150,19 @@ const dbName = 'public2', dbName2 = 'public';
 const savepoint = await sqlClient.alterDatabase(dbName, dbSchema => {
     dbSchema.name = dbName2;
 }, { savepointDesc: 'To public2' });
-console.log('ALTER DATABASE public', savepoint);
-const publicDb = sqlClient.database(dbName2);
-console.log('public@', await publicDb.savepoint());
 
-const schema1 = {
+console.log('............../////////////// alter public db', savepoint.toJson());
+
+console.log('ALTER DATABASE public', await savepoint.rollback());
+
+
+
+
+
+const publicDb = sqlClient.database(dbName);
+console.log('public@', (await publicDb.savepoint({ direction: 'forward' }))?.toJson());
+
+const booksTbl = {
     name: 'books',
     columns: [
         { name: 'id', type: 'int', primaryKey: true },
@@ -167,52 +178,84 @@ const schema1 = {
     indexes: []
 };
 
-await publicDb.dropTable(schema1.name, { ifExists: true });
+await publicDb.dropTable(booksTbl.name, { ifExists: true });
 
 console.log('CREATE TABLE books IF NOT EXISTS, then DESCRIBE');
-await publicDb.createTable(schema1, { ifNotExists: true });
-const booksSchema = await sqlClient.database(dbName2).describeTable('books');
+
+await publicDb.createTable(booksTbl, { ifNotExists: true });
+const booksSchema = await publicDb.describeTable('books');
 console.log(CreateTable.fromJson(booksSchema) + '');
 
-const tt = await sqlClient.database(dbName2).alterTable('books', tblSchema => {
+const tt = await publicDb.alterTable('books', tblSchema => {
     const isbn = tblSchema.columns.find(col => col.name === 'isbn');
     delete isbn.identity;
 });
 
 
-console.log('----------------------------------------------------------------');
-
-
+/*
+await sqlClient.dropDatabase('some_db', { ifExists: true, cascade: true });
+await sqlClient.dropDatabase('some_new_db', { ifExists: true, cascade: true });
+await sqlClient.dropDatabase('new_db_name', { ifExists: true, cascade: true });
+*/
 await client.query(`DROP SCHEMA IF EXISTS some_db CASCADE`);
 await client.query(`DROP SCHEMA IF EXISTS new_db_name CASCADE`);
-try {
-    await sqlClient.dropDatabase('some_db', { ifExists: true });
-} catch(e) {}
+await client.query(`DROP SCHEMA IF EXISTS some_new_db CASCADE`);
 
-const dbApi = await sqlClient.createDatabase({ name: 'some_db', tables: [
-        {
-            name: 'test0',
-            columns: [
-                { name: 'id', type: 'int', primaryKey: true },
-            ]
-        },
-        schema1,
-    ]
-});
-await dbApi.createTable({
+console.log('----------------------------------------------------------------');
+
+// ----------------
+// Create database
+const dbCreateRequest = {
+    name: 'some_db',
+    tables: [{
+        name: 'test0',
+        columns: [
+            { name: 'id', type: 'int', primaryKey: true },
+        ]
+    },
+    booksTbl,
+]};
+
+const dbApi = await sqlClient.createDatabase(dbCreateRequest);
+const savepoint0 = await dbApi.savepoint();
+//const savepoint0 = await sqlClient.alterDatabase(dbCreateRequest.name, dbSchema => dbSchema.name = 'some_new_db');
+globalParams.showSql = true;
+console.log('---------------------------------------rolling back to CREATION POINT (DROP DB):', savepoint0.toJson());
+console.log('---------------------------------------rollback done:', await savepoint0.rollback({ allowMutateDB: true }));
+
+//console.log('\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\', savepoint0.toJson());
+console.log((await dbApi.savepoint({ direction: 'forward' }))?.toJson(), (await client.query(`SELECT * FROM obj_information_schema.database_savepoints ORDER BY savepoint_date ASC`)).rows);
+
+const savepoint1 = await dbApi.savepoint({ direction: 'forward' });
+console.log('\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ rolling forward to DROP POINT (RECREATE DB)', savepoint1.toJson());
+console.log('--------------------------------------- rollback forward to recreate', await savepoint1.rollback({ allowMutateDB: true }));
+
+console.log((await dbApi.savepoint({force: true}))?.toJson(), (await client.query(`SELECT * FROM obj_information_schema.database_savepoints ORDER BY savepoint_date ASC`)).rows);
+
+// ----------------
+// Create table test1
+const tblCreateRequest = {
     name: 'test1',
     columns: [
         { name: 'id', type: 'int', primaryKey: true },
     ]
-});
-const sp = await sqlClient.alterDatabase({
+};
+const savepoint2 = await dbApi.createTable(tblCreateRequest);
+
+// ----------------
+// Alter database (batch)
+const dbAlterRequest = {
     name: 'some_db',
     tables: ['test0', 'test1', 'books'],
-}, dbSchema => {
+};
+const savepoint3 = await sqlClient.alterDatabase(dbAlterRequest, dbSchema => {
+    // Rename DB
     dbSchema.name = 'new_db_name';
-    dbSchema.tables.find(t => t.name === 'test0').columns.find(c => c.name === 'id').notNull = 'test2';
-    const i = dbSchema.tables.findIndex(t => t.name === 'test1');
-    dbSchema.tables.splice(i, 1);
+    // Modify column
+    dbSchema.tables.get('test0').columns.get('id').uniqueKey = true;
+    // Remove test1 table
+    dbSchema.tables.delete('test1');
+    /// Add table test2
     dbSchema.tables.push({
         name: 'test2',
         columns: [
@@ -221,9 +264,11 @@ const sp = await sqlClient.alterDatabase({
     });
 });
 
+await savepoint3.rollback();
+
 /*
 console.log('ALTER TABLE books', tt);
-console.log(await sqlClient.database(dbName2).table('books').savepoint());
+console.log(await publicDb.table('books').savepoint());
 
 // --------------------------------------------
 

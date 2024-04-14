@@ -29,12 +29,17 @@ export default class DropDatabase extends DropInterface {
 	/**
 	 * @inheritdoc
 	 */
+	toJson() { return { name: this.name }; }
+	
+	/**
+	 * @inheritdoc
+	 */
 	toString() { return this.stringify(); }
 	
 	/**
 	 * @inheritdoc
 	 */
-	stringify() { return `DROP ${ this.params.dialect === 'postgres' ? 'SCHEMA' : 'DATABASE' }${ this.params.ifExists ? ' IF EXISTS' : '' } ${ this.name }`; }
+	stringify() { return `DROP SCHEMA${ this.params.ifExists ? ' IF EXISTS' : '' } ${ this.name }${ this.params.cascade ? ' CASCADE' : '' }`; }
 	
 	/**
 	 * @inheritdoc
@@ -44,6 +49,14 @@ export default class DropDatabase extends DropInterface {
 		if (!dbName) return;
 		if (ifExists) { params = { ...params, ifExists: true }; }
 		return new this(dbName, params);
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(json, params = {}) {
+		if (!json.name || !json.name.match(/[a-zA-Z]+/i)) throw new Error(`Could not assertain database name or database name invalid.`);
+		return new this(json.name, params);
 	}
 
 }
