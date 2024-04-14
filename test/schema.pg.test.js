@@ -93,6 +93,47 @@ describe(`Postgres Create Table & Alter Table statements`, function() {
             */
             expect(sql1).to.eq(sql2);
         });
+        
+        it(`DO: Diffs 2 schemas into an Alter Table statement`, async function() {
+            const schemaA = {
+                name: 'testt',
+                database: 'public',
+                columns: [
+                    { name: 'id', type: { name: 'VARCHAR', maxLen: 30 }, default: 20 },
+                    { name: 'author', type: { name: 'INT' }, references: { constraintName: 'fkk', table: 'table1', columns: ['col3', 'col4']} },
+                ],
+                constraints: [
+                    { type: 'FOREIGN KEY', columns: ['col1', 'col2'], references: { table: 'table1', columns: ['col3', 'col4']} },
+                    { type: 'PRIMARY KEY', columns: 'col5' },
+                ],
+                indexes: []
+            };
+            const schemaB = {
+                name: 'testt',
+                database: 'public2',
+                columns: [
+                    { name: 'id3', $name: 'id', notNull: true, type: { name: 'vARCHAR', maxLen: 70 }, default: 20 },
+                    { name: 'author', type: { name: 'INT' }, references: { constraintName: 'fkk222', $constraintName: 'fkk', table: 'table1', columns: ['col3', 'col5']} },
+                ],
+                constraints: [
+                    { type: 'FOREIGN KEY', columns: ['col1', 'col2'], references: { table: 'table1', columns: ['col3', 'col4']} },
+                    { type: 'PRIMARY KEY', columns: 'col5' },
+                ],
+                indexes: []
+            };
+            const tblAlterInstance1 = AlterTable.fromDiffing(schemaA, schemaB);
+            const tblAlterInstance2 = AlterTable.fromJson(tblAlterInstance1.toJson(), tblAlterInstance1.params);
+            const sql1 = tblAlterInstance1 + '';
+            const sql2 = tblAlterInstance2 + '';
+            /*
+            console.log(sql1);
+            console.log(sql2);
+            console.log(JSON.stringify(tblAlterInstance1.toJson(), null, 3));
+            console.log(JSON.stringify(tblAlterInstance2.toJson(), null, 3));
+            */
+            expect(sql1).to.eq(sql2);
+        });
+            
     });
 
 });

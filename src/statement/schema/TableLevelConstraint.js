@@ -29,6 +29,20 @@ export default class TableLevelConstraint extends ConstraintInterface {
 	/**
 	 * @inheritdoc
 	 */
+	toJson() {
+		return {
+			...(this.constraintName ? { constraintName: this.constraintName } : {}),
+			type: this.type,
+			...(this.columns.length ? { columns: this.columns } : {}),
+			// Either of the below
+			...(this.references ? { references: { ...this.references } } : {}),
+			...(this.expr ? { expr: this.expr } : {}),
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
 	toString() { return this.stringify(); }
 	
 	/**
@@ -47,42 +61,6 @@ export default class TableLevelConstraint extends ConstraintInterface {
 			sql += ` (${ this.expr })`;
 		}
 		return sql;
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	toJson() {
-		return {
-			...(this.constraintName ? { constraintName: this.constraintName } : {}),
-			type: this.type,
-			...(this.columns.length ? { columns: this.columns } : {}),
-			// Either of the below
-			...(this.references ? { references: { ...this.references } } : {}),
-			...(this.expr ? { expr: this.expr } : {}),
-		};
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	static fromJson(json, params = {}) {
-		if (json.constraintName || (typeof json.type === 'string' && json.type.match(/PRIMARY[ ]+KEY|UNIQUE([ ]+KEY)?|CHECK|FOREIGN[ ]+KEY/i))) {
-			return new this(json.constraintName, json.type.replace(/UNIQUE[ ]+KEY/i, 'UNIQUE'), json.columns, json.references || json.expr || json.value, params);
-		}
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	static fromColumnLevelConstraint(columnLevelConstraint, columnName) {
-		return new this(
-			columnLevelConstraint.constraintName, 
-			columnLevelConstraint.attribute === 'REFERENCES' ? 'FOREIGN KEY' : columnLevelConstraint.attribute, 
-			[columnName], 
-			columnLevelConstraint.attribute === 'CHECK' ? columnLevelConstraint.detail.expr : columnLevelConstraint.detail,
-			columnLevelConstraint.params
-		);
 	}
 
     /**
@@ -111,6 +89,28 @@ export default class TableLevelConstraint extends ConstraintInterface {
 			deleteRule: matchReferentialRule(referentialRules, 'DELETE'),
 		}, params);
     }
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(json, params = {}) {
+		if (json.constraintName || (typeof json.type === 'string' && json.type.match(/PRIMARY[ ]+KEY|UNIQUE([ ]+KEY)?|CHECK|FOREIGN[ ]+KEY/i))) {
+			return new this(json.constraintName, json.type.replace(/UNIQUE[ ]+KEY/i, 'UNIQUE'), json.columns, json.references || json.expr, params);
+		}
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromColumnLevelConstraint(columnLevelConstraint, columnName) {
+		return new this(
+			columnLevelConstraint.constraintName, 
+			columnLevelConstraint.attribute === 'REFERENCES' ? 'FOREIGN KEY' : columnLevelConstraint.attribute, 
+			[columnName], 
+			columnLevelConstraint.attribute === 'CHECK' ? columnLevelConstraint.detail.expr : columnLevelConstraint.detail,
+			columnLevelConstraint.params
+		);
+	}
 
     /**
 	 * @property RegExp

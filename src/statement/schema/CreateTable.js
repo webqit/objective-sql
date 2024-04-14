@@ -63,7 +63,7 @@ export default class CreateTable extends CreateInterface {
 		if (this.params.dialect === 'mysql') {
 			constraints.push(...this.columns.reduce((constraints, col) => {
 				const constraint = col.constraints.find(c => c.attribute === 'REFERENCES');
-				if (constraint) return constraints.concat(TableLevelConstraint.fromColumnLevelConstraint(constraint, col.name, this.params));
+				if (constraint) return constraints.concat(TableLevelConstraint.fromColumnLevelConstraint(constraint, col.name));
 				return constraints;
 			}, []));
 		}

@@ -100,7 +100,7 @@ export default class AlterTable extends AlterInterface {
 				stmts1.push(`ADD ${ action.argument instanceof Column ? `COLUMN ` : '' }${ ifNotExists ? 'IF NOT EXISTS ' : '' }${ action.argument }${ first ? ' FIRST' : (afterCol ? ` AFTER ${ afterCol.toLowerCase() }` : '') }`);
 				if (this.params.dialect === 'mysql' && action.argument instanceof Column) {
 					const constraint = action.argument.constraints.find(c => c.attribute === 'REFERENCES');
-					if (constraint) stmts1.push(`ADD ${ TableLevelConstraint.fromColumnLevelConstraint(constraint, action.argument.name, this.params) }`);
+					if (constraint) stmts1.push(`ADD ${ TableLevelConstraint.fromColumnLevelConstraint(constraint, action.argument.name) }`);
 				}
 				continue;
 			}
@@ -287,7 +287,7 @@ export default class AlterTable extends AlterInterface {
 	 */
 	static fromJson(json, params = {}) {
 		if (!json.target.name || !json.target.name.match(/[a-zA-Z]+/i)) throw new Error(`Could not assertain table name or table name invalid.`);
-		const $params = { database: json.target.database, ...params };
+		const $params = { ...params, database: json.target.database || params.database };
 		const actions = json.actions.map(action => {
 			// DROP/ADD
 			if (['DROP','ADD'].includes(action.type)) {
@@ -319,7 +319,7 @@ export default class AlterTable extends AlterInterface {
 	static fromDiffing(jsonA, jsonB, params = {}) {
 		if (!jsonA.name || !jsonA.name.match(/[a-zA-Z]+/i)) throw new Error(`Could not assertain table1 name or table1 name invalid.`);
 		if (!jsonB.name || !jsonB.name.match(/[a-zA-Z]+/i)) throw new Error(`Could not assertain table2 name or table2 name invalid.`);
-		const $params = { database: jsonB.database || jsonA.database, ...params };
+		const $params = { ...params, database: jsonA.database || jsonB.database || params.database };
 		// --------
 		const actions = [];
 		// RENAME ... TO ...
