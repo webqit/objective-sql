@@ -19,7 +19,7 @@ export default class Node {
 	 * 
 	 * @returns String
 	 */
-	get params() { return this.CONTEXT.params; }
+	get params() { return this.CONTEXT?.params || {}; }
 
 	/**
 	 * Helper for adding additional attributes to the instance.
@@ -104,6 +104,23 @@ export default class Node {
 			if (Array.isArray(this[attrName])) this[attrName].push(arg);
 			else this[attrName] = arg;
 		}
+	}
+
+	/**
+	 * @property String
+	 */
+	get escChar() { return this.params.dialect === 'mysql' ? '`' : '"'; }
+
+	/**
+	 * An Escape helper
+	 * 
+	 * @param String|Array string_s 
+	 * 
+	 * @returns String
+	 */
+	autoEsc(string_s) {
+		const $strings = (Array.isArray(string_s) ? string_s : [string_s]).map(s => s && !/^\w+$/.test(s) ? `${this.escChar}${s}${this.escChar}` : s );
+		return Array.isArray(string_s) ? $strings : $strings[0];
 	}
 
 	/**

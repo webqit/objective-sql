@@ -24,7 +24,7 @@ const sqlClient = new SQLClient($pgClient, { dialect: 'postgres' });
 
 describe(`Postgres Create Table & Alter Table statements`, function() {
 
-    describe(`Create Table`, function() {return;
+    describe(`Create Table`, function() {
 
         it(`DO: Parses a Create Table statement`, async function() {
             const createTableSql = `
@@ -39,7 +39,7 @@ describe(`Postgres Create Table & Alter Table statements`, function() {
                 UNIQUE (rand2,rand)
             )`;
             const tblCreateInstance1 = await Parser.parse({}, createTableSql);
-            const tblCreateInstance2 = CreateTable.fromJson(tblCreateInstance1.toJson(), tblCreateInstance1.params);
+            const tblCreateInstance2 = CreateTable.fromJson(tblCreateInstance1.CONTEXT, tblCreateInstance1.toJson(), tblCreateInstance1.FLAGS);
             const sql1 = tblCreateInstance1 + '';
             const sql2 = tblCreateInstance2 + '';
             /*
@@ -52,7 +52,7 @@ describe(`Postgres Create Table & Alter Table statements`, function() {
         });
     });
 
-    describe(`Alter Table`, function() {return;
+    describe(`Alter Table`, function() {
 
         it(`DO: Parses an Alter Table statement`, async function() {
             const alterTableSql = `
@@ -82,7 +82,7 @@ describe(`Postgres Create Table & Alter Table statements`, function() {
                 ALTER constraint constraint_name8 DEFERRABLE
             `;
             const tblAlterInstance1 = await Parser.parse({}, alterTableSql);
-            const tblAlterInstance2 = AlterTable.fromJson(tblAlterInstance1.toJson(), tblAlterInstance1.params);
+            const tblAlterInstance2 = AlterTable.fromJson(tblAlterInstance1.CONTEXT, tblAlterInstance1.toJson(), tblAlterInstance1.FLAGS);
             const sql1 = tblAlterInstance1 + '';
             const sql2 = tblAlterInstance2 + '';
             /*
@@ -121,8 +121,8 @@ describe(`Postgres Create Table & Alter Table statements`, function() {
                 ],
                 indexes: []
             };
-            const tblAlterInstance1 = AlterTable.fromDiffing(schemaA, schemaB);
-            const tblAlterInstance2 = AlterTable.fromJson(tblAlterInstance1.toJson(), tblAlterInstance1.params);
+            const tblAlterInstance1 = AlterTable.fromDiffing({}, schemaA, schemaB);
+            const tblAlterInstance2 = AlterTable.fromJson(tblAlterInstance1.CONTEXT, tblAlterInstance1.toJson());
             const sql1 = tblAlterInstance1 + '';
             const sql2 = tblAlterInstance2 + '';
             /*

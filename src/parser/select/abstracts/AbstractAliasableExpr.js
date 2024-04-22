@@ -35,7 +35,7 @@ export default class AbstractAliasableExpr extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	stringify() { return [this.EXPR, this.CLAUSED ? 'AS' : '', this.ALIAS].filter(s => s).join(' '); }
+	stringify() { return [this.EXPR, this.CLAUSED ? 'AS' : '', this.autoEsc(this.ALIAS)].filter(s => s).join(' '); }
 	
 	/**
 	 * @inheritdoc
@@ -45,7 +45,8 @@ export default class AbstractAliasableExpr extends Node {
 		// E.g: SELECT first_name AS fname, 4 + 5 AS result, 5 + 5
 		// Without an "AS" clause, its hard to determine if an expression is actually aliased...
 		// E.g: In the statement SELECT first_name fname, 4 + 5 result, 5 + 5, (SELECT ...) alias FROM ...,
-		let { tokens: [ exprSpec, alias = '' ], matches: [ separator ] } = Lexer.lex(expr, ['([\\w"]|^)([ ]+AS[ ]+|[ ]+)[A-Za-z"]'], { useRegex:'i' });
+		const escChar = context?.params?.dialect === 'mysql' ? '`' : '"';
+		let { tokens: [ exprSpec, alias = '' ], matches: [ separator ] } = Lexer.lex(expr, [`([\\w${escChar}]|^)([ ]+AS[ ]+|[ ]+)[A-Za-z${escChar}]`], { useRegex:'i' });
 		// Note in the regex that separator will cut exprSpec's last letter (when not an enclosure "()") and alias' first letter.
 		if (separator) {
 			const separatorTokens = separator.replace(/[ ]+/, ' ').split(' ');
@@ -54,7 +55,7 @@ export default class AbstractAliasableExpr extends Node {
 			separator = separatorTokens.join('');
 		}
 		const instance = new this(context, await parseCallback(context, exprSpec, this.exprTypes));
-		instance.as(alias, !!separator);
+		instance.as(alias.replace(new RegExp(escChar, 'g'), ''), !!separator);
 		return instance;
 	}
 

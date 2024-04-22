@@ -95,7 +95,8 @@ export default class Column extends Node {
             const attrName = ColumnLevelConstraint.attrEquivalents[property];
             instance.constraint(ColumnLevelConstraint.fromJson(instance, { constraintName, attribute: attrName, detail }));
         }
-        instance.type(DataType.fromJson(instance, json.type));
+        // An instance with just the name is used in AlterTable.fromJson() for DROP col_name
+        if (json.type) instance.type(DataType.fromJson(instance, json.type));
 		return instance;
 	}
 }

@@ -29,7 +29,7 @@ export default class Str extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-		const quotes = ['"', "'"], $ = {};
+		const quotes = context?.params?.dialect === 'mysql' ? ['"', "'"] : ["'"], $ = {};
 		if (!($.quote = quotes.find(q => _wrapped(expr, q, q))) || Lexer.match(expr, [' ']).length) return;
 		return new this(
 			context,

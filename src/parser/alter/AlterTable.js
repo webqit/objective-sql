@@ -305,7 +305,7 @@ export default class AlterTable extends StatementNode {
 					argumentNew = $.argument;
 				}
 				// Is SET|DROP|ADD flag?
-				else if (subAction) {
+				else if (subAction_d/*NOTE: original*/) {
 					argumentNew = argument_d;
 				}
 				// Is just flag?
@@ -329,13 +329,13 @@ export default class AlterTable extends StatementNode {
 		for (const action of json.actions) {
 			// RENAME/RELOCATE
 			if (['RENAME','RELOCATE'].includes(action.type)) {
-				(action.type === 'RENAME' ? instance.renameTo : instance.relocateTo)(action.argument);
+				instance[action.type === 'RENAME' ? 'renameTo' : 'relocateTo'](action.argument);
 				continue;
 			}
 			// DROP/ADD
 			if (['DROP','ADD'].includes(action.type)) {
 				const argument = [TableLevelConstraint,Index,Column].reduce((prev, Class) => prev || Class.fromJson(instance, action.argument), null);
-				(action.type === 'DROP' ? instance.drop : instance.add)(argument);
+				instance[action.type === 'DROP' ? 'drop' : 'add'](argument, action.flags);
 				continue;
 			}
 			// ALTER
@@ -344,10 +344,10 @@ export default class AlterTable extends StatementNode {
 				const { action: subAction, argumentNew, argumentOld } = action;
 				let $args = [argumentNew, argumentOld];
 				if (action.reference.type === 'COLUMN') {
-					$args = $args.map(arg => [ColumnLevelConstraint,DataType].reduce((prev, Class) => prev || Class.fromJson(instance, arg), null) || arg);
+					$args = $args.filter(s => s).map(arg => [ColumnLevelConstraint,DataType].reduce((prev, Class) => prev || Class.fromJson(instance, arg), null) || arg);
 				} else {
 					const Class = action.reference.type === 'CONSTRAINT' ? TableLevelConstraint : Index;
-					$args = $args.map(arg => Class.fromJson(instance, arg) || arg);
+					$args = $args.filter(s => s).map(arg => Class.fromJson(instance, arg) || arg);
 				}
 				instance.alter(action.reference, subAction, $args.shift(), $args.shift(), action.flags);
 				continue;

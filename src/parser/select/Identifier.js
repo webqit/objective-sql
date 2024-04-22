@@ -1,4 +1,5 @@
 
+import Lexer from '@webqit/util/str/Lexer.js';
 import Node from '../Node.js';
 
 export default class Identifier extends Node {
@@ -46,16 +47,19 @@ export default class Identifier extends Node {
 	 * @inheritdoc
 	 */
 	stringify() {
-		return [
-			this.BASENAME && !/^\w+$/.test(this.BASENAME) ? `"${ this.BASENAME }"` : this.BASENAME,
-			!/^\w+$/.test(this.NAME) ? `"${ this.NAME }"` : this.NAME
-		].filter(s => s).join('.') + (this.FLAGS.length ? ` ${ this.FLAGS.map(s => s.replace(/_/g, ' ')).join(' ') }` : '');
+		return this.autoEsc([this.BASENAME, this.NAME].filter(s => s)).join('.') + (
+			this.FLAGS.length ? ` ${ this.FLAGS.map(s => s.replace(/_/g, ' ')).join(' ') }` : ''
+		);
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-		if (/^[\w.]+$/.test(expr)) return new this(context, ...expr.split('.').map(s => s.trim()));
+		const esc = context?.params?.dialect === 'mysql' ? '`' : '"';
+		const parts = Lexer.split(expr, ['.']);
+		const parses = parts.map(s => (new RegExp(`^(?:(\\w+)|${esc}(.+)${esc})$`)).exec(s.trim())).filter(s => s);
+		if (parses.length !== parts.length) return;
+		return new this(context, ...parses.map(s => s[1] || s[2]));
 	}
 }

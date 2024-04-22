@@ -50,7 +50,7 @@ export default class CaseConstruct extends Node {
 		if (this.GIVEN_VALUE) sql.push(this.GIVEN_VALUE);
 		sql.push(`WHEN ${ this.WHEN_CLAUSES.join(' WHEN ') }`);
 		if (this.ELSE_CLAUSE) sql.push('ELSE', this.ELSE_CLAUSE);
-		return `CASE ${ sql.join(' ') } END`;
+		return `CASE ${ sql.join(' ') } END${ this.params.dialect === 'mysql' ? ' CASE' : '' }`;
 	}
 
 	/**
