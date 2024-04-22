@@ -1,9 +1,6 @@
 
-/**
- * @imports
- */
-import Parser from './Parser.js';
-import ODB from './database/odb/ODBClient.js';
+import Parser from './parser/Parser.js';
+import ODB from './api/odb/ODBClient.js';
 
 /**
  * @exports

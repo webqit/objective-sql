@@ -2,9 +2,9 @@
 import pg from 'pg';
 import mysql from 'mysql2';
 import Parser from '../src/Parser.js';
-import CreateTable from '../src/statement/schema/CreateTable.js';
-import AlterTable from '../src/statement/schema/AlterTable.js';
-import SQLClient from '../src/database/sql/SQLClient.js';
+import CreateTable from '../src/statements/schema/CreateTable.js';
+import AlterTable from '../src/statements/schema/AlterTable.js';
+import SQLClient from '../src/databases/sql/SQLClient.js';
 
 // PG Client
 const pgClient = new pg.Client({

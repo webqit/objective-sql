@@ -4,7 +4,7 @@
  */
 import pg from 'pg';
 import { expect } from 'chai';
-import SQLClient from '../src/database/sql/SQLClient.js';
+import SQLClient from '../src/api/sql/SQLClient.js';
 
 // --------------------------
 const pgClient = new pg.Client({
@@ -12,11 +12,16 @@ const pgClient = new pg.Client({
     port: 5432,
 });
 await pgClient.connect();
-let $pgClient = { query(sql, ...args) {
-    console.log(`\n\n\n\nSQL:`, sql);
-    return pgClient.query(sql, ...args);
+let $pgClient = { async query(sql, ...args) {
+    try {
+        //console.log(`\n\nSQL:`, sql, '\n\n');
+        const result = await pgClient.query(sql, ...args);
+        return result;
+    } catch(e) {
+        throw e;
+    }
 } };
-const sqlClient = new SQLClient(pgClient, { dialect: 'postgres' });
+const sqlClient = new SQLClient($pgClient, { dialect: 'postgres' });
 // --------------------------
 
 describe(`Postgres Savepoints & Rollbacks`, function() {
@@ -28,7 +33,7 @@ describe(`Postgres Savepoints & Rollbacks`, function() {
         await sqlClient.alterDatabase('private', db => db.name = 'public', { ifExists: true, noCreateSavepoint: true });
     });
 
-    const desc0 = `Rename DB "public" to "private".`;
+    const desc0 = `Re-name DB "public" to "private".`;
     describe(`Rename DB and rollback`, function() {
 
         let dbApi, savepoint0;
@@ -45,24 +50,24 @@ describe(`Postgres Savepoints & Rollbacks`, function() {
         });
 
         it(`ROLLBACK: ${ desc0 }`, async function() {
-            const status = await savepoint0.rollback();
-            expect(status).to.be.true;
+            const success = await savepoint0.rollback();
+            expect(success).to.be.true;
             const databases = await sqlClient.databases();
             expect(databases).to.be.an('array').that.includes('public').and.not.includes('private');
         });
 
         it(`ROLLFORWARD: ${ desc0 }`, async function() {
             const savepoint = await dbApi.savepoint({ direction: 'forward' });
-            const status = await savepoint.rollback();
-            expect(status).to.be.true;
+            const success = await savepoint.rollback();
+            expect(success).to.be.true;
             const databases = await sqlClient.databases();
             expect(databases).to.be.an('array').that.includes('private').and.not.includes('public');
         });
 
         it(`ROLLBACK: ${ desc0 }`, async function() {
             const savepoint = await dbApi.savepoint();
-            const status = await savepoint.rollback();
-            expect(status).to.be.true;
+            const success = await savepoint.rollback();
+            expect(success).to.be.true;
             const databases = await sqlClient.databases();
             expect(databases).to.be.an('array').that.includes('public').and.not.includes('private');
         });
@@ -74,7 +79,7 @@ describe(`Postgres Savepoints & Rollbacks`, function() {
                     { name: 'id', type: 'int', primaryKey: true },
                 ]
             };
-            const savepoint2 = await dbApi.createTable(tblCreateRequest, { ifNotExists: true });
+            const tblApi = await dbApi.createTable(tblCreateRequest, { ifNotExists: true });
             const tables = await dbApi.tables();
             expect(tables).to.be.an('array').that.includes('test2');
         });
@@ -118,36 +123,41 @@ describe(`Postgres Savepoints & Rollbacks`, function() {
             expect(tables).to.be.an('array').that.eql(['test0','books']);
         });
 
+        let savepoint0;
         it(`ROLLBACK: ${ desc1 } (BY DROPPING DB)`, async function() {
-            const savepoint0 = await dbApi.savepoint();
-            const status = await savepoint0.rollback({ allowMutateDB: true });
-            expect(status).to.be.true;
+            savepoint0 = await dbApi.savepoint();
+            const success = await savepoint0.rollback({ allowMutateDB: true });
+            expect(success).to.be.true;
             const databases = await sqlClient.databases();
             expect(databases).to.be.an('array').that.not.includes('some_db');
         });
 
         it(`ROLLFORWARD: ${ desc1 } (BY RECREATING DB & TABLES)`, async function() {
+            // Remeber savepoint0? Let's assert that we can't rollback (since it's been rolled back)
+            expect((await savepoint0.status()).canRollback).to.be.false;
             const savepoint = await dbApi.savepoint({ direction: 'forward' });
-            const status = await savepoint.rollback({ allowMutateDB: true });
-            expect(status).to.be.true;
+            const success = await savepoint.rollback({ allowMutateDB: true });
+            expect(success).to.be.true;
             const databases = await sqlClient.databases();
             expect(databases).to.be.an('array').that.includes('some_db');
             const tables = await dbApi.tables();
             expect(tables).to.be.an('array').that.eql(['test0','books']);
+            // Call out savepoint0! Let's assert that now we can rollback (since it's been rolled forward)
+            expect((await savepoint0.status()).canRollback).to.be.true;
         });
 
         it(`ROLLBACK: ${ desc1 } (BY DROPPING DB)`, async function() {
             const savepoint = await dbApi.savepoint();
-            const status = await savepoint.rollback({ allowMutateDB: true });
-            expect(status).to.be.true;
+            const success = await savepoint.rollback({ allowMutateDB: true });
+            expect(success).to.be.true;
             const databases = await sqlClient.databases();
             expect(databases).to.be.an('array').that.not.includes('some_db');
         });
 
         it(`ROLLFORWARD: ${ desc1 } (BY RECREATING DB & TABLES)`, async function() {
             const savepoint = await dbApi.savepoint({ direction: 'forward' });
-            const status = await savepoint.rollback({ allowMutateDB: true });
-            expect(status).to.be.true;
+            const success = await savepoint.rollback({ allowMutateDB: true });
+            expect(success).to.be.true;
             const databases = await sqlClient.databases();
             expect(databases).to.be.an('array').that.includes('some_db');
             const tables = await dbApi.tables();
@@ -161,9 +171,11 @@ describe(`Postgres Savepoints & Rollbacks`, function() {
                     { name: 'id', type: 'int', primaryKey: true },
                 ]
             };
-            const savepoint2 = await dbApi.createTable(tblCreateRequest);
+            const tblApi = await dbApi.createTable(tblCreateRequest);
             const tables = await dbApi.tables();
             expect(tables).to.be.an('array').that.eql(['test0','books','test1']);
+            const tblSavepointDetails = await dbApi.table('test1').savepoint();
+            expect(await tblSavepointDetails.context.status()).to.be.an('object').with.property('canRollback', true);
         });
 
         it(`ALTER whole DB`, async function() {
@@ -189,7 +201,7 @@ describe(`Postgres Savepoints & Rollbacks`, function() {
             expect(dbApi.name).to.eql('new_db_name');
             const tables = await dbApi.tables();
             expect(tables).to.be.an('array').that.eql(['test0','books','test2']);
-            const test0 = await dbApi.describeTable('test0');
+            const test0 = await dbApi.describeTable('test0', { force: true });
             expect(test0.columns.find(col => col.name === 'id').uniqueKey).to.be.an('object');
 
             //console.log((await pgClient.query(`SELECT * FROM obj_information_schema.database_savepoints ORDER BY savepoint_date ASC`)).rows);

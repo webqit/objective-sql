@@ -3,8 +3,8 @@
  * @imports
  */
 import Parser from '../src/Parser.js';
-import ODB from '../src/database/odb/ODBDriver.js';
-import SQL from '../src/database/sql/SQLDriver.js';
+import ODB from '../src/databases/odb/ODBDriver.js';
+import SQL from '../src/databases/sql/SQLDriver.js';
 
 export { Parser };
 

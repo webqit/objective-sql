@@ -1,0 +1,28 @@
+
+import AbstractGroupBy from './abstracts/AbstractGroupBy.js';
+
+export default class GroupByClause extends AbstractGroupBy {
+
+	/**
+	 * Sets the WITH_ROLLUP flag.
+	 * 
+	 * @returns this
+	 */
+	withRollup() { return this.withFlag('WITH_ROLLUP'); }
+
+	/**
+	 * @inheritdoc
+	 */
+	stringify() { return ['GROUP BY', super.stringify(), ...this.FLAGS.map(s => s.replace(/_/g, ' '))].join(' '); }
+
+	/**
+	 * @inheritdoc
+	 */
+	static async parse(context, expr, parseCallback) {
+		const { tokens: [$expr], matches } = Lexer.lex(expr, ['[ ]+WITH[ ]+ROLLUP$'], { useRegex: 'i' });
+		const instance = await super.parse(context, $expr, parseCallback);
+		if (!instance) return;
+		if (matches.length) instance.withFlag('WITH_ROLLUP');
+		return instance;
+	}
+}
