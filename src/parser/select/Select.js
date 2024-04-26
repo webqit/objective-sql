@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import StatementNode from '../StatementNode.js';
 import JoinClause from './JoinClause.js';
 import GroupByClause from './GroupByClause.js';
@@ -9,7 +9,6 @@ import Condition from './Condition.js';
 import Assertion from './Assertion.js';
 import Field from './Field.js';
 import Table from './Table.js';
-import Node from '../Node.js';
 
 export default class Select extends StatementNode {
 	
@@ -17,18 +16,18 @@ export default class Select extends StatementNode {
 	 * Instance properties
 	 */
 	SELECT_LIST = [];
-	TABLE_REFERENCES = [];
-	JOIN_CLAUSES = [];
-	WHERE_CLAUSE;
-	GROUP_BY_CLAUSE;
-	HAVING_CLAUSE;
-	WINDOW_CLAUSE;
-	ORDER_BY_CLAUSE;
+	FROM_LIST = [];
+	JOIN_LIST = [];
+	WHERE_CLAUSE = null;
+	GROUP_BY_CLAUSE = null;
+	HAVING_CLAUSE = null;
+	WINDOW_CLAUSE = null;
+	ORDER_BY_CLAUSE = null;
 	OFFSET_CLAUSE = null;
 	LIMIT_CLAUSE = null;
 
 	/**
-	 * Builds the SELECT STMT's Fields
+	 * Builds the statement's SELECT_LIST
 	 * 
 	 * .select(
 	 * 		'col1',
@@ -45,24 +44,24 @@ export default class Select extends StatementNode {
 	 * 		).as('alias4'),
 	 * );
 	 * 
-	 * @return array
+	 * @return Void
 	 */
 	select(...fields) { return this.build('SELECT_LIST', fields, Field); }
 
 	/**
-	 * Builds the SELECT STMT's sources
+	 * Builds the statement's FROM_LIST
 	 * 
 	 * .from(
 	 * 		t1 => t1.name('tbl1').as('alias'),
 	 * 		t2 => t2.name('tbl2')
 	 * );
 	 * 
-	 * @return Object|array
+	 * @return Void
 	 */
-	from(...tables) { return this.build('TABLE_REFERENCES', tables, Table); }
+	from(...tables) { return this.build('FROM_LIST', tables, Table); }
 
 	/**
-	 * Builds the SELECT STMT's joins
+	 * Builds the statement's JOIN_LIST
 	 * 
 	 * .join(
 	 * 		j1 => j1.name('tbl1').using('col').as('alias1'),
@@ -73,48 +72,48 @@ export default class Select extends StatementNode {
 	 * 		).as('alias2')
 	 * );
 	 * 
-	 * @return array
+	 * @return Void
 	 */
-	join(...tables) { return this.build('JOIN_CLAUSES', tables, JoinClause); }
+	join(...tables) { return this.build('JOIN_LIST', tables, JoinClause); }
 
 	/**
 	 * A variant of the join()
 	 * 
 	 * @param  ...Any tables 
 	 * 
-	 * @returns 
+	 * @returns Void
 	 */
-	leftJoin(...tables) { return this.build('JOIN_CLAUSES', tables, JoinClause, null, [null, 'LEFT JOIN']); }
+	leftJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'LEFT JOIN']); }
 
 	/**
 	 * A variant of the join()
 	 * 
 	 * @param  ...Any tables 
 	 * 
-	 * @returns 
+	 * @returns Void
 	 */
-	rightJoin(...tables) { return this.build('JOIN_CLAUSES', tables, JoinClause, null, [null, 'RIGHT JOIN']); }
+	rightJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'RIGHT JOIN']); }
 
 	/**
 	 * A variant of the join()
 	 * 
 	 * @param  ...Any tables 
 	 * 
-	 * @returns 
+	 * @returns Void
 	 */
-	innerJoin(...tables) { return this.build('JOIN_CLAUSES', tables, JoinClause, null, [null, 'INNER JOIN']); }
+	innerJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'INNER JOIN']); }
 
 	/**
 	 * A variant of the join()
 	 * 
 	 * @param  ...Any tables 
 	 * 
-	 * @returns 
+	 * @returns Void
 	 */
-	crossJoin(...tables) { return this.build('JOIN_CLAUSES', tables, JoinClause, null, [null, 'CROSS JOIN']); }
+	crossJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'CROSS JOIN']); }
 
 	/**
-	 * Builds the SELECT STMT's "WHERE" clause
+	 * Builds the statement's WHERE_CLAUSE
 	 * 
 	 * .where(
 	 * 		c1 => c1.equals('a', 'b').and(
@@ -123,12 +122,12 @@ export default class Select extends StatementNode {
 	 * 		c3 => c3.lessThan(2, 4)
 	 * );
 	 * 
-	 * @return Object
+	 * @return Void
 	 */
 	where(...wheres) { return this.build('WHERE_CLAUSE', wheres, Condition, 'and'); }
 
 	/**
-	 * Builds the SELECT STMT's "GROUP BY" clause
+	 * Builds the statement's GROUP_BY_CLAUSE
 	 * 
 	 * .groupBy(
 	 * 		'col1',
@@ -137,12 +136,12 @@ export default class Select extends StatementNode {
 	 * 		by => by.case(c => c.given(2), c => c.when(2).then(4), c => c.else(4) ),
 	 * ).withRollup()
 	 * 
-	 * @return array
+	 * @return Void
 	 */
 	groupBy(...groupBys) { return (this.build('GROUP_BY_CLAUSE', groupBys, GroupByClause, 'criterion'), this.GROUP_BY_CLAUSE/* for: .withRollup() */); }
 
 	/**
-	 * Builds the SELECT STMT's "HAVING" clause
+	 * Builds the statement's HAVING_CLAUSE
 	 * 
 	 * .having(
 	 * 		c1 => c1.equals('a', 'b').and(
@@ -151,12 +150,12 @@ export default class Select extends StatementNode {
 	 * 		c3 => c3.lessThan(2, 4)
 	 * );
 	 * 
-	 * @return Object
+	 * @return Void
 	 */
 	having(...wheres) { return this.build('HAVING_CLAUSE', wheres, Condition, 'and'); }
 
 	/**
-	 * Builds the SELECT STMT's "WINDOW" clause
+	 * Builds the statement's WINDOW_CLAUSE
 	 * 
 	 * .window(
 	 * 		w1 => w1.name('w1').partitionBy(
@@ -167,12 +166,12 @@ export default class Select extends StatementNode {
 	 * 		w2 => w2.name('w2').extends('w1')
 	 * )
 	 * 
-	 * @return array
+	 * @return Void
 	 */
 	window(...windows) { return this.build('WINDOW_CLAUSE', windows, WindowClause, 'define'); }
 
 	/**
-	 * Builds the SELECT STMT's "ORDER BY" clause
+	 * Builds the statement's ORDER_BY_CLAUSE
 	 * 
 	 * .orderBy(
 	 * 		'col1',
@@ -181,12 +180,12 @@ export default class Select extends StatementNode {
 	 * 		by => by.case(c => c.given(), c => c.when(...).then(...), c.else() ).ASC(),
 	 * ).withRollup()
 	 * 
-	 * @return array
+	 * @return this
 	 */
 	orderBy(...orderBys) { return (this.build('ORDER_BY_CLAUSE', orderBys, OrderByClause, 'criterion'), this.ORDER_BY_CLAUSE/* for: .withRollup() */); }
 
 	/**
-	 * Sets the SELECT STMT's "OFFSET" clause
+	 * Sets the statement's OFFSET_CLAUSE
 	 * 
 	 * .offset(3);
 	 * 
@@ -198,7 +197,7 @@ export default class Select extends StatementNode {
 	}
 
 	/**
-	 * Sets the SELECT STMT's "LIMIT" clause
+	 * Sets the statement's LIMIT_CLAUSE
 	 * 
 	 * .limit([3, 5]);
 	 * 
@@ -213,18 +212,18 @@ export default class Select extends StatementNode {
 	 * @inheritdoc
 	 */
 	stringify(params = {}) {
-		const sql = [`SELECT`];
+		const sql = ['SELECT'];
 		if (this.FLAGS.length) sql.push(this.FLAGS.map(s => s.replace(/_/g, ' ')));
 		sql.push(this.SELECT_LIST.join(', '));
-		sql.push(`FROM ${ this.TABLE_REFERENCES.join(', ') }`);
-		if (this.JOIN_CLAUSES.length) sql.push(...this.JOIN_CLAUSES);
-		if (this.WHERE_CLAUSE) sql.push(`WHERE ${ this.WHERE_CLAUSE }`);
+		sql.push('FROM', this.FROM_LIST.join(', '));
+		if (this.JOIN_LIST.length) sql.push(...this.JOIN_LIST);
+		if (this.WHERE_CLAUSE) sql.push('WHERE', this.WHERE_CLAUSE);
 		if (this.GROUP_BY_CLAUSE) sql.push(this.GROUP_BY_CLAUSE);
-		if (this.HAVING_CLAUSE) sql.push(`HAVING ${ this.HAVING_CLAUSE }`);
+		if (this.HAVING_CLAUSE) sql.push('HAVING', this.HAVING_CLAUSE);
 		if (this.WINDOW_CLAUSE) sql.push(this.WINDOW_CLAUSE);
 		if (this.ORDER_BY_CLAUSE) sql.push(this.ORDER_BY_CLAUSE);
-		if (this.OFFSET_CLAUSE) sql.push(`OFFSET ${ this.OFFSET_CLAUSE }`);
-		if (this.LIMIT_CLAUSE) sql.push(`LIMIT ${ (Array.isArray(this.LIMIT_CLAUSE) ? this.LIMIT_CLAUSE : [this.LIMIT_CLAUSE]).join(',') }`);
+		if (this.OFFSET_CLAUSE) sql.push('OFFSET', this.OFFSET_CLAUSE);
+		if (this.LIMIT_CLAUSE) sql.push('LIMIT', (Array.isArray(this.LIMIT_CLAUSE) ? this.LIMIT_CLAUSE : [this.LIMIT_CLAUSE]).join(','));
 		return sql.join(' ');
 	}
 	
@@ -232,37 +231,37 @@ export default class Select extends StatementNode {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const [ selectMatch, withUac, allOrDistinct, body ] = expr.match(new RegExp(`^${ this.regex }(.*)$`, 'i')) || [];
+		const [ selectMatch, withUac, allOrDistinct, body ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
 		if (!selectMatch) return;
 		const instance = new this(context);
 		if (withUac) instance.withFlag('WITH_UAC');
 		if (allOrDistinct) instance.withFlag(allOrDistinct);
-		const clausesMap = { from:'(?<!DISTINCT\\b)FROM', join:JoinClause, where:'WHERE', groupBy:GroupByClause, having:'HAVING', window:WindowClause, orderBy:OrderByClause, offset:'OFFSET', limit:'LIMIT' };
-		const { tokens: [ fieldsSpec, ...tokens ], matches: clauses } = Lexer.lex(body.trim(), Object.values(clausesMap).map(x => typeof x === 'string' ? x : x.regex), { useRegex: 'i' });
+		const clausesMap = { from: { test: 'FROM', lookback: '^(?!.*\\s+DISTINCT\\s+$).*' }, join:JoinClause, where:'WHERE', groupBy:GroupByClause, having:'HAVING', window:WindowClause, orderBy:OrderByClause, offset:'OFFSET', limit:'LIMIT' };
+		const { tokens: [ fieldsSpec, ...tokens ], matches: clauses } = Lexer.lex(body.trim(), Object.values(clausesMap).map(x => typeof x === 'string' || x.test ? x : x.regex), { useRegex: 'i' });
 		// SELECT_LIST
 		for (const fieldExpr of Lexer.split(fieldsSpec, [','])) {
 			const field = await parseCallback(instance, fieldExpr.trim(), [Field]);
 			instance.select(field);
 		}
-		// OTHER CLAUSES
+		// CLAUSES
 		for (const clause of clauses) {
 			const clauseRe = new RegExp(clause.replace(/\s+/g, ''), 'i'), clauseKey = Object.keys(clausesMap).find(key => clauseRe.test(key));
-			// TABLE_REFERENCES
+			// FROM_LIST
 			if (clauseKey === 'from') {
 				for (const tblExpr of Lexer.split(tokens.shift(), [','])) {
 					const node = await parseCallback(instance, tblExpr.trim(), [Table]);
 					instance.from(node);
 				}
 			}
-			// OFFSET|LIMIT
-			else if (['offset', 'limit'].includes(clauseKey)) {
-				const args = tokens.shift().split(',').map(s => parseInt(s.trim()));
-				instance[clauseKey](...args);
-			}
 			// WHERE_CLAUSE|HAVING_CLAUSE
 			else if (['where', 'having'].includes(clauseKey)) {
 				const node = await parseCallback(instance, tokens.shift().trim(), [Condition,Assertion]);
 				instance[clauseKey](node);
+			}
+			// OFFSET|LIMIT
+			else if (['offset', 'limit'].includes(clauseKey)) {
+				const args = tokens.shift().split(',').map(s => parseInt(s.trim()));
+				instance[clauseKey](...args);
 			}
 			// JOIN|GROUP_BY|WINDOW|ORDER_BY
 			else {
@@ -276,5 +275,5 @@ export default class Select extends StatementNode {
 	/**
 	 * @property String
 	 */
-	static regex = 'SELECT[ ]+(?:(WITH[ ]+UAC)[ ]+)?(ALL|DISTINCT)?';
+	static regex = 'SELECT\\s+(?:(WITH\\s+UAC)\\s+)?(ALL|DISTINCT)?';
 }

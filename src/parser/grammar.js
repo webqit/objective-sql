@@ -12,15 +12,16 @@ import Select from './select/Select.js';
 //import Union from './select/Union.js';
 import Update from './update/Update.js';
 // Expressions
+import Identifier from './Identifier.js';
 import CaseConstruct from './select/case/CaseConstruct.js';
 import Abstraction from './select/Abstraction.js';
-import Identifier from './select/Identifier.js';
 import Assertion from './select/Assertion.js';
 import Math from './select/Math.js';
 import Aggr from './select/Aggr.js';
 import Func from './select/Func.js';
 import Json from './select/Json.js';
-import Str from './select/Str.js';
+import PgConcat from './select/str/PgConcat.js';
+import Str from './select/str/Str.js';
 import Num from './select/Num.js';
 
 /**
@@ -42,6 +43,7 @@ export default {
 	// Expressions
 	Abstraction,
 	CaseConstruct,
+	PgConcat,
 	Assertion,
 	Math,
 	Aggr,

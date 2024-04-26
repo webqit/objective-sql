@@ -53,10 +53,10 @@ export default class DataType extends Node {
         return new this(context, name.toUpperCase(), precision);
     }
 
-	static pgFixedTypesRe = /(bigint|int8|bigserial|serial8|boolean|bool|box|bytea|cidr|circle|date|double[ ]+precision|float8|inet|integer|int|int4|json|jsonb|line|lseg|macaddr|macaddr8|money|path|pg_lsn|pg_snapshot|point|polygon|real|float4|smallint|int2|smallserial|serial2|serial|serial4|text|timetz|timestamptz|tsquery|tsvector|txid_snapshot|uuid|xml)/;
-	static pgVariableTypesRe = /(bit|bit[ ]+varying|varbit|character|char|character[ ]+varying|varchar|interval|numeric|time|timestamp)(?:[ ]+)?(?:\(([\d, ]+)\))?/;
+	static pgFixedTypesRe = /(bigint|int8|bigserial|serial8|boolean|bool|box|bytea|cidr|circle|date|double\s+precision|float8|inet|integer|int|int4|json|jsonb|line|lseg|macaddr|macaddr8|money|path|pg_lsn|pg_snapshot|point|polygon|real|float4|smallint|int2|smallserial|serial2|serial|serial4|text|timetz|timestamptz|tsquery|tsvector|txid_snapshot|uuid|xml)/;
+	static pgVariableTypesRe = /(bit|bit\s+varying|varbit|character|char|character\s+varying|varchar|interval|numeric|time|timestamp)(?:\s+)?(?:\(([\d, ]+)\))?/;
 	static myFixedTypesRe = /(tinyint|smallint|mediumint|enum|set|tinyblob|mediumblob|longblob|geometry|longstring|geometrycollection|multilinestring|multipoint|multipolygon)/;
-	static myVariableTypesRe = /(float|decimal|double|tinytext|mediumtext|longtext|binary|varbinary|blob)(?:[ ]+)?(?:\(([\d, ]+)\))?/;
+	static myVariableTypesRe = /(float|decimal|double|tinytext|mediumtext|longtext|binary|varbinary|blob)(?:\s+)?(?:\(([\d, ]+)\))?/;
 }
 
 const parse = expr => {

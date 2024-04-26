@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import { _unwrap } from '@webqit/util/str/index.js';
 import StatementNode from '../StatementNode.js';
 import TableLevelConstraint from './TableLevelConstraint.js';
@@ -87,7 +87,7 @@ export default class CreateTable extends StatementNode {
 		}
 		if (constraints.length) { defs.push(constraints.map(cnst => cnst.stringify()).join(',\n\t')); }
 		if (this.INDEXES.length) { defs.push(this.INDEXES.map(ndx => ndx.stringify()).join(',\n\t')); }
-		return `CREATE TABLE${ this.hasFlag('IF_NOT_EXISTS') ? ' IF NOT EXISTS' : '' } ${ this.BASENAME ? `${ this.BASENAME }.` : `` }${ this.NAME } (\n\t${ defs.join(',\n\t') }\n)`;
+		return `CREATE TABLE${ this.hasFlag('IF_NOT_EXISTS') ? ' IF NOT EXISTS' : '' } ${ this.autoEsc([this.BASENAME, this.NAME].filter(s => s)).join('.') } (\n\t${ defs.join(',\n\t') }\n)`;
 	}
 	
 	/**
@@ -96,7 +96,7 @@ export default class CreateTable extends StatementNode {
 	static async parse(context, expr, parseCallback) {
 		if (expr.trim().substr(0, 6).toUpperCase() !== 'CREATE') return;
 		const [ create, body ] = Lexer.split(expr, [], { limit: 2 });
-		const [ , ifNotExists, dbName, tblName ] = /CREATE[ ]+TABLE[ ]+(IF[ ]+NOT[ ]+EXISTS[ ]+)?(?:(\w+)\.)?(\w+)/i.exec(create) || [];
+		const [ , ifNotExists, dbName, tblName ] = /CREATE\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?(?:(\w+)\.)?(\w+)/i.exec(create) || [];
 		if (!tblName) return;
 		const instance = new this(context, tblName, dbName);
 		if (ifNotExists) instance.withFlag('IF_NOT_EXISTS');

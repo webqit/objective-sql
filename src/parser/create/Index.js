@@ -1,4 +1,4 @@
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import { _unwrap } from '@webqit/util/str/index.js';
 import Node from '../Node.js';
 
@@ -59,7 +59,7 @@ export default class Index extends Node {
     /**
 	 * @property RegExp
 	 */
-    static regex = /^((?:(?:FULLTEXT|SPATIAL)(?:[ ]+INDEX|[ ]+KEY)?)|(?:INDEX|KEY))([ ]+\w+)?(?:[ ]+)?(\([^\)]+\))/i;
+    static regex = /^((?:(?:FULLTEXT|SPATIAL)(?:\s+INDEX|\s+KEY)?)|(?:INDEX|KEY))(\s+\w+)?(?:\s+)?(\([^\)]+\))/i;
 
     /**
      * @property Object

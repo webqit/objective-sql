@@ -26,13 +26,13 @@ export default class DropTable extends StatementNode {
 	/**
 	 * @inheritdoc
 	 */
-	stringify() { return `DROP TABLE${ this.hasFlag('IF_EXISTS') ? ' IF EXISTS' : '' } ${ this.BASENAME ? `${ this.BASENAME }.` : `` }${ this.NAME }`; }
+	stringify() { return `DROP TABLE${ this.hasFlag('IF_EXISTS') ? ' IF EXISTS' : '' } ${ this.autoEsc([this.BASENAME, this.NAME].filter(s => s)).join('.') }`; }
 	
 	/**
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-		const [ , ifExists, dbName, tblName ] = /DROP[ ]+TABLE[ ]+(IF[ ]+EXISTS[ ]+)?(?:(\w+)\.)?(\w+)/i.exec(expr) || [];
+		const [ , ifExists, dbName, tblName ] = /DROP\s+TABLE\s+(IF\s+EXISTS\s+)?(?:(\w+)\.)?(\w+)/i.exec(expr) || [];
 		if (!tblName) return;
 		const instance = new this(context, tblName, dbName);
 		if (ifExists) instance.withFlag('IF_EXISTS');

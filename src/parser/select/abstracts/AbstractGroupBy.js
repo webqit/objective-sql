@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../../Lexer.js';
 import Node from '../../Node.js';
 
 export default class AbstractGroupBy extends Node {
@@ -27,7 +27,7 @@ export default class AbstractGroupBy extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const [ groupByMatch, criteriaExpr ] = expr.match(new RegExp(`^${ this.regex }(.*)$`, 'i')) || [];
+		const [ groupByMatch, criteriaExpr ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
 		if (!groupByMatch) return;
 		const instance = new this(context);
 		for (const criterionExpr of Lexer.split(criteriaExpr.trim(), [','])) {
@@ -39,5 +39,5 @@ export default class AbstractGroupBy extends Node {
 	/**
 	 * @property String
 	 */
-	static regex = 'GROUP[ ]+BY';
+	static regex = 'GROUP\\s+BY';
 }

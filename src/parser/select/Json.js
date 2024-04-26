@@ -3,7 +3,7 @@
  * @imports
  */
 import { _unwrap, _wrapped } from '@webqit/util/str/index.js';
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import Node from '../Node.js';
 
 /**

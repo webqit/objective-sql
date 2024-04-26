@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import Node from '../Node.js';
 
 export default class Math extends Node {
@@ -80,12 +80,10 @@ export default class Math extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		for (const operators of [['\\*', '\\/'], ['\\+', '\\-']]) {
-			let { tokens, matches } = Lexer.lex(expr, [`([ ]+)?(${ operators.join('|') })([ ]+)?`], { useRegex: 'i' });
-			if (matches.length) {
-				const instance = new this(context, matches.pop().trim(), ...(await Promise.all(tokens.map(expr => parseCallback(context, expr.trim())))));
-				return instance;
-			}
+		for (const operator of ['\\*', '\\/','\\+', '\\-']) {
+			let { tokens, matches } = Lexer.lex(expr, [`(\\s+)?${ operator }(\\s+)?`], { useRegex: 'i' });
+			if (tokens.filter(s => s.trim()).length < 2) continue; // Note that we're not simply asking matches.length; think SELECT * FROM
+			return new this(context, matches.pop().trim(), ...(await Promise.all(tokens.map(expr => parseCallback(context, expr.trim())))));
 		}
 	}
 }

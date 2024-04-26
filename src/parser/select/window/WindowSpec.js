@@ -1,6 +1,6 @@
 
 import { _unwrap } from '@webqit/util/str/index.js';
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../../Lexer.js';
 import PartitionByClause from '../PartitionByClause.js';
 import OrderByClause from '../OrderByClause.js';
 import Node from '../../Node.js';
@@ -99,11 +99,11 @@ export default class WindowSpec extends Node {
 	static async parse(context, expr, parseCallback) {
 		const instance = new this(context);
 		const parseEnclosure = async enclosure => {
-			const { tokens: [ definedRef, ...clauses ], matches: clauseTypes } = Lexer.split(_unwrap(enclosure.trim(), '(', ')'), ['PARTITION[ ]+BY', 'ORDER[ ]+BY'], { useRegex:'i', preserveDelims: true });
+			const { tokens: [ definedRef, ...clauses ], matches: clauseTypes } = Lexer.split(_unwrap(enclosure.trim(), '(', ')'), ['PARTITION\\s+BY', 'ORDER\\s+BY'], { useRegex:'i', preserveDelims: true });
 			if (definedRef.trim()) instance.extends(definedRef.trim());
 			for (const clauseType of clauseTypes) {
 				// PARTITION BY
-				if (/PARTITION[ ]+BY/i.test(clauseType)) {
+				if (/PARTITION\s+BY/i.test(clauseType)) {
 					instance.partitionBy(await parseCallback(instance, clauses.shift().trim(), [PartitionByClause]));
 					continue;
 				}

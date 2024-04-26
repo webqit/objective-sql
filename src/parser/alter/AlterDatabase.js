@@ -1,41 +1,39 @@
 
 import StatementNode from '../StatementNode.js';
+import Action from './Action.js';
 
 export default class AlterDatabase extends StatementNode {
 	 
 	/**
 	 * Instance properties
 	 */
-	TARGET = {};
+	NAME = '';
 	ACTIONS = [];
 
 	/**
 	 * @constructor
 	 */
-	constructor(context, target) {
+	constructor(context, name) {
 		super(context);
-		this.TARGET = target;
+		this.NAME = name;
 	}
 
 	/**
-	 * Adds a "rename" action to the instance,
+	 * Adds a "RENAME" action to the instance,
 	 * 
 	 * @param String newName
 	 * 
-	 * @returns this
+	 * @returns Action
 	 */
-	renameTo(newName) {
-		this.ACTIONS.push({ type: 'RENAME', argument: newName });
-		return this;
-	}
+	renameTo(newName) { return this.build('ACTIONS', [newName], Action, 'renameTo'); }
 
 	/**
 	 * @inheritdoc
 	 */
 	toJson() {
 		return {
-			target: this.TARGET,
-			actions: this.ACTIONS.map(action => structuredClone(action)),
+			name: this.NAME,
+			actions: this.ACTIONS.map(action => action.toJson()),
 		};
 	}
 	
@@ -43,18 +41,18 @@ export default class AlterDatabase extends StatementNode {
 	 * @inheritdoc
 	 */
 	stringify() {
-		const newDbName = this.ACTIONS.find(action => action.type === 'RENAME')?.argument;
+		const newDbName = this.ACTIONS.find(action => action.TYPE === 'RENAME' && !action.REFERENCE)?.ARGUMENT;
 		if (!newDbName) return '';
-		return `ALTER SCHEMA${ this.hasFlag('IF_EXISTS') ? ' IF EXISTS' : '' } ${ this.TARGET.name } RENAME TO ${ newDbName }`;
+		return `ALTER SCHEMA${ this.hasFlag('IF_EXISTS') ? ' IF EXISTS' : '' } ${ this.autoEsc(this.NAME) } RENAME TO ${ this.autoEsc(newDbName) }`;
 	}
 
 	/**
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-		const [ , ifExists, dbName, newName ] = /ALTER[ ]+DATABASE[ ]+(IF[ ]+EXISTS[ ]+)?(\w+)[ ]+RENAME[ ]+TO[ ]+(\w+)/i.exec(expr) || [];
+		const [ , ifExists, dbName, newName ] = /ALTER\s+DATABASE\s+(IF\s+EXISTS\s+)?(\w+)\s+RENAME\s+TO\s+(\w+)/i.exec(expr) || [];
 		if (!dbName) return;
-		const instance = new this(context, { name: dbName });
+		const instance = new this(context, dbName);
 		if (ifExists) instance.withFlag('IF_EXISTS');
 		return instance.renameTo(newName);
 	}
@@ -63,10 +61,10 @@ export default class AlterDatabase extends StatementNode {
 	 * @inheritdoc
 	 */
 	static fromJson(context, json, flags = []) {
-		if (!json.target?.name?.match(/[a-zA-Z]+/i)) return;
-		const instance = (new this(context, json.target)).withFlag(...flags);
+		if (!json.name) return;
+		const instance = (new this(context, json.name)).withFlag(...flags);
 		for (const action of json.actions) {
-			instance.ACTIONS.push(structuredClone(action));
+			instance.ACTIONS.push(Action.fromJson(context, action));
 		}
 		return instance;
 	}
@@ -75,9 +73,9 @@ export default class AlterDatabase extends StatementNode {
 	 * @inheritdoc
 	 */
 	static fromDiffing(context, jsonA, jsonB, flags = []) {
-		if (!jsonA.name?.match(/[a-zA-Z]+/i)) throw new Error(`Could not assertain database1 name or database1 name invalid.`);
-		if (!jsonB.name?.match(/[a-zA-Z]+/i)) throw new Error(`Could not assertain database2 name or database2 name invalid.`);
-		const instance = (new this(context, jsonA)).withFlag(...flags);
+		if (!jsonA.name) throw new Error(`Could not assertain database1 name or database1 name invalid.`);
+		if (!jsonB.name) throw new Error(`Could not assertain database2 name or database2 name invalid.`);
+		const instance = (new this(context, jsonA.name)).withFlag(...flags);
 		// RENAME TO...
 		if (jsonB.name !== jsonA.name) {
 			instance.renameTo(jsonB.name);

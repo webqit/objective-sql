@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from './Lexer.js';
 import { _merge } from '@webqit/util/obj/index.js';
 import grammar from './grammar.js';
 		

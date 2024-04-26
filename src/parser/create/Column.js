@@ -62,7 +62,7 @@ export default class Column extends Node {
         // Render constraints in the order of ColumnLevelConstraint.attrEquivalents;
         let constraints = Object.values(ColumnLevelConstraint.attrEquivalents).map(attr => this.CONSTRAINTS.find(cnst => cnst.ATTRIBUTE === attr)).filter(c => c);
         if (this.params.dialect === 'mysql') { constraints = constraints.filter(c => c.ATTRIBUTE !== 'REFERENCES'); }
-        return `${ this.NAME } ${ this.TYPE }${ constraints.length ? ` ${ constraints.join(' ') }` : '' }`;
+        return `${ this.autoEsc(this.NAME) } ${ this.TYPE }${ constraints.length ? ` ${ constraints.join(' ') }` : '' }`;
     }
     
     /**

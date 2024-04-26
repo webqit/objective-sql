@@ -259,7 +259,7 @@ export default class AbstractClient {
         if (dbAlterRequest instanceof AlterDatabase) {
             // Remap arguments
             dbAlterInstance = dbAlterRequest;
-            dbName = dbAlterInstance.TARGET.name;
+            dbName = dbAlterInstance.NAME;
             params = editCallback || {};
             // Create savepount data
             dbSchema = schemasMap.get(dbName);
@@ -315,7 +315,7 @@ export default class AbstractClient {
         // ------
         // DB changes now
         await callback(dbAlterInstance, onAfterAlter, params);
-        const newDbName = dbAlterInstance.ACTIONS.find(action => action.type === 'RENAME')?.argument;
+        const newDbName = dbAlterInstance.ACTIONS.find(action => action.TYPE === 'RENAME' && !action.REFERENCE)?.ARGUMENT;
         if (newDbName) {
             // Modify original schema to immediately reflect the db changes
             dbSchema.name = newDbName;

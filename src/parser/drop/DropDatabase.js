@@ -24,13 +24,13 @@ export default class DropDatabase extends StatementNode {
 	/**
 	 * @inheritdoc
 	 */
-	stringify() { return `DROP SCHEMA${ this.hasFlag('IF_EXISTS') ? ' IF EXISTS' : '' } ${ this.NAME }${ this.hasFlag('CASCADE') ? ' CASCADE' : '' }`; }
+	stringify() { return `DROP SCHEMA${ this.hasFlag('IF_EXISTS') ? ' IF EXISTS' : '' } ${ this.autoEsc(this.NAME) }${ this.hasFlag('CASCADE') ? ' CASCADE' : '' }`; }
 	
 	/**
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-		const [ , ifExists, dbName ] = /DROP[ ]+DATABASE[ ]+(IF[ ]+EXISTS[ ]+)?(\w+)/i.exec(expr) || [];
+		const [ , ifExists, dbName ] = /DROP\s+DATABASE\s+(IF\s+EXISTS\s+)?(\w+)/i.exec(expr) || [];
 		if (!dbName) return;
 		const instance = new this(context, dbName);
 		if (ifExists) instance.withFlag('IF_EXISTS');

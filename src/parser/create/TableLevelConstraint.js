@@ -51,7 +51,7 @@ export default class TableLevelConstraint extends Node {
 	 * @inheritdoc
 	 */
 	stringify() {
-        let sql = `${ this.CONSTRAINT_NAME?.match(/[a-zA-Z]+/i) ? `CONSTRAINT ${ this.CONSTRAINT_NAME } ` : '' }${ this.TYPE }`;
+        let sql = `${ this.CONSTRAINT_NAME ? `CONSTRAINT ${ this.autoEsc(this.CONSTRAINT_NAME) } ` : '' }${ this.TYPE }`;
 		if (this.COLUMNS?.length && this.TYPE !== 'CHECK') { sql += ` (${ this.COLUMNS.join(',') })`; }
 		if (this.TYPE === 'FOREIGN KEY') {
 			const basename = this.REFERENCES.basename || this.BASENAME;
@@ -96,8 +96,8 @@ export default class TableLevelConstraint extends Node {
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (json.constraintName || (typeof json.type === 'string' && json.type.match(/PRIMARY[ ]+KEY|UNIQUE([ ]+KEY)?|CHECK|FOREIGN[ ]+KEY/i))) {
-			return new this(context, json.constraintName, json.type.replace(/UNIQUE[ ]+KEY/i, 'UNIQUE'), json.columns, json.references || json.expr);
+		if (json.constraintName || (typeof json.type === 'string' && json.type.match(/PRIMARY\s+KEY|UNIQUE(\s+KEY)?|CHECK|FOREIGN\s+KEY/i))) {
+			return new this(context, json.constraintName, json.type.replace(/UNIQUE\s+KEY/i, 'UNIQUE'), json.columns, json.references || json.expr);
 		}
 	}
 
@@ -117,10 +117,10 @@ export default class TableLevelConstraint extends Node {
     /**
 	 * @property RegExp
 	 */
-	static constraintNameRe = /(?:CONSTRAINT[ ]+(\w+[ ]+)?)?/;
-	static primaryKeyRe = /PRIMARY[ ]+KEY(?:[ ]+)?\(([^\)]+)\)/;
-	static uniqueKeyRe = /UNIQUE(?:[ ]+KEY)?(?:[ ]+)?\(([^\)]+)\)/;
-	static checkRe = /CHECK(?:(?:[ ]+)?\(([^\)]+)\))/;
-	static foreignKeyRe = /FOREIGN[ ]+KEY(?:[ ]+)?\(([^\)]+)\)(?:[ ]+)?REFERENCES[ ]+(?:(\w+)\.)?(\w+)(?:[ ]+)?\(([^\)]+)\)(?:[ ]+)?(.+)?$/;
+	static constraintNameRe = /(?:CONSTRAINT\s+(\w+\s+)?)?/;
+	static primaryKeyRe = /PRIMARY\s+KEY(?:\s+)?\(([^\)]+)\)/;
+	static uniqueKeyRe = /UNIQUE(?:\s+KEY)?(?:\s+)?\(([^\)]+)\)/;
+	static checkRe = /CHECK(?:(?:\s+)?\(([^\)]+)\))/;
+	static foreignKeyRe = /FOREIGN\s+KEY(?:\s+)?\(([^\)]+)\)(?:\s+)?REFERENCES\s+(?:(\w+)\.)?(\w+)(?:\s+)?\(([^\)]+)\)(?:\s+)?([\s\S]+)?$/;
 
 }

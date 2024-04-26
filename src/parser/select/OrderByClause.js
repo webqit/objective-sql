@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import AbstractOrderBy from './abstracts/AbstractOrderBy.js';
 
 export default class OrderByClause extends AbstractOrderBy {
@@ -20,7 +20,7 @@ export default class OrderByClause extends AbstractOrderBy {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const { tokens: [$expr], matches } = Lexer.lex(expr, ['[ ]+WITH[ ]+ROLLUP$'], { useRegex: 'i' });
+		const { tokens: [$expr], matches } = Lexer.lex(expr, ['\\s+WITH\\s+ROLLUP$'], { useRegex: 'i' });
 		const instance = await super.parse(context, $expr.trim(), parseCallback);
 		if (!instance) return;
 		if (matches.length) instance.withFlag('WITH_ROLLUP');

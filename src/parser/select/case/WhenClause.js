@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../../Lexer.js';
 import Node from '../../Node.js';
 
 export default class WhenClause extends Node {
@@ -37,7 +37,7 @@ export default class WhenClause extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const tokens = Lexer.split(expr, [`[ ]+THEN[ ]+`], { useRegex: 'i' });
+		const tokens = Lexer.split(expr, [`\\s+THEN\\s+`], { useRegex: 'i' });
 		if (tokens.length !== 2) return;
 		const instance = new this(context);
 		const [criterion, consequence] = await Promise.all(tokens.map($expr => parseCallback(instance, $expr.trim())));

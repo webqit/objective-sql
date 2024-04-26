@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import WindowSpec from './window/WindowSpec.js';
 import OrderByClause from './OrderByClause.js';
 import Func from './Func.js';
@@ -35,13 +35,13 @@ export default class Aggr extends Func {
 	 */
 	static async parse(context, expr, parseCallback) {
 		// Break off any OVER clause, then assert that it's a function
-		const [ func, over ] = Lexer.split(expr, ['OVER[ ]+'], { useRegex: 'i' }).map(s => s.trim());
+		const [ func, over ] = Lexer.split(expr, ['OVER\\s+'], { useRegex: 'i' }).map(s => s.trim());
 		if (!func.endsWith(')') || Lexer.match(func, [' ']).length) return;
 		// Match any ALL|DISTINCT flags; also assert that it's an aggr function
-		const [ , name, allOrDistinct, args ] = /^(\w+)\((?:(ALL|DISTINCT)[ ]+)?(.+)\)$/i.exec(func);
+		const [ , name, allOrDistinct, args ] = /^(\w+)\((?:(ALL|DISTINCT)\s+)?([\s\S]+)\)$/i.exec(func);
 		if (!this.names.flat().includes(name.toUpperCase())) return;
 		// Break off any ORDER BY clause, then render
-		const [ , $args, orderByClause ] = /^(.+)(?:[ ]+(ORDER[ ]+BY[ ]+.+))$/i.exec(args) || [ , args ];
+		const [ , $args, orderByClause ] = /^([\s\S]+)(?:\s+(ORDER\s+BY\s+.+))$/i.exec(args) || [ , args ];
 		const instance = await super.parse(context, `${ name }(${ $args })`, parseCallback);
 		if (allOrDistinct) instance.withFlag(allOrDistinct);
 		if (orderByClause) instance.orderBy(await parseCallback(instance, orderByClause, [OrderByClause]));

@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import Assertion from './Assertion.js';
 import Node from '../Node.js';
 
@@ -55,8 +55,8 @@ export default class Condition extends Node {
 	 */
 	static async parse(context, expr, parseCallback) {
 		for (const logic of ['AND', 'OR']) {
-			const split = Lexer.split(expr, [`[ ]+${ logic }[ ]+`], { useRegex: 'i' });
-			if (split.length > 1) {
+			const tokens = Lexer.split(expr, [`\\s+${ logic }\\s+`], { useRegex: 'i' });
+			if (tokens.length > 1) {
 				const instance = new this(logic);
 				for (const $expr of tokens) instance[logic.toLowerCase()](await parseCallback(instance, $expr));
 				return instance;

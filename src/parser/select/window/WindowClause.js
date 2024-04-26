@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../../Lexer.js';
 import Window from './WindowSpec.js';
 import Node from '../../Node.js';
 
@@ -29,7 +29,7 @@ export default class WindowClause extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const [ windowMatch, windowSpec ] = expr.match(new RegExp(`^${ this.regex }(.*)$`, 'i')) || [];
+		const [ windowMatch, windowSpec ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
 		if (!windowMatch) return;
 		const instance = new this(context);
 		for (const spec of Lexer.split(windowSpec, [','])) {

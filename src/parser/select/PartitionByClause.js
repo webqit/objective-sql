@@ -11,5 +11,5 @@ export default class PartitionByClause extends AbstractGroupBy {
 	/**
 	 * @inheritdoc
 	 */
-	static regex = 'PARTITION[ ]+BY';
+	static regex = 'PARTITION\\s+BY';
 }

@@ -1,6 +1,6 @@
 
 import { _unwrap } from '@webqit/util/str/index.js';
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import Condition from './Condition.js';
 import Node from '../Node.js';
 
@@ -324,5 +324,5 @@ export default class Assertion extends Node {
 		return new this(context, $operator, ...(await Promise.all($operands.map(opr => parseCallback(context, opr.trim())))));
 	}
 
-	static regex = '(([ ]+(?:NOT[ ]+)?IS[ ]+(?:NOT[ ]+)?(TRUE|FALSE|NULL|UNKNOWN|DISTINCT[ ]+FROM)[ ]+)|[ ]+(ISNULL|NOTNULL|IN|ANY|LIKE|(?:NOT[ ]+)?BETWEEN(?:[ ]+SYMMETRIC)?)[ ]+|(?:[ ]+)?(=|<=|>=|!=|<>)(?:[ ]+)?)';
+	static regex = '((\\s+(?:NOT\\s+)?IS\\s+(?:NOT\\s+)?(TRUE|FALSE|NULL|UNKNOWN|DISTINCT\\s+FROM)\\s+)|\\s+(ISNULL|NOTNULL|IN|ANY|LIKE|(?:NOT\\s+)?BETWEEN(?:\\s+SYMMETRIC)?)\\s+|(?:\\s+)?(=|<|<=|>=|>|!=|<>)(?:\\s+)?)';
 }

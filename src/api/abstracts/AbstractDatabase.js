@@ -254,10 +254,10 @@ export default class AbstractDatabase {
             if (tblName instanceof AlterTable) {
                 // Remap arguments
                 tblAlterRequest = tblName;
-                tblName = tblAlterRequest.TARGET.name;
+                tblName = tblAlterRequest.NAME;
                 params = editCallback || {};
                 // Create savepount data
-                tblSchema = tblAlterRequest.TARGET.columns ? tblAlterRequest.TARGET : await this.describeTable(tblName, params);
+                tblSchema = tblAlterRequest.JSON_BEFORE?.columns ? tblAlterRequest.JSON_BEFORE : await this.describeTable(tblName, params);
             } else if (typeof editCallback === 'function') {
                 // First we validate operation
                 const tblFound = (await this.tables({ name: tblName }))[0];
@@ -277,15 +277,15 @@ export default class AbstractDatabase {
             } else {
                 throw new Error(`Alter table "${ tblName }" called with invalid arguments.`);
             }
-            const newTblName = tblAlterRequest.ACTIONS.find(action => action.type === 'RENAME' && !action.reference)?.argument;
-            const newTblLocation = tblAlterRequest.ACTIONS.find(action => action.type === 'RELOCATE')?.argument;
+            const newTblName = tblAlterRequest.ACTIONS.find(action => action.TYPE === 'RENAME' && !action.REFERENCE)?.ARGUMENT;
+            const newTblLocation = tblAlterRequest.ACTIONS.find(action => action.TYPE === 'RELOCATE')?.ARGUMENT;
             if (tblAlterRequest.ACTIONS.length) {
                 // Create savepoint
                 for (const action of tblAlterRequest.ACTIONS) {
-                    if (action.type === 'RENAME' && action.reference) {
-                        const listName = action.reference.type === 'CONSTRAINT' ? 'constraints' : (action.reference.type === 'INDEX' ? 'indexes' : 'columns');
+                    if (action.TYPE === 'RENAME' && action.REFERENCE) {
+                        const listName = action.REFERENCE.type === 'CONSTRAINT' ? 'constraints' : (action.REFERENCE.type === 'INDEX' ? 'indexes' : 'columns');
                         const nameKey = listName === 'constraints' ? 'constraintName' : (listName === 'indexes' ? 'indexName' : 'name');
-                        tblSchema[listName].find(obj => obj[nameKey] === action.reference.name)[`$${ nameKey }`] = action.argument;
+                        tblSchema[listName].find(obj => obj[nameKey] === action.REFERENCE.name)[`$${ nameKey }`] = action.ARGUMENT;
                     }
                 }
                 dbSchemaEdit.tablesSavepoints.add({

@@ -22,6 +22,28 @@ export default class Node {
 	get params() { return this.CONTEXT?.params || {}; }
 
 	/**
+	 * @property Array
+	 */
+	get quoteChars() { return this.constructor.getQuoteChars(this); }
+
+	/**
+	 * @property String
+	 */
+	get escChar() { return this.constructor.getEscChar(this); }
+
+	/**
+	 * An Escape helper
+	 * 
+	 * @param String|Array string_s 
+	 * 
+	 * @returns String
+	 */
+	autoEsc(string_s) {
+		const $strings = (Array.isArray(string_s) ? string_s : [string_s]).map(s => s && !/^[*\w]+$/.test(s) ? `${this.escChar}${s}${this.escChar}` : s );
+		return Array.isArray(string_s) ? $strings : $strings[0];
+	}
+
+	/**
 	 * Helper for adding additional attributes to the instance.
 	 * 
 	 * @params Object meta
@@ -66,61 +88,43 @@ export default class Node {
 	 * @return this
 	 */
 	build(attrName, args, Type, targetMethod, defaultArgs = []) {
-		const getInstance = () => {
+		const get = () => {
 			if (this[attrName] && !Array.isArray(this[attrName])) return this[attrName]; // Singleton?
 			return new Type(this, ...defaultArgs);
 		};
+		const set = (...args) => {
+			for (const arg of args) {
+				if (Array.isArray(this[attrName])) this[attrName].push(arg);
+				else this[attrName] = arg;
+			}
+		};
+		// ---------
+		const instance = args.length === 1 && typeof args[0] !== 'function' && Type && (args[0] instanceof Type ? args[0] : Type.fromJson(this, args[0]));
+		if (instance) return set(instance);
+		// ---------
+		if (targetMethod) {
+			const instance = get();
+			set(instance);
+			// Forward the function to target...
+			// which is expected to recurse here for building entries in the instance
+			return instance[targetMethod](...args);
+		}
+		// ---------
 		for (let arg of args) {
 			if (typeof arg === 'function') {
-				if (Type) {
-					const instance = getInstance();
-					if (targetMethod) {
-						// Forward the function to target...
-						// which is expected to recurse here for building entries in the instance
-						instance[targetMethod](arg);
-					}
-					arg = instance;
-				} else {
-					arg = arg(); throw new Error(`TODO`);
-				}
-			} else if (Type && !(arg instanceof Type)) {
+				const instance = get();
+				arg = (arg(instance), instance);
+			} else if (!(arg instanceof Node)) {
 				// Attempt to cast to type
 				const $arg = Type.fromJson?.(this, arg);
 				if ($arg) {
 					arg = $arg;
-				} else if (targetMethod) {
-					// Forward the input to target...
-					// which is expected to recurse here for building entries in the instance
-					const instance = getInstance();
-					instance[targetMethod](arg);
-					arg = instance;
 				} else {
 					throw new Error(`Arguments must be of type ${ Type.name } or a JSON equivalent.`);
 				}
-			} else if (!(arg instanceof Node)) {
-				// TODO: Attempt casting
-				throw new Error(`Arguments must be of type Node or a JSON equivalent.`);
 			}
-			if (Array.isArray(this[attrName])) this[attrName].push(arg);
-			else this[attrName] = arg;
+			set(arg);
 		}
-	}
-
-	/**
-	 * @property String
-	 */
-	get escChar() { return this.params.dialect === 'mysql' ? '`' : '"'; }
-
-	/**
-	 * An Escape helper
-	 * 
-	 * @param String|Array string_s 
-	 * 
-	 * @returns String
-	 */
-	autoEsc(string_s) {
-		const $strings = (Array.isArray(string_s) ? string_s : [string_s]).map(s => s && !/^\w+$/.test(s) ? `${this.escChar}${s}${this.escChar}` : s );
-		return Array.isArray(string_s) ? $strings : $strings[0];
 	}
 
 	/**
@@ -157,4 +161,22 @@ export default class Node {
 	 * @return Node
 	 */
 	static fromJson(context, json) {}
+	
+	/**
+	 * Determines the proper quote characters for the active SQL dialect ascertained from context.
+	 * 
+	 * @param Node|AbstractClient context 
+	 * 
+	 * @returns Array
+	 */
+	static getQuoteChars(context) { return context?.params?.dialect === 'mysql' ? ['"', "'"] : ["'"]; }
+
+	/**
+	 * Determines the proper escape character for the active SQL dialect ascertained from context.
+	 * 
+	 * @param Node|AbstractClient context 
+	 * 
+	 * @returns String
+	 */
+	static getEscChar(context) { return context?.params?.dialect === 'mysql' ? '`' : '"'; }
 }

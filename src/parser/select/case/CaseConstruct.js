@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../../Lexer.js';
 import WhenClause from './WhenClause.js';
 import Node from '../../Node.js';
 
@@ -57,15 +57,14 @@ export default class CaseConstruct extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const matches = Lexer.match(expr, [`^CASE[ ]+(.*)[ ]+END([ ]+CASE)?$`], { useRegex: 'i' }) || [];
-		if (!matches.length) return;
-		const { tokens: [ , caseValue, ...assertions ], matches: [ , ...clauses ] } = Lexer.lex(expr, ['CASE','WHEN','ELSE','END([ ]+CASE)?'], { useRegex: 'i' });
+		const [caseMatch,caseConstruct] = expr.match(/^CASE\s+([\s\S]*)\s+END(\s+CASE)?$/i) || [];
+		if (!caseMatch) return;
+		const { tokens: [ caseValue, ...assertions ], matches: clauses } = Lexer.lex(caseConstruct, ['WHEN','ELSE'], { useRegex: 'i' });
 		const instance = new this(context);
 		// Has given value?
 		if (caseValue.trim()) instance.given(await parseCallback(instance, caseValue.trim()));
 		// On to the cases
 		for (const clause of clauses) {
-			if (/END/i.test(clause)) break;
 			const assertStmt = assertions.shift();
 			if (/ELSE/i.test(clause)) {
 				instance.else(await parseCallback(instance, assertStmt.trim()));

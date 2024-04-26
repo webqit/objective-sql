@@ -1,6 +1,6 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
-import Node from '../Node.js';
+import Lexer from './Lexer.js';
+import Node from './Node.js';
 
 export default class Identifier extends Node {
 	
@@ -13,10 +13,10 @@ export default class Identifier extends Node {
 	/**
 	 * @constructor
 	 */
-	constructor(context, ...args) {
+	constructor(context, name, basename = null) {
 		super(context);
-		this.NAME = args.pop(); // First
-		this.BASENAME = args.pop();
+		this.NAME = name;
+		this.BASENAME = basename;
 	}
 
 	/**
@@ -42,6 +42,11 @@ export default class Identifier extends Node {
 		this.BASENAME = basename;
 		return this;
 	}
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() { return { name: this.NAME, basename: this.BASENAME }; }
 	
 	/**
 	 * @inheritdoc
@@ -56,10 +61,19 @@ export default class Identifier extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-		const esc = context?.params?.dialect === 'mysql' ? '`' : '"';
+		const escChar = this.getEscChar(context);
 		const parts = Lexer.split(expr, ['.']);
-		const parses = parts.map(s => (new RegExp(`^(?:(\\w+)|${esc}(.+)${esc})$`)).exec(s.trim())).filter(s => s);
+		const parses = parts.map(s => (new RegExp(`^(?:([*\\w]+)|${escChar}([^${escChar}]+)${escChar})$`)).exec(s.trim())).filter(s => s);
 		if (parses.length !== parts.length) return;
-		return new this(context, ...parses.map(s => s[1] || s[2]));
+		const get = x => x?.[1] || x?.[2];
+		return new this(context, get(parses.pop()), get(parses.pop()));
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (!('name' in json)) return;
+		return new this(context, json.name, json.basename);
 	}
 }

@@ -1,8 +1,8 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import AbstractAliasableExpr from './abstracts/AbstractAliasableExpr.js';
 import Abstraction from './Abstraction.js';
-import Identifier from './Identifier.js';
+import Identifier from '../Identifier.js';
 import Condition from './Condition.js';
 import Assertion from './Assertion.js';
 
@@ -59,7 +59,7 @@ export default class JoinClause extends AbstractAliasableExpr {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const [ joinMatch, clause, joinSpec ] = expr.match(new RegExp(`^${ this.regex }(.*)$`, 'i')) || [];
+		const [ joinMatch, clause, joinSpec ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
 		if (!joinMatch) return;
 		const [ $table, $correlation ] = Lexer.split(joinSpec, ['ON|USING'], { useRegex:'i', preserveDelims: true });
 		const instance = (await super.parse(context, $table.trim(), parseCallback)).with({ CLAUSE: clause });
@@ -74,7 +74,7 @@ export default class JoinClause extends AbstractAliasableExpr {
 	/**
 	 * @property String
 	 */
-	static regex = '(INNER[ ]+|CROSS[ ]+|(?:LEFT|RIGHT)(?:[ ]+OUTER)?[ ]+)?JOIN';
+	static regex = '(INNER\\s+|CROSS\\s+|(?:LEFT|RIGHT)(?:\\s+OUTER)?\\s+)?JOIN';
 
 	/**
 	 * @property Array

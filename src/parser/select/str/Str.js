@@ -1,7 +1,7 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../../Lexer.js';
 import { _wrapped, _unwrap } from '@webqit/util/str/index.js';
-import Node from '../Node.js';
+import Node from '../../Node.js';
 
 export default class Str extends Node {
 	
@@ -29,8 +29,8 @@ export default class Str extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-		const quotes = context?.params?.dialect === 'mysql' ? ['"', "'"] : ["'"], $ = {};
-		if (!($.quote = quotes.find(q => _wrapped(expr, q, q))) || Lexer.match(expr, [' ']).length) return;
+		const quoteChars = this.getQuoteChars(context), $ = {};
+		if (!($.quote = quoteChars.find(q => _wrapped(expr, q, q))) || Lexer.match(expr, [' ']).length) return;
 		return new this(
 			context,
 			_unwrap(expr, $.quote, $.quote),

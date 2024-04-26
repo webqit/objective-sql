@@ -1,6 +1,6 @@
 
 import { _wrapped, _unwrap } from '@webqit/util/str/index.js';
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import Node from '../Node.js';
 
 export default class Abstraction extends Node {

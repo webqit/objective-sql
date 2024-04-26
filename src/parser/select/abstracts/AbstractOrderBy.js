@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../../Lexer.js';
 import Node from '../../Node.js';
 
 export default class AbstractOrderBy extends Node {
@@ -27,11 +27,11 @@ export default class AbstractOrderBy extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const [ orderByMatch, criteriaExpr ] = expr.match(new RegExp(`^${ this.regex }(.*)$`, 'i')) || [];
+		const [ orderByMatch, criteriaExpr ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
 		if (!orderByMatch) return;
 		const instance = new this(context);
 		for (const criterionExpr of Lexer.split(criteriaExpr.trim(), [','])) {
-			const [ , expr, sort ] = /(.+)[ ]+(ASC|DESC)$/i.exec(criterionExpr) || [ , criterionExpr ];
+			const [ , expr, sort ] = /([\s\S]+)\s+(ASC|DESC)$/i.exec(criterionExpr) || [ , criterionExpr ];
 			instance.criterion((await parseCallback(instance, expr)).withFlag(sort));
 		}
 		return instance;
@@ -40,5 +40,5 @@ export default class AbstractOrderBy extends Node {
 	/**
 	 * @property String
 	 */
-	static regex = 'ORDER[ ]+BY';
+	static regex = 'ORDER\\s+BY';
 }

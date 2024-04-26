@@ -12,9 +12,10 @@ const pgClient = new pg.Client({
     port: 5432,
 });
 await pgClient.connect();
+let explain;
 let $pgClient = { async query(sql, ...args) {
     try {
-        //console.log(`\n\nSQL:`, sql, '\n\n');
+        if (explain) console.log(`\n\nSQL:`, sql, '\n\n');
         const result = await pgClient.query(sql, ...args);
         return result;
     } catch(e) {
@@ -45,7 +46,7 @@ describe(`Postgres Savepoints & Rollbacks`, function() {
                 savepointDesc: 'Rename to private',
             });
             dbApi = sqlClient.database('public');
-            const databases = await sqlClient.databases();
+            const databases = await sqlClient.databases({ force: true });
             expect(databases).to.be.an('array').that.includes('private').and.not.includes('public');
         });
 

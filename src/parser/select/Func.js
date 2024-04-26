@@ -1,5 +1,5 @@
 
-import Lexer from '@webqit/util/str/Lexer.js';
+import Lexer from '../Lexer.js';
 import { _unwrap } from '@webqit/util/str/index.js';
 import Node from '../Node.js';
 
@@ -46,7 +46,7 @@ export default class Func extends Node {
 	 */
 	static async parse(context, expr, parseCallback) {
 		if (!expr.endsWith(')') || Lexer.match(expr, [' ']).length) return;
-		const [ , name, args ] = /^(\w+)\((.+)\)$/i.exec(expr);
+		const [ , name, args ] = /^(\w+)\(([\s\S]+)\)$/i.exec(expr);
 		const instance = new this(context, name);
 		instance.args(...(await Promise.all(Lexer.split(args, [',']).map(arg => parseCallback(instance, arg.trim())))));
 		return instance;

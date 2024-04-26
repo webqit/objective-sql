@@ -30,7 +30,7 @@ export default class ColumnLevelConstraint extends Node {
 	 * @inheritdoc
 	 */
 	stringify() {
-        let sql = `${ this.CONSTRAINT_NAME?.match(/[a-zA-Z]+/i) ? `CONSTRAINT ${ this.CONSTRAINT_NAME } ` : '' }${ ['IDENTITY', 'EXPRESSION'].includes(this.ATTRIBUTE) ? 'GENERATED' : this.ATTRIBUTE }`;
+        let sql = `${ this.CONSTRAINT_NAME ? `CONSTRAINT ${ this.autoEsc(this.CONSTRAINT_NAME) } ` : '' }${ ['IDENTITY', 'EXPRESSION'].includes(this.ATTRIBUTE) ? 'GENERATED' : this.ATTRIBUTE }`;
 		if (this.ATTRIBUTE === 'REFERENCES') {
 			const basename = this.DETAIL.basename || this.BASENAME;
 			sql += ` ${ basename ? `${ basename }.` : `` }${ this.DETAIL.table } (${ this.DETAIL.columns.join(',') })`;
@@ -108,15 +108,15 @@ export default class ColumnLevelConstraint extends Node {
     /**
 	 * @property RegExp
 	 */
-	static constraintNameRe = /(?:CONSTRAINT[ ]+(\w+[ ]+)?)?/;
-	static otherRe = /(AUTO_INCREMENT|NOT[ ]+NULL)/;
-	static primaryKeyRe = /PRIMARY[ ]+KEY/;
-	static uniqueKeyRe = /UNIQUE(?:[ ]+KEY)?/;
-	static checkRe = /CHECK(?:(?:[ ]+)?\(([^\)]+)\))/;
-	static referencesRe = /REFERENCES[ ]+(?:(\w+)\.)?(\w+)(?:[ ]+)?\(([^\)]+)\)(?:[ ]+)?(.+)?$/;
-	static identityRe = /GENERATED[ ]+(ALWAYS|BY[ ]+DEFAULT)[ ]+AS[ ]IDENTITY/;
-	static expressionRe = /GENERATED[ ]+(?:(ALWAYS|BY[ ]+DEFAULT)$|ALWAYS[ ]+AS[ ]+\(([^\)]+)\)(?:[ ]+STORED)?)?/;
-	static defaultRe = /DEFAULT(?:[ ]+(\w+)|(?:[ ]+)?\(([^\)]+)\))?/;
+	static constraintNameRe = /(?:CONSTRAINT\s+(\w+\s+)?)?/;
+	static otherRe = /(AUTO_INCREMENT|NOT\s+NULL)/;
+	static primaryKeyRe = /PRIMARY\s+KEY/;
+	static uniqueKeyRe = /UNIQUE(?:\s+KEY)?/;
+	static checkRe = /CHECK(?:(?:\s+)?\(([^\)]+)\))/;
+	static referencesRe = /REFERENCES\s+(?:(\w+)\.)?(\w+)(?:\s+)?\(([^\)]+)\)(?:\s+)?([\s\S]+)?$/;
+	static identityRe = /GENERATED\s+(ALWAYS|BY\s+DEFAULT)\s+AS[ ]IDENTITY/;
+	static expressionRe = /GENERATED\s+(?:(ALWAYS|BY\s+DEFAULT)$|ALWAYS\s+AS\s+\(([^\)]+)\)(?:\s+STORED)?)?/;
+	static defaultRe = /DEFAULT(?:\s+(\w+)|(?:\s+)?\(([^\)]+)\))?/;
 
     /**
      * @property Object
@@ -139,8 +139,8 @@ export default class ColumnLevelConstraint extends Node {
 export const serializeReferentialRule = rule => typeof rule === 'object' && rule ? `${ rule.rule } (${ rule.columns.join(',') })` : rule;
 
 export const matchReferentialRule = (str, type) => {
-	if (type === 'MATCH') return str.match(/MATCH[ ]+(\w+)/i)?.[1];
-	const referentialActionRe = /(NO[ ]+ACTION|RESTRICT|CASCADE|(SET[ ]+NULL|SET[ ]+DEFAULT)(?:[ ]+\(([^\)]+)\))?)/;
-	const [ , keyword1, keyword2, keyword2Columns ] = str.match(new RegExp(`ON[ ]+${ type }[ ]+${ referentialActionRe.source }`, 'i')) || [];
+	if (type === 'MATCH') return str.match(/MATCH\s+(\w+)/i)?.[1];
+	const referentialActionRe = /(NO\s+ACTION|RESTRICT|CASCADE|(SET\s+NULL|SET\s+DEFAULT)(?:\s+\(([^\)]+)\))?)/;
+	const [ , keyword1, keyword2, keyword2Columns ] = str.match(new RegExp(`ON\\s+${ type }\\s+${ referentialActionRe.source }`, 'i')) || [];
 	return keyword2 ? (!keyword2Columns ? keyword2 : { rule: keyword2, columns: keyword2Columns.split(',').map(s => s.trim()) }) : keyword1;
 };
