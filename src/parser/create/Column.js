@@ -1,4 +1,5 @@
 
+import Lexer from '../Lexer.js';
 import { _after, _before, _unwrap, _toCamel } from '@webqit/util/str/index.js';
 import ColumnLevelConstraint from './ColumnLevelConstraint.js';
 import DataType from './DataType.js';		
@@ -10,7 +11,7 @@ export default class Column extends Node {
 	 * Instance properties
 	 */
 	NAME = '';
-	TYPE;
+	TYPE = null;
 	CONSTRAINTS = [];
 
     /**
@@ -48,8 +49,8 @@ export default class Column extends Node {
             type: this.TYPE?.toJson(),
         };
         for (const constraint of this.CONSTRAINTS) {
-            const { constraintName, attribute, detail } = constraint.toJson();
-            const equivProperty = Object.keys(ColumnLevelConstraint.attrEquivalents).find(prop => ColumnLevelConstraint.attrEquivalents[prop] === attribute);
+            const { constraintName, type, detail } = constraint.toJson();
+            const equivProperty = Object.keys(ColumnLevelConstraint.attrEquivalents).find(prop => ColumnLevelConstraint.attrEquivalents[prop] === type);
             json = { ...json, [ equivProperty ]: { constraintName, ...detail } };
         }
         return json;
@@ -60,8 +61,8 @@ export default class Column extends Node {
 	 */
 	stringify() {
         // Render constraints in the order of ColumnLevelConstraint.attrEquivalents;
-        let constraints = Object.values(ColumnLevelConstraint.attrEquivalents).map(attr => this.CONSTRAINTS.find(cnst => cnst.ATTRIBUTE === attr)).filter(c => c);
-        if (this.params.dialect === 'mysql') { constraints = constraints.filter(c => c.ATTRIBUTE !== 'REFERENCES'); }
+        let constraints = Object.values(ColumnLevelConstraint.attrEquivalents).map(type => this.CONSTRAINTS.find(cnst => cnst.TYPE === type)).filter(c => c);
+        if (this.params.dialect === 'mysql') { constraints = constraints.filter(c => c.TYPE !== 'FOREIGN_KEY'); }
         return `${ this.autoEsc(this.NAME) } ${ this.TYPE }${ constraints.length ? ` ${ constraints.join(' ') }` : '' }`;
     }
     
@@ -69,16 +70,24 @@ export default class Column extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-        let [ name ] = expr.match(/^\w+/);
+		const [ namePart, bodyPart ] = Lexer.split(expr, ['\\s+'], { useRegex: true, limit: 1 });
+        const [name] = this.parseIdent(context, namePart.trim()) || [];
         if (!name) return;
         const instance = new this(context, name);
-        let $expr = expr, constraint;
-        while($expr && (constraint = await parseCallback(instance, $expr, [ColumnLevelConstraint], { assert: false }))) {
-            instance.constraint(constraint);
-            $expr = $expr.replace(constraint.WHOLE_MATCH, '');
+        // Parse into "type" and constraints
+        const qualifier = '(CONSTRAINT\\s+.+?\\s+)?';
+        const regexes = [
+            { test: `${ qualifier }(PRIMARY[ ]+KEY|NOT[ ]+NULL|GENERATED|REFERENCES|UNIQUE(?:[ ]+KEY)?|CHECK|AUTO_INCREMENT)` },
+            { backtest: '^(?!.*\\s+(NOT|SET)\\s+$)', test: `${ qualifier }NULL` },
+            { backtest: '^(?!.*\\s+BY\\s+$)', test: `${ qualifier }DEFAULT` },
+        ];
+        const [ columnType, ...tokens ] = Lexer.split(bodyPart, regexes, { useRegex:'i', preserveDelims: true });
+        // Type
+        instance.type(await parseCallback(instance, columnType.trim(), [DataType]));
+        // Constraints
+        for (const constraint of tokens) {
+            instance.constraint(await parseCallback(instance, constraint, [ColumnLevelConstraint]));
         }
-        // Only now
-        instance.type(await parseCallback(instance, $expr/* NOTE: not expr but $expr */, [DataType]));
         return instance;
     }
 
@@ -86,14 +95,14 @@ export default class Column extends Node {
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (!json.name || !json.name.match(/[a-zA-Z]+/i)) return;
+		if (!json?.name) return;
         const instance = new this(context, json.name);
         // Constraints
         for (const property in ColumnLevelConstraint.attrEquivalents) {
             if (!json[property]) continue;
             const { constraintName, ...detail } = json[property];
-            const attrName = ColumnLevelConstraint.attrEquivalents[property];
-            instance.constraint(ColumnLevelConstraint.fromJson(instance, { constraintName, attribute: attrName, detail }));
+            const type = ColumnLevelConstraint.attrEquivalents[property];
+            instance.constraint(ColumnLevelConstraint.fromJson(instance, { constraintName, type, detail }));
         }
         // An instance with just the name is used in AlterTable.fromJson() for DROP col_name
         if (json.type) instance.type(DataType.fromJson(instance, json.type));

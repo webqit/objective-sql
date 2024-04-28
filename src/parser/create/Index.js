@@ -41,10 +41,14 @@ export default class Index extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-        let [ , type, indexName = '', columns ] = (new RegExp(this.regex.source, this.regex.flags)).exec(expr) || [];
-        if (!type) return;
-        columns = Lexer.split(_unwrap(columns, '(', ')'), [',']).map(col => col.trim());
-        return new this(context, indexName.trim(), type.toUpperCase(), columns);
+		const [ match, type, rest ] = /^((?:(?:FULLTEXT|SPATIAL)(?:\s+INDEX|\s+KEY)?)|(?:INDEX|KEY))([\s\S]+)$/i.exec(expr) || [];
+        if (!match) return;
+		const [ namePart, columnsPart ] = Lexer.split(rest, []);
+		const [name] = this.parseIdent(context, namePart.trim());
+		const columns = Lexer.split(_unwrap(columnsPart, '(', ')'), [',']).map(columnExpr => {
+			return this.parseIdent(context, columnExpr.trim())[0];
+		});
+        return new this(context, name, type.toUpperCase(), columns);
     }
 
 	/**
@@ -55,11 +59,6 @@ export default class Index extends Node {
 			return new this(context, json.indexName, json.type, json.columns);
 		}
 	}
-
-    /**
-	 * @property RegExp
-	 */
-    static regex = /^((?:(?:FULLTEXT|SPATIAL)(?:\s+INDEX|\s+KEY)?)|(?:INDEX|KEY))(\s+\w+)?(?:\s+)?(\([^\)]+\))/i;
 
     /**
      * @property Object

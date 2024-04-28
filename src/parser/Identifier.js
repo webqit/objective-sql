@@ -61,12 +61,9 @@ export default class Identifier extends Node {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-		const escChar = this.getEscChar(context);
-		const parts = Lexer.split(expr, ['.']);
-		const parses = parts.map(s => (new RegExp(`^(?:([*\\w]+)|${escChar}([^${escChar}]+)${escChar})$`)).exec(s.trim())).filter(s => s);
-		if (parses.length !== parts.length) return;
-		const get = x => x?.[1] || x?.[2];
-		return new this(context, get(parses.pop()), get(parses.pop()));
+		const [name, basename] = this.parseIdent(context, expr) || [];
+		if (!name) return;
+		return new this(context, name, basename);
 	}
 
 	/**

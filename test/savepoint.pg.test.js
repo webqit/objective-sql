@@ -13,14 +13,9 @@ const pgClient = new pg.Client({
 });
 await pgClient.connect();
 let explain;
-let $pgClient = { async query(sql, ...args) {
-    try {
-        if (explain) console.log(`\n\nSQL:`, sql, '\n\n');
-        const result = await pgClient.query(sql, ...args);
-        return result;
-    } catch(e) {
-        throw e;
-    }
+let $pgClient = { query(sql, ...args) {
+    //console.log(`\n\n\n\nSQL:`, sql);
+    return pgClient.query(sql, ...args);
 } };
 const sqlClient = new SQLClient($pgClient, { dialect: 'postgres' });
 // --------------------------
@@ -107,8 +102,8 @@ describe(`Postgres Savepoints & Rollbacks`, function() {
                     { name: 'isbn', type: 'int', identity: { always: false }, notNull: true },
                 ],
                 constraints: [
-                    { type: 'FOREIGN KEY', columns: ['author2'], references: { table: 'test0', columns: ['id'] } },
-                    { type: 'UNIQUE KEY', columns: ['author2', 'author1'] },
+                    { type: 'FOREIGN_KEY', columns: ['author2'], references: { table: 'test0', columns: ['id'] } },
+                    { type: 'UNIQUE', columns: ['author2', 'author1'] },
                 ],
                 indexes: []
             }]

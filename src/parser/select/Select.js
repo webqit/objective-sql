@@ -231,12 +231,12 @@ export default class Select extends StatementNode {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const [ selectMatch, withUac, allOrDistinct, body ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
-		if (!selectMatch) return;
+		const [ match, withUac, allOrDistinct, body ] = /^SELECT\s+(?:(WITH\s+UAC)\s+)?(ALL|DISTINCT)?([\s\S]+)$/i.exec(expr) || [];
+		if (!match) return;
 		const instance = new this(context);
 		if (withUac) instance.withFlag('WITH_UAC');
 		if (allOrDistinct) instance.withFlag(allOrDistinct);
-		const clausesMap = { from: { test: 'FROM', lookback: '^(?!.*\\s+DISTINCT\\s+$).*' }, join:JoinClause, where:'WHERE', groupBy:GroupByClause, having:'HAVING', window:WindowClause, orderBy:OrderByClause, offset:'OFFSET', limit:'LIMIT' };
+		const clausesMap = { from: { backtest: '^(?!.*\\s+DISTINCT\\s+$)', test: 'FROM' }, join:JoinClause, where:'WHERE', groupBy:GroupByClause, having:'HAVING', window:WindowClause, orderBy:OrderByClause, offset:'OFFSET', limit:'LIMIT' };
 		const { tokens: [ fieldsSpec, ...tokens ], matches: clauses } = Lexer.lex(body.trim(), Object.values(clausesMap).map(x => typeof x === 'string' || x.test ? x : x.regex), { useRegex: 'i' });
 		// SELECT_LIST
 		for (const fieldExpr of Lexer.split(fieldsSpec, [','])) {
@@ -271,9 +271,4 @@ export default class Select extends StatementNode {
 		}
 		return instance;
 	}
-
-	/**
-	 * @property String
-	 */
-	static regex = 'SELECT\\s+(?:(WITH\\s+UAC)\\s+)?(ALL|DISTINCT)?';
 }

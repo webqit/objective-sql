@@ -32,7 +32,9 @@ export default class DropTable extends StatementNode {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-		const [ , ifExists, dbName, tblName ] = /DROP\s+TABLE\s+(IF\s+EXISTS\s+)?(?:(\w+)\.)?(\w+)/i.exec(expr) || [];
+		const [ match, ifExists, namePart ] = /^DROP\s+TABLE\s+(IF\s+EXISTS\s+)?([\s\S]+)$/i.exec(expr) || [];
+		if (!match) return;
+		const [tblName, dbName] = this.parseIdent(context, namePart.trim()) || [];
 		if (!tblName) return;
 		const instance = new this(context, tblName, dbName);
 		if (ifExists) instance.withFlag('IF_EXISTS');

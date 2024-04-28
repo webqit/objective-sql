@@ -188,12 +188,12 @@ export default class Delete extends StatementNode {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const [ deleteMatch, withUac, mysqlIgnore, body ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
-		if (!deleteMatch) return;
+		const [ match, withUac, mysqlIgnore, body ] = /^DELETE(\s+WITH\s+UAC)?(?:\s+(IGNORE))?([\s\S]+)$/i.exec(expr.trim()) || [];
+		if (!match) return;
 		const instance = new this(context);
 		if (withUac) instance.withFlag('WITH_UAC');
 		if (mysqlIgnore) instance.withFlag(mysqlIgnore);
-		const clausesMap = { from: { test: 'FROM', lookback: '^(?!.*\\s+DISTINCT\\s+$).*' }, using: { test: 'USING', lookback: '^(?!.*\\s+JOIN\\s+).*$' }, join:JoinClause, where:'WHERE', orderBy:OrderByClause, limit:'LIMIT' };
+		const clausesMap = { from: { backtest: '^(?!.*\\s+DISTINCT\\s+$)', test: 'FROM' }, using: { backtest: '^(?!.*\\s+JOIN\\s+)', test: 'USING' }, join:JoinClause, where:'WHERE', orderBy:OrderByClause, limit:'LIMIT' };
 		const { tokens: [ maybeTablesSpec, ...tokens ], matches: clauses } = Lexer.lex(body.trim(), Object.values(clausesMap).map(x => typeof x === 'string' || x.test ? x : x.regex), { useRegex: 'i' });
 		// MAYBE_TABLES_SPEC (BEFORE A FROM CLAUSE) - MYSQL
 		for (const tblExpr of Lexer.split(maybeTablesSpec, [','])) {
@@ -229,9 +229,4 @@ export default class Delete extends StatementNode {
 		}
 		return instance;
 	}
-
-	/**
-	 * @property String
-	 */
-	static regex = 'DELETE(\\s+WITH\\s+UAC)?(?:\\s+(IGNORE))?';
 }

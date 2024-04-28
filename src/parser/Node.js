@@ -1,3 +1,4 @@
+import Lexer from './Lexer.js';
 
 export default class Node {
 	
@@ -39,7 +40,7 @@ export default class Node {
 	 * @returns String
 	 */
 	autoEsc(string_s) {
-		const $strings = (Array.isArray(string_s) ? string_s : [string_s]).map(s => s && !/^[*\w]+$/.test(s) ? `${this.escChar}${s}${this.escChar}` : s );
+		const $strings = (Array.isArray(string_s) ? string_s : [string_s]).map(s => s && !/^[*\w]+$/.test(s) ? `${ this.escChar }${ s.replace(new RegExp(this.escChar, 'g'), this.escChar.repeat(2)) }${ this.escChar }` : s );
 		return Array.isArray(string_s) ? $strings : $strings[0];
 	}
 
@@ -151,6 +152,26 @@ export default class Node {
 	 * @return Node
 	 */
 	static async parse(context, expr, parseCallback = null) {}
+	
+	/**
+	 * @inheritdoc
+	 */
+	static parseIdent(context, expr) {
+		const escChar = this.getEscChar(context);
+		const parts = Lexer.split(expr, ['.']);
+		const parses = parts.map(s => (new RegExp(`^(?:(\\*|[\\w]+)|(${ escChar })((?:\\2\\2|[^\\2])+)\\2)$`)).exec(s.trim())).filter(s => s);
+		if (parses.length !== parts.length) return;
+		const get = x => x?.[1] || x?.[3];
+		return [this.normalizeEscChars(context, get(parses.pop())), this.normalizeEscChars(context, get(parses.pop()))];
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static normalizeEscChars(context, expr) {
+		const escChar = this.getEscChar(context);
+		return (expr || '').replace(new RegExp(escChar + escChar, 'g'), escChar);
+	}
 	
 	/**
 	 * SAttempts to parse a string into the class instance.

@@ -1,8 +1,9 @@
-import { _after } from '@webqit/util/str/index.js';
-import { matchReferentialRule, serializeReferentialRule } from './ColumnLevelConstraint.js';
-import Node from '../Node.js';
 
-export default class TableLevelConstraint extends Node {
+import { _unwrap } from '@webqit/util/str/index.js';
+import AbstractConstraint from './abstracts/AbstractConstraint.js';
+import Lexer from '../Lexer.js';
+
+export default class TableLevelConstraint extends AbstractConstraint {
 
 	/**
 	 * Instance properties
@@ -10,22 +11,17 @@ export default class TableLevelConstraint extends Node {
 	CONSTRAINT_NAME = '';
 	TYPE = '';
 	COLUMNS = [];
-	REFERENCES = {};
-	EXPR = '';
+	DETAIL = {};
 
     /**
 	 * @constructor
 	 */
-    constructor(context, constraintName, type, columns, detail) {
+    constructor(context, constraintName, type, columns, detail = {}) {
         super(context);
         this.CONSTRAINT_NAME = constraintName;
         this.TYPE = type;
         this.COLUMNS = columns;
-		if (type === 'FOREIGN KEY') {
-			this.REFERENCES = detail;
-		} else if (type === 'CHECK') {
-			this.EXPR = detail;
-		}
+		this.DETAIL = detail;
     }
 
 	/**
@@ -41,64 +37,57 @@ export default class TableLevelConstraint extends Node {
 			...(this.CONSTRAINT_NAME ? { constraintName: this.CONSTRAINT_NAME } : {}),
 			type: this.TYPE,
 			...(this.COLUMNS.length ? { columns: this.COLUMNS } : {}),
-			// Either of the below
-			...(this.TYPE === 'FOREIGN KEY' ? { references: { ...this.REFERENCES } } : {}),
-			...(this.EXPR ? { expr: this.EXPR } : {}),
+			detail: this.DETAIL,
 		};
 	}
-	
+
 	/**
 	 * @inheritdoc
 	 */
 	stringify() {
-        let sql = `${ this.CONSTRAINT_NAME ? `CONSTRAINT ${ this.autoEsc(this.CONSTRAINT_NAME) } ` : '' }${ this.TYPE }`;
-		if (this.COLUMNS?.length && this.TYPE !== 'CHECK') { sql += ` (${ this.COLUMNS.join(',') })`; }
-		if (this.TYPE === 'FOREIGN KEY') {
-			const basename = this.REFERENCES.basename || this.BASENAME;
-			sql += ` REFERENCES ${ basename ? `${ basename }.` : `` }${ this.REFERENCES.table } (${ this.REFERENCES.columns.join(',') })`;
-			if (this.REFERENCES.matchRule) { sql += ` MATCH ${ this.REFERENCES.matchRule }`; }
-			if (this.REFERENCES.updateRule) { sql += ` ON UPDATE ${ serializeReferentialRule(this.REFERENCES.updateRule) }`; }
-			if (this.REFERENCES.deleteRule) { sql += ` ON DELETE ${ serializeReferentialRule(this.REFERENCES.deleteRule) }`; }
-		} else if (this.TYPE === 'CHECK') {
-			sql += ` (${ this.EXPR })`;
-		}
-		return sql;
+        const sql = [this.stringifyName(), this.TYPE.replace(/_/i, ' ')];
+		if (this.COLUMNS?.length && this.TYPE !== 'CHECK') sql.push(`(${ this.autoEsc(this.COLUMNS).join(',') })`);
+		if (this.TYPE === 'FOREIGN_KEY') sql.push('REFERENCES', this.stringifyReference());
+		else if (this.TYPE === 'CHECK') sql.push(this.stringifyCheck());
+		return sql.filter(s => s).join(' ');
 	}
+
 
     /**
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-		const [ idMatch, constraintName = '' ] = (new RegExp(`^${ this.constraintNameRe.source }`, 'i')).exec(expr) || [];
-		if (idMatch) { expr = _after(expr, idMatch); }
-		// PRIMARY KEY
-		const [ primaryKeyMatch, columns ] = (new RegExp(`^${ this.primaryKeyRe.source }`, 'i')).exec(expr) || [];
-		if (primaryKeyMatch) return new this(context, constraintName.trim(), 'PRIMARY KEY', columns.split(',').map(s => s.trim()), null);
-		// UNIQUE KEY
-		const [ uniqueKeyMatch, _columns ] = (new RegExp(`^${ this.uniqueKeyRe.source }`, 'i')).exec(expr) || [];
-		if (uniqueKeyMatch) return new this(context, constraintName.trim(), 'UNIQUE', _columns.split(',').map(s => s.trim()), null);
-		// CHECK
-		const [ checkMatch, _expr ] = (new RegExp(`^${ this.checkRe.source }`, 'i')).exec(expr) || [];
-		if (checkMatch) return new this(context, constraintName.trim(), 'CHECK', [], _expr);
-		// FOREIGN KEY
-		const [ foreignKeyReMatch, localColumns, referencedDb, referencedTable, referencedColumns, referentialRules = '' ] = (new RegExp(`^${ this.foreignKeyRe.source }`, 'i')).exec(expr) || [];
-		if (foreignKeyReMatch) return new this(context, constraintName.trim(), 'FOREIGN KEY', localColumns.split(',').map(s => s.trim()), {
-			basename: referencedDb,
-			table: referencedTable,
-			columns: referencedColumns.split(',').map(s => s.trim()),
-			matchRule: matchReferentialRule(referentialRules, 'MATCH'),
-			updateRule: matchReferentialRule(referentialRules, 'UPDATE'),
-			deleteRule: matchReferentialRule(referentialRules, 'DELETE'),
+		const parseColumns = columnsExpr => Lexer.split(_unwrap(columnsExpr, '(', ')'), [',']).map(columnExpr => {
+			return this.parseIdent(context, columnExpr.trim())[0];
 		});
+		// Splice out the name part of the expression
+		const { constraintName = '', expr: $expr } = this.parseName(context, expr);
+		if (!$expr) return; // Not a constraint
+		const [ $$expr, columnsExpr, ...rest ] = Lexer.split($expr, []);
+		// PRIMARY KEY
+		if (/^PRIMARY\s+KEY/i.test($$expr)) {
+			return new this(context, constraintName.trim(), 'PRIMARY_KEY', parseColumns(columnsExpr));
+		}
+		// UNIQUE KEY]
+		if (/^UNIQUE/i.test($$expr)) {
+			return new this(context, constraintName.trim(), 'UNIQUE', parseColumns(columnsExpr));
+		}
+		// REFERENCE
+		if (/^FOREIGN\s+KEY/i.test($expr)) {
+			return new this(context, constraintName, 'FOREIGN_KEY', parseColumns(columnsExpr), this.parseReference(context, rest.join('').trim().replace(/^REFERENCES\s+/i, '')));
+		}
+		// CHECK
+		if (/^CHECK/i.test($expr)) {
+			return new this(context, constraintName, 'CHECK', [], this.parseCheck(columnsExpr.replace(/^CHECK\s+/i, '')));
+		}
     }
 
 	/**
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (json.constraintName || (typeof json.type === 'string' && json.type.match(/PRIMARY\s+KEY|UNIQUE(\s+KEY)?|CHECK|FOREIGN\s+KEY/i))) {
-			return new this(context, json.constraintName, json.type.replace(/UNIQUE\s+KEY/i, 'UNIQUE'), json.columns, json.references || json.expr);
-		}
+		if (!json.constraintName && !(typeof json.type === 'string' && json.type.match(/PRIMARY_KEY|UNIQUE|CHECK|FOREIGN_KEY/i))) return;
+		return new this(context, json.constraintName, json.type.replace(/UNIQUE_KEY/i, 'UNIQUE'), json.columns, json.references/*from user-defined schema*/ || json.expr/*from user-defined schema*/ || json.detail/*the standard*/ );
 	}
 
 	/**
@@ -108,19 +97,9 @@ export default class TableLevelConstraint extends Node {
 		return new this(
 			columnLevelConstraint.CONTEXT/*Column*/.CONTEXT/*Create|AlterTable*/,
 			columnLevelConstraint.CONSTRAINT_NAME,
-			columnLevelConstraint.ATTRIBUTE === 'REFERENCES' ? 'FOREIGN KEY' : columnLevelConstraint.ATTRIBUTE,
+			columnLevelConstraint.TYPE,
 			[columnName],
-			columnLevelConstraint.ATTRIBUTE === 'CHECK' ? columnLevelConstraint.DETAIL.expr : columnLevelConstraint.DETAIL,
+			columnLevelConstraint.DETAIL,
 		);
 	}
-
-    /**
-	 * @property RegExp
-	 */
-	static constraintNameRe = /(?:CONSTRAINT\s+(\w+\s+)?)?/;
-	static primaryKeyRe = /PRIMARY\s+KEY(?:\s+)?\(([^\)]+)\)/;
-	static uniqueKeyRe = /UNIQUE(?:\s+KEY)?(?:\s+)?\(([^\)]+)\)/;
-	static checkRe = /CHECK(?:(?:\s+)?\(([^\)]+)\))/;
-	static foreignKeyRe = /FOREIGN\s+KEY(?:\s+)?\(([^\)]+)\)(?:\s+)?REFERENCES\s+(?:(\w+)\.)?(\w+)(?:\s+)?\(([^\)]+)\)(?:\s+)?([\s\S]+)?$/;
-
 }

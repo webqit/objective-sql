@@ -30,7 +30,9 @@ export default class DropDatabase extends StatementNode {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr) {
-		const [ , ifExists, dbName ] = /DROP\s+DATABASE\s+(IF\s+EXISTS\s+)?(\w+)/i.exec(expr) || [];
+		const [ match, ifExists, namePart ] = /^DROP\s+DATABASE\s+(IF\s+EXISTS\s+)?(.+)$/i.exec(expr) || [];
+		if (!match) return;
+		const [dbName] = this.parseIdent(context, namePart.trim()) || [];
 		if (!dbName) return;
 		const instance = new this(context, dbName);
 		if (ifExists) instance.withFlag('IF_EXISTS');

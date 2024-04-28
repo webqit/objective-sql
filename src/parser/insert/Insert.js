@@ -106,8 +106,8 @@ export default class Insert extends StatementNode {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const [insertMatch, withUac, mysqlIgnore, body] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
-		if (!insertMatch) return;
+		const [ match, withUac, mysqlIgnore, body ] = /^INSERT(\s+WITH\s+UAC)?(?:\s+(IGNORE))?(?:\s+INTO)?([\s\S]+)$/i.exec(expr) || [];
+		if (!match ) return;
 		const { tokens: [ tableSpec, payloadSpec, onConflictSpec ], matches: [insertType, onConflictClause] } = Lexer.lex(body.trim(), ['(VALUES|VALUE|SET|SELECT)', 'ON\\s+(DUPLICATE\\s+KEY|CONFLICT)'], { useRegex:'i' });
 		const instance = new this(context);
 		if (withUac) instance.withFlag('WITH_UAC');
@@ -137,9 +137,4 @@ export default class Insert extends StatementNode {
 		if (onConflictClause) { instance.onConflict(await parseCallback(instance, `${ onConflictClause } ${ onConflictSpec }`, [OnConflictClause])); }
 		return instance;
 	}
-
-	/**
-	 * @property String
-	 */
-	static regex = 'INSERT(\\s+WITH\\s+UAC)?(?:\\s+(IGNORE))?(?:\\s+INTO)?';
 }

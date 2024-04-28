@@ -27,11 +27,6 @@ export default class CreateTable extends StatementNode {
 	}
 
 	/**
-	 * @property String
-	 */
-	get BASENAME() { return this.CONTEXT/*Database*/.name; }
-
-	/**
 	 * Adds a column to the schema,
 	 * 
 	 * @param Column column
@@ -80,7 +75,7 @@ export default class CreateTable extends StatementNode {
 		const constraints = this.CONSTRAINTS.slice(0);
 		if (this.params.dialect === 'mysql') {
 			constraints.push(...this.COLUMNS.reduce((constraints, col) => {
-				const constraint = col.CONSTRAINTS.find(c => c.ATTRIBUTE === 'REFERENCES');
+				const constraint = col.CONSTRAINTS.find(c => c.TYPE === 'FOREIGN_KEY');
 				if (constraint) return constraints.concat(TableLevelConstraint.fromColumnLevelConstraint(constraint, col.NAME));
 				return constraints;
 			}, []));
@@ -94,13 +89,14 @@ export default class CreateTable extends StatementNode {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		if (expr.trim().substr(0, 6).toUpperCase() !== 'CREATE') return;
-		const [ create, body ] = Lexer.split(expr, [], { limit: 2 });
-		const [ , ifNotExists, dbName, tblName ] = /CREATE\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?(?:(\w+)\.)?(\w+)/i.exec(create) || [];
+		const [ match, ifNotExists, rest ] = /^CREATE\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?([\s\S]+)$/i.exec(expr.trim()) || [];
+		const [ namePart, bodyPart ] = Lexer.split(rest, [], { limit: 2 });
+		if (!match) return;
+		const [tblName, dbName] = this.parseIdent(context, namePart.trim()) || [];
 		if (!tblName) return;
-		const instance = new this(context, tblName, dbName);
+		const instance = new this(context, tblName, dbName || context/*Database*/?.name);
 		if (ifNotExists) instance.withFlag('IF_NOT_EXISTS');
-		const defs = await Promise.all(Lexer.split(_unwrap(body, '(', ')'), [',']).map(def => {
+		const defs = await Promise.all(Lexer.split(_unwrap(bodyPart, '(', ')'), [',']).map(def => {
 			return parseCallback(instance, def.trim(), [TableLevelConstraint,Index,Column]); // Note that Column must come last
 		}));
 		for (const def of defs) {
@@ -116,7 +112,7 @@ export default class CreateTable extends StatementNode {
 	 */
 	static fromJson(context, json, flags = []) {
 		if (!json.name || !json.name.match(/[a-zA-Z]+/i)) return;
-		const instance = (new this(context, json.name, json.basename || context?.name)).withFlag(...flags);
+		const instance = (new this(context, json.name, json.basename || context/*Database*/?.name)).withFlag(...flags);
 		// Lists
 		instance.column(...json.columns);
 		instance.constraint(...(json.constraints || []));

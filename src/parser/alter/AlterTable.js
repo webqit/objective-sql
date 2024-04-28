@@ -1,6 +1,5 @@
 
 import Lexer from '../Lexer.js';
-import { _after } from '@webqit/util/str/index.js';
 import { _isObject, _isFunction } from '@webqit/util/js/index.js';
 import StatementNode from '../StatementNode.js';
 import CreateTable from '../create/CreateTable.js';
@@ -97,12 +96,12 @@ export default class AlterTable extends StatementNode {
 		for (const action of this.ACTIONS) {
 			// RENAME TO...
 			if (action.TYPE === 'RENAME') {
-				stmts0.push(`RENAME TO ${ action.ARGUMENT }`);
+				stmts0.push(`RENAME TO ${ this.autoEsc(action.ARGUMENT) }`);
 				continue;
 			}
 			// RELOCATE TO...
 			if (action.TYPE === 'RELOCATE') {
-				stmts0.push(`SET SCHEMA ${ action.ARGUMENT }`);
+				stmts0.push(`SET SCHEMA ${ this.autoEsc(action.ARGUMENT) }`);
 				continue;
 			}
 			// DROP
@@ -114,7 +113,7 @@ export default class AlterTable extends StatementNode {
 					stmts1.push(`DROP PRIMARY KEY`);
 				} else {
 					const nameKey = nodeKind === 'CONSTRAINT' ? 'CONSTRAINT_NAME' : (nodeKind === 'INDEX' ? 'INDEX_NAME' : 'NAME');
-					stmts1.push(`DROP ${ this.params.dialect === 'mysql' && nodeKind === 'CONSTRAINT' && action.ARGUMENT.TYPE/* being a table-level constraint */ === 'FOREIGN KEY' ? 'FOREIGN KEY' : nodeKind }${ ifExists ? ' IF EXISTS' : '' } ${ action.ARGUMENT[nameKey] }${ $flags.length ? ` ${ $flags[0] }` : '' }`);
+					stmts1.push(`DROP ${ this.params.dialect === 'mysql' && nodeKind === 'CONSTRAINT' && action.ARGUMENT.TYPE/* being a table-level constraint */ === 'FOREIGN_KEY' ? 'FOREIGN KEY' : nodeKind }${ ifExists ? ' IF EXISTS' : '' } ${ this.autoEsc(action.ARGUMENT[nameKey]) }${ $flags.length ? ` ${ $flags[0] }` : '' }`);
 				}
 				continue;
 			}
@@ -124,7 +123,7 @@ export default class AlterTable extends StatementNode {
 				const [ , first, afterCol ] = /(FIRST)|AFTER\s+(\w+)/i.exec(action.FLAGS?.join(' ') || '') || [];
 				stmts1.push(`ADD ${ action.ARGUMENT instanceof Column ? `COLUMN ` : '' }${ ifNotExists ? 'IF NOT EXISTS ' : '' }${ action.ARGUMENT }${ first ? ' FIRST' : (afterCol ? ` AFTER ${ afterCol.toLowerCase() }` : '') }`);
 				if (this.params.dialect === 'mysql' && action.ARGUMENT instanceof Column) {
-					const constraint = action.ARGUMENT.CONSTRAINTS.find(c => c.ATTRIBUTE === 'REFERENCES');
+					const constraint = action.ARGUMENT.CONSTRAINTS.find(c => c.TYPE === 'FOREIGN_KEY');
 					if (constraint) stmts1.push(`ADD ${ TableLevelConstraint.fromColumnLevelConstraint(constraint, action.ARGUMENT.NAME) }`);
 				}
 				continue;
@@ -135,7 +134,7 @@ export default class AlterTable extends StatementNode {
 				const { REFERENCE:reference, ARGUMENT:subAction } = action;
 				// RENAME
 				if (subAction.TYPE === 'RENAME') {
-					stmts1.push(`RENAME ${ reference.kind } ${ reference.name } TO ${ subAction.ARGUMENT }`);
+					stmts1.push(`RENAME ${ reference.kind } ${ this.autoEsc(reference.name) } TO ${ this.autoEsc(subAction.ARGUMENT) }`);
 					continue;
 				}
 				if (reference.kind === 'COLUMN') {
@@ -143,26 +142,26 @@ export default class AlterTable extends StatementNode {
 						if (subAction.TYPE === 'ADD') {
 							stmts1.push(`ADD ${ TableLevelConstraint.fromColumnLevelConstraint(subAction.ARGUMENT, reference.name) }`);
 						} else {
-							let dropStatement = dropTarget => `DROP CONSTRAINT ${ dropTarget.CONSTRAINT_NAME }`;
-							if (this.params.dialect === 'mysql' && ['PRIMARY KEY', 'REFERENCES'].includes(dropTarget.ATTRIBUTE)) {
-								dropStatement = dropTarget => dropTarget.ATTRIBUTE === 'PRIMARY KEY' ? `DROP PRIMARY KEY` : `DROP FOREIGN KEY ${ dropTarget.CONSTRAINT_NAME }`;
+							let dropStatement = dropTarget => `DROP CONSTRAINT ${ this.autoEsc(dropTarget.CONSTRAINT_NAME) }`;
+							if (this.params.dialect === 'mysql' && ['PRIMARY_KEY', 'FOREIGN_KEY'].includes(dropTarget.TYPE)) {
+								dropStatement = dropTarget => dropTarget.TYPE === 'PRIMARY_KEY' ? `DROP PRIMARY KEY` : `DROP FOREIGN KEY ${ this.autoEsc(dropTarget.CONSTRAINT_NAME) }`;
 							}
 							if (subAction.TYPE === 'DROP') {
 								stmts1.push(dropStatement(subAction.ARGUMENT));
 							} else if (subAction.TYPE === 'SET') {
-								stmts1.push(dropStatement({ ATTRIBUTE: subAction.ARGUMENT.ATTRIBUTE, CONSTRAINT_NAME: reference.name })); // We process DROP first, then ADD
+								stmts1.push(dropStatement({ TYPE: subAction.ARGUMENT.TYPE, CONSTRAINT_NAME: reference.name })); // We process DROP first, then ADD
 								stmts1.push(`ADD ${ TableLevelConstraint.fromColumnLevelConstraint(subAction.ARGUMENT, reference.name) }`);
 							}
 						}
 					};
 					const asLiterals = () => {
-						stmts1.push(`ALTER COLUMN ${ reference.name } ${ subAction.TYPE } ${ subAction.ARGUMENT }`);
+						stmts1.push(`ALTER COLUMN ${ this.autoEsc(reference.name) } ${ subAction.TYPE } ${ subAction.ARGUMENT }`);
 					};
 					if (this.params.dialect === 'mysql') {
 						if (subAction.ARGUMENT instanceof ColumnLevelConstraint) {
-							if (subAction.ARGUMENT.ATTRIBUTE === 'DEFAULT') {
-								stmts1.push(`ALTER COLUMN ${ reference.name } ${ subAction.TYPE === 'DROP' ? 'DROP' : 'SET' } ${ subAction.ARGUMENT }`);
-							} else if (['PRIMARY KEY', 'REFERENCES', 'UNIQUE'].includes(subAction.ARGUMENT.ATTRIBUTE)) {
+							if (subAction.ARGUMENT.TYPE === 'DEFAULT') {
+								stmts1.push(`ALTER COLUMN ${ this.autoEsc(reference.name) } ${ subAction.TYPE === 'DROP' ? 'DROP' : 'SET' } ${ subAction.ARGUMENT }`);
+							} else if (['PRIMARY_KEY', 'FOREIGN_KEY', 'UNIQUE'].includes(subAction.ARGUMENT.TYPE)) {
 								asTableLevelConstraint();
 							} else {
 								asLiterals();
@@ -172,16 +171,16 @@ export default class AlterTable extends StatementNode {
 						}
 					} else {
 						if (subAction.ARGUMENT instanceof DataType) {
-							stmts1.push(`ALTER COLUMN ${ reference.name } SET DATA TYPE ${ subAction.ARGUMENT }`);
+							stmts1.push(`ALTER COLUMN ${ this.autoEsc(reference.name) } SET DATA TYPE ${ subAction.ARGUMENT }`);
 						} else if (subAction.ARGUMENT instanceof ColumnLevelConstraint) {
-							if (['IDENTITY', 'EXPRESSION', 'DEFAULT', 'NOT NULL'].includes(subAction.ARGUMENT.ATTRIBUTE)) {
-								if (subAction.TYPE === 'DROP' || (subAction.ARGUMENT.ATTRIBUTE === 'IDENTITY' && subAction.TYPE === 'SET')) {
-									stmts1.push(`ALTER COLUMN ${ reference.name } DROP ${ subAction.ARGUMENT.ATTRIBUTE }${ subAction.TYPE === 'DROP' && ['IDENTITY', 'EXPRESSION'].includes(subAction.ARGUMENT.ATTRIBUTE) && action.FLAGS?.includes('IF_EXISTS') ? ` IF EXISTS` : '' }`);
+							if (['IDENTITY', 'EXPRESSION', 'DEFAULT', 'NOT_NULL'].includes(subAction.ARGUMENT.TYPE)) {
+								if (subAction.TYPE === 'DROP' || (subAction.ARGUMENT.TYPE === 'IDENTITY' && subAction.TYPE === 'SET')) {
+									stmts1.push(`ALTER COLUMN ${ this.autoEsc(reference.name) } DROP ${ subAction.ARGUMENT.TYPE.replace(/_/, ' ') }${ subAction.TYPE === 'DROP' && ['IDENTITY', 'EXPRESSION'].includes(subAction.ARGUMENT.TYPE) && action.FLAGS?.includes('IF_EXISTS') ? ` IF EXISTS` : '' }`);
 								}
-								if (['ADD', 'SET'].includes(subAction.TYPE) && subAction.ARGUMENT.ATTRIBUTE !== 'EXPRESSION'/* Can't add a generated expression to a column after definition */) {
-									stmts1.push(`ALTER COLUMN ${ reference.name } ${ subAction.ARGUMENT.ATTRIBUTE === 'IDENTITY' ? 'ADD' : 'SET' } ${ subAction.ARGUMENT }`);
+								if (['ADD', 'SET'].includes(subAction.TYPE) && subAction.ARGUMENT.TYPE !== 'EXPRESSION'/* Can't add a generated expression to a column after definition */) {
+									stmts1.push(`ALTER COLUMN ${ this.autoEsc(reference.name) } ${ subAction.ARGUMENT.TYPE === 'IDENTITY' ? 'ADD' : 'SET' } ${ subAction.ARGUMENT }`);
 								}
-							} else if (['PRIMARY KEY', 'REFERENCES', 'UNIQUE', 'CHECK'].includes(subAction.ARGUMENT.ATTRIBUTE)) {
+							} else if (['PRIMARY_KEY', 'FOREIGN_KEY', 'UNIQUE', 'CHECK'].includes(subAction.ARGUMENT.TYPE)) {
 								asTableLevelConstraint();
 							} else {
 								asLiterals();
@@ -193,13 +192,13 @@ export default class AlterTable extends StatementNode {
 					continue;
 				}
 				if (typeof subAction.ARGUMENT === 'string') {
-					stmts1.push(`ALTER ${ reference.kind } ${ reference.name } ${ subAction.ARGUMENT }`);
+					stmts1.push(`ALTER ${ reference.kind } ${ this.autoEsc(reference.name) } ${ subAction.ARGUMENT }`);
 					continue;
 				}
 				// From constraints diffing
-				let dropStatement = `DROP ${ reference.kind } ${ reference.name }`;
-				if (this.params.dialect === 'mysql' && ['PRIMARY KEY', 'FOREIGN KEY'].includes(subAction.ARGUMENT.TYPE/* being a table-level constraint */)) {
-					dropStatement = subAction.ARGUMENT.ATTRIBUTE === 'PRIMARY KEY' ? `DROP PRIMARY KEY` : `DROP FOREIGN KEY ${ reference.name }`;
+				let dropStatement = `DROP ${ reference.kind } ${ this.autoEsc(reference.name) }`;
+				if (this.params.dialect === 'mysql' && ['PRIMARY_KEY', 'FOREIGN_KEY'].includes(subAction.ARGUMENT.TYPE/* being a table-level constraint */)) {
+					dropStatement = subAction.ARGUMENT.TYPE === 'PRIMARY_KEY' ? `DROP PRIMARY KEY` : `DROP FOREIGN KEY ${ this.autoEsc(reference.name) }`;
 				}
 				stmts1.push(dropStatement, `ADD ${ subAction.ARGUMENT }`);
 				continue;
@@ -212,37 +211,42 @@ export default class AlterTable extends StatementNode {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const [ match, ifExists, dbName, tblName ] = /ALTER\s+TABLE\s+(IF\s+EXISTS\s+)?(?:(\w+)\.)?(\w+)/i.exec(expr) || [];
+		const [ match, ifExists, rest ] = /^ALTER\s+TABLE\s+(IF\s+EXISTS\s+)?([\s\S]+)$/i.exec(expr.trim()) || [];
+		if (!match) return;
+		const [ namePart, bodyPart ] = Lexer.split(rest, ['\\s+'], { useRegex: true, limit: 1 });
+		const [tblName, dbName] = this.parseIdent(context, namePart.trim()) || [];
 		if (!tblName) return;
-		const instance = new this(context, tblName, dbName);
+		const instance = new this(context, tblName, dbName || context/*Database*/?.name);
 		if (ifExists) instance.withFlag('IF_EXISTS');
 		// ----------
 		const regex = name => new RegExp(`${ this[ name ].source }`, 'i');
-		const stmts = Lexer.split(_after(expr, match), [',']).map(s => s.trim());
+		const stmts = Lexer.split(bodyPart, [',']).map(s => s.trim());
 		for (const stmt of stmts) {
 			// RENAME ... TO ...
-			const [ renameMatch, nodeKind_a, nodeName_a, newName_a ] = regex('renameRe').exec(stmt) || [];
+			const [ renameMatch, nodeKind_a, nodeNameUnescaped_a, /*esc*/, nodeNameEscaped_a, newNodeNameUnescaped_a, /*esc*/, newNodeNameEscaped_a ] = regex('renameRe').exec(stmt) || [];
 			if (renameMatch) {
-				if (nodeName_a) {
+				const nodeName = this.normalizeEscChars(instance, nodeNameUnescaped_a || nodeNameEscaped_a);
+				const newNodeName = this.normalizeEscChars(instance, newNodeNameUnescaped_a || newNodeNameEscaped_a);
+				if (nodeName) {
 					const nodeKind = /KEY|INDEX/i.test(nodeKind_a) ? 'INDEX' : nodeKind_a.toUpperCase();
-					const reference = { kind: nodeKind, name: nodeName_a };
-					instance.alter(reference, a => a.renameTo(newName_a));
+					const reference = { kind: nodeKind, name: nodeName };
+					instance.alter(reference, a => a.renameTo(newNodeName));
 				} else {
-					instance.renameTo(newName_a);
+					instance.renameTo(newNodeName);
 				}
 				continue;
 			}
 			// RELOCATE ... TO ...
-			const [ relocateMatch, newSchema ] = regex('relocateRe').exec(stmt) || [];
+			const [ relocateMatch, newSchemaUnescaped, /*esc*/, newSchemaEscaped ] = regex('relocateRe').exec(stmt) || [];
 			if (relocateMatch) {
-				instance.relocateTo(newSchema);
+				instance.relocateTo(this.normalizeEscChars(instance, newSchemaUnescaped || newSchemaEscaped));
 				continue;
 			}
 			// DROP
-			const [ dropMatch, nodeKind_b = 'COLUMN', ifExists_b/* postgresql-specific */, nodeName_b, flags_b/* postgresql-specific */ ] = regex('dropRe').exec(stmt) || [];
+			const [ dropMatch, nodeKind_b = 'COLUMN', ifExists_b/* postgresql-specific */, nodeNameUnescaped_b, /*esc*/, nodeNameEscaped_b, flags_b/* postgresql-specific */ ] = regex('dropRe').exec(stmt) || [];
 			if (dropMatch) {
 				const nodeKind = /CONSTRAINT|PRIMARY\s+KEY|FOREIGN\s+KEY|CHECK/i.test(nodeKind_b) ? 'CONSTRAINT' : (/INDEX|KEY/i.test(nodeKind_b) ? 'INDEX' : 'COLUMN');
-				const nodeName = nodeName_b || nodeKind_b.trim().replace(/\s+KEY/i, '').toUpperCase()/* when, in mysql, it's just: drop PRIMARY KEY */;
+				const nodeName = this.normalizeEscChars(instance, nodeNameUnescaped_b || nodeNameEscaped_b) || nodeKind_b.trim().replace(/\s+KEY/i, '').toUpperCase()/* when, in mysql, it's just: drop PRIMARY KEY */;
 				const argument = nodeKind === 'CONSTRAINT' ? new TableLevelConstraint(instance, nodeName, nodeKind_b.trim().toUpperCase(), []/*columns*/, null) : (
 					nodeKind === 'INDEX' ? new Index(instance, nodeName, nodeKind_b.trim().toUpperCase(), []/*columns*/) : new Column(instance, nodeName, null, [])
 				);
@@ -253,15 +257,16 @@ export default class AlterTable extends StatementNode {
 			// ADD
 			const [ addMatch, columnKeyword_c, ifColumnNotExists_c, spec_c ] = regex('addRe').exec(stmt) || [];
 			if (addMatch) {
-				const [ , $spec, $flags ] = spec_c.match(/([\s\S]+)\s+(FIRST|AFTER\s+\w+)$/i) || [ , spec_c ];
-				const argument = await parseCallback(instance, $spec.trim(), columnKeyword_c ? [Column] : [TableLevelConstraint, Index, Column]); // Note that Column must come last
+				const [ , $spec, $flags ] = spec_c.match(/([\s\S]+)\s+(FIRST|AFTER\s+.+)$/i) || [ , spec_c ];
+				const argument = await parseCallback(instance, $spec.trim(), columnKeyword_c ? [Column] : [TableLevelConstraint,Index,Column]); // Note that Column must come last
 				const flags = [ifColumnNotExists_c, $flags].filter(s => s).map(s => s.trim().replace(/\s+/g, '_').toUpperCase());
 				instance.add(argument).withFlag(...flags);
 				continue;
 			}
 			// ALTER
-			const [ alterMatch, nodeKind_d, nodeName_d, subAction_d = '', argument_d = '', ifNodeExits_d, constraintOrIndexAttr_d ] = regex('alterRe').exec(stmt) || [];
+			const [ alterMatch, nodeKind_d, nodeNameUnescaped_d, /*esc*/, nodeNameEscaped_d, subAction_d = '', argument_d = '', ifNodeExits_d, constraintOrIndexAttr_d ] = regex('alterRe').exec(stmt) || [];
 			if (alterMatch) {
+				const nodeName = this.normalizeEscChars(instance, nodeNameUnescaped_d || nodeNameEscaped_d);
 				const nodeKind = /CONSTRAINT|CHECK/i.test(nodeKind_d) ? 'CONSTRAINT' : (/INDEX|KEY/i.test(nodeKind_d) ? 'INDEX' : 'COLUMN');
 				let subAction = subAction_d.toUpperCase() || 'SET', flags = ifNodeExits_d ? ['IF_EXISTS'] : [], $ = {};
 				let argumentNew;
@@ -283,9 +288,11 @@ export default class AlterTable extends StatementNode {
 					argumentNew = constraintOrIndexAttr_d;
 				}
 				// Push
-				const reference = { kind: nodeKind, name: nodeName_d };
+				const reference = { kind: nodeKind, name: nodeName };
 				instance.alter(reference, a => a[subAction.toLowerCase()](argumentNew)).withFlag(...flags);
+				continue;
 			}
+			throw new SyntaxError(stmt);
 		}
 		return instance;
 	}
@@ -295,7 +302,7 @@ export default class AlterTable extends StatementNode {
 	 */
 	static fromJson(context, json, flags = []) {
 		if (!json.name) return;
-		const instance = (new this(context, json.name, json.basename, json.jsonBefore)).withFlag(...flags);
+		const instance = (new this(context, json.name, json.basename || context/*Database*/?.name, json.jsonBefore)).withFlag(...flags);
 		for (const action of json.actions) {
 			instance.ACTIONS.push(Action.fromJson(instance, action));
 		}
@@ -303,8 +310,8 @@ export default class AlterTable extends StatementNode {
 	}
 
 	static fromDiffing(context, jsonA, jsonB, flags = []) {
-		if (!jsonA.name) throw new Error(`Could not assertain table1 name or table1 name invalid.`);
-		if (!jsonB.name) throw new Error(`Could not assertain table2 name or table2 name invalid.`);
+		if (!jsonA?.name) throw new Error(`Could not assertain table1 name or table1 name invalid.`);
+		if (!jsonB?.name) throw new Error(`Could not assertain table2 name or table2 name invalid.`);
 		const instance = (new this(context, jsonA.name, jsonA.basename || context/* databaseApi */?.name, jsonA)).withFlag(...flags);
 		// RENAME TO...
 		if (jsonB.name !== jsonA.name) {
@@ -340,7 +347,7 @@ export default class AlterTable extends StatementNode {
 								const attrEquivalent = ColumnLevelConstraint.attrEquivalents[property];
 								if (attrEquivalent) {
 									const { constraintName, ...detail } = node[property];
-									return ColumnLevelConstraint.fromJson(instance, { constraintName, attribute: attrEquivalent, detail });
+									return ColumnLevelConstraint.fromJson(instance, { constraintName, type: attrEquivalent, detail });
 								}
 								throw new Error(`Unkown attribute: ${ property }.`);
 							};
@@ -403,11 +410,11 @@ export default class AlterTable extends StatementNode {
     /**
 	 * @property RegExp
 	 */
-	static renameRe = /^RENAME\s+(?:(?:(COLUMN|CONSTRAINT|INDEX|KEY)\s+)?(\w+)\s+)?(?:TO|AS)\s+(\w+)/;
-	static relocateRe = /^SET\s+SCHEMA\s+(\w+)$/;
+	static renameRe = /^RENAME\s+(?:(?:(COLUMN|CONSTRAINT|INDEX|KEY)\s+)?(?:(\w+)|([`"])((?:\3\3|[^\3])+)\3)\s+)?(?:TO|AS)\s+(?:(\w+)|([`"])([^\6]+)\6)$/;
+	static relocateRe = /^SET\s+SCHEMA\s+(?:(\w+)|([`"])((?:\2\2|[^\3])+)\2)$/;
+	static dropRe = /^DROP\s+(COLUMN\s+|CONSTRAINT\s+|PRIMARY\s+KEY|FOREIGN\s+KEY\s+|CHECK\s+|INDEX\s+|KEY\s+)?(IF\s+EXISTS\s+)?(?:(\w+)|([`"])((?:\4\4|[^\3])+)\4)?(?:\s+(RESTRICT|CASCADE))?$/;
 	static addRe = /^ADD\s+(COLUMN\s+)?(IF\s+NOT\s+EXISTS\s+)?([\s\S]+)$/;
-	static dropRe = /^DROP\s+(COLUMN\s+|CONSTRAINT\s+|PRIMARY\s+KEY|FOREIGN\s+KEY\s+|CHECK\s+|INDEX\s+|KEY\s+)?(IF\s+EXISTS\s+)?(\w+)?(?:\s+(RESTRICT|CASCADE))?/;
-	static alterRe = /^ALTER\s+(?:(COLUMN|CONSTRAINT|CHECK|INDEX|KEY)\s+)?(\w+)\s+(?:(ADD|DROP|(?:SET(?:\s+DATA\s+)?)?(?:TYPE)?)\s+([\s\S]+)(IF\s+EXISTS)?$|(VISIBLE|(?:NOT\s+)?INVISIBLE|NOT\s+ENFORCED|ENFORCED|DEFERRABLE|NOT\s+DEFERRABLE|INITIALLY\s+DEFERRED|INITIALLY\s+IMMEDIATE))/;
+	static alterRe = /^ALTER\s+(?:(COLUMN|CONSTRAINT|CHECK|INDEX|KEY)\s+)?(?:(\w+)|([`"])((?:\3\3|[^\3])+?)\3)\s+(?:(ADD|DROP|(?:SET\s+DATA\s+)?TYPE|SET)\s+(.+)(IF\s+EXISTS)?$|(VISIBLE|(?:NOT\s+)?INVISIBLE|NOT\s+ENFORCED|ENFORCED|DEFERRABLE|NOT\s+DEFERRABLE|INITIALLY\s+DEFERRED|INITIALLY\s+IMMEDIATE))/;
 }
 
 function makeSets(a, b, nameKey) {

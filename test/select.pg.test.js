@@ -12,7 +12,7 @@ const pgClient = new pg.Client({
     port: 5432,
 });
 await pgClient.connect();
-const dd = `'kk' || table_schema || '...' || case WHEN 4=3 THEN '5' ELSE '--...' || 6 END`;
+const dd = `'kk' || "table_schema" || '...' || case WHEN 4=3 THEN '5' ELSE '--...' || 6 END`;
 //console.log('..........', await pgClient.query(`SELECT ${ dd } dd, (CASE WHEN 4=3 THEN 5 ELSE 6 END)f_f from information_schema.tables limit 1`));
 
 

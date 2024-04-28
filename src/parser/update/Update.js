@@ -155,8 +155,8 @@ export default class Update extends StatementNode {
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
-		const [updateMatch, withUac, mysqlIgnore, body] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
-		if (!updateMatch) return;
+		const [ match, withUac, mysqlIgnore, body ] = /^UPDATE(\s+WITH\s+UAC)?(?:\s+(IGNORE))?([\s\S]+)$/i.exec(expr) || [];
+		if (!match) return;
 		const instance = new this(context);
 		if (withUac) instance.withFlag('WITH_UAC');
 		if (mysqlIgnore) instance.withFlag(mysqlIgnore);
@@ -192,9 +192,4 @@ export default class Update extends StatementNode {
 		}
 		return instance;
 	}
-
-	/**
-	 * @property String
-	 */
-	static regex = 'UPDATE(\\s+WITH\\s+UAC)?(?:\\s+(IGNORE))?';
 }
