@@ -161,8 +161,8 @@ export default class Node {
 		const parts = Lexer.split(expr, ['.']);
 		const parses = parts.map(s => (new RegExp(`^(?:(\\*|[\\w]+)|(${ escChar })((?:\\2\\2|[^\\2])+)\\2)$`)).exec(s.trim())).filter(s => s);
 		if (parses.length !== parts.length) return;
-		const get = x => x?.[1] || x?.[3];
-		return [this.normalizeEscChars(context, get(parses.pop())), this.normalizeEscChars(context, get(parses.pop()))];
+		const get = x => x?.[1] || this.normalizeEscChars(context, x?.[3]);
+		return [get(parses.pop()), get(parses.pop())];
 	}
 
 	/**
@@ -190,7 +190,9 @@ export default class Node {
 	 * 
 	 * @returns Array
 	 */
-	static getQuoteChars(context) { return context?.params?.dialect === 'mysql' ? ['"', "'"] : ["'"]; }
+	static getQuoteChars(context) {
+		return context?.params?.dialect === 'mysql' && !context.params.ansiQuotes ? ['"', "'"] : ["'"];
+	}
 
 	/**
 	 * Determines the proper escape character for the active SQL dialect ascertained from context.
@@ -199,5 +201,7 @@ export default class Node {
 	 * 
 	 * @returns String
 	 */
-	static getEscChar(context) { return context?.params?.dialect === 'mysql' ? '`' : '"'; }
+	static getEscChar(context) {
+		return context?.params?.dialect === 'mysql' && !context.params.ansiQuotes ? '`' : '"';
+	}
 }
