@@ -1,5 +1,4 @@
 
-import Lexer from './Lexer.js';
 import Node from './Node.js';
 
 export default class Identifier extends Node {
@@ -70,7 +69,7 @@ export default class Identifier extends Node {
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (!('name' in json)) return;
+		if (!json.name) return;
 		return new this(context, json.name, json.basename);
 	}
 }

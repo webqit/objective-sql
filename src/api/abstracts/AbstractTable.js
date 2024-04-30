@@ -76,7 +76,7 @@ export default class AbstractTable {
 	 * 
 	 * @returns Array
 	 */
-	async primaryKeyColumns() { return (await this.columnsForConstraint('PRIMARY KEY'))[0]; }
+	async primaryKeyColumns() { return (await this.columnsForConstraint('PRIMARY_KEY'))[0]; }
 
 	/**
 	 * Get columns that have given constraintType.
@@ -87,7 +87,7 @@ export default class AbstractTable {
 	 */
 	async columnsForConstraint(constraintType) {
 		const schema = await this.database.describeTable(this.name);
-		const inlineConstraintTypesMap = { 'PRIMARY KEY': 'primaryKey', 'UNIQUE': 'uniqueKey', 'CHECK': 'check', 'FOREIGN KEY': 'references' };
+		const inlineConstraintTypesMap = { 'PRIMARY_KEY': 'primaryKey', 'UNIQUE': 'uniqueKey', 'CHECK': 'check', 'FOREIGN_KEY': 'references' };
 		let columns = !(constraintType in inlineConstraintTypesMap) ? [] : schema.columns.filter(col => col[inlineConstraintTypesMap[constraintType]]).map(col => [col.name]);
 		if (schema.constraints.length) { columns = columns.concat(schema.constraints.filter(cnst => cnst.type === constraintType).reduce((cols, cnst) => cols.concat([cnst.columns]))); }
 		return columns;

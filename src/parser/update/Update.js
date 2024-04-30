@@ -55,7 +55,7 @@ export default class Update extends StatementNode {
 	 * 
 	 * @returns 
 	 */
-	leftJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'LEFT JOIN']); }
+	leftJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'LEFT_JOIN']); }
 
 	/**
 	 * A variant of the join()
@@ -64,7 +64,7 @@ export default class Update extends StatementNode {
 	 * 
 	 * @returns 
 	 */
-	rightJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'RIGHT JOIN']); }
+	rightJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'RIGHT_JOIN']); }
 
 	/**
 	 * A variant of the join()
@@ -73,7 +73,7 @@ export default class Update extends StatementNode {
 	 * 
 	 * @returns 
 	 */
-	innerJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'INNER JOIN']); }
+	innerJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'INNER_JOIN']); }
 
 	/**
 	 * A variant of the join()
@@ -82,7 +82,7 @@ export default class Update extends StatementNode {
 	 * 
 	 * @returns 
 	 */
-	crossJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'CROSS JOIN']); }
+	crossJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'CROSS_JOIN']); }
 
 	/**
 	 * Builds the statement's SET_CLAUSE

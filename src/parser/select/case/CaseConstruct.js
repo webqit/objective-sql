@@ -1,6 +1,7 @@
 
 import Lexer from '../../Lexer.js';
 import WhenClause from './WhenClause.js';
+import Abstraction from '../Abstraction.js';
 import Node from '../../Node.js';
 
 export default class CaseConstruct extends Node {
@@ -8,18 +9,18 @@ export default class CaseConstruct extends Node {
 	/**
 	 * Instance properties
 	 */
-	GIVEN_VALUE;
+	CASE_VALUE;
 	WHEN_CLAUSES = [];
 	ELSE_CLAUSE;
 
 	/**
 	 * Sets a given value for the cases.
 	 * 
-	 * @param Any givenValue
+	 * @param Any caseValue
 	 * 
 	 * @returns this
 	 */
-	given(givenValue) { return this.build('GIVEN_VALUE', [givenValue]); }
+	case(caseValue) { return this.build('CASE_VALUE', [caseValue], Abstraction.exprTypes); }
 
 	/**
 	 * Adds a "when" expression
@@ -40,14 +41,14 @@ export default class CaseConstruct extends Node {
 	 * 
 	 * @returns this
 	 */
-	else(elseClause) { return this.build('ELSE_CLAUSE', [elseClause]); }
+	else(elseClause) { return this.build('ELSE_CLAUSE', [elseClause], Abstraction.exprTypes); }
 	
 	/**
 	 * @inheritdoc
 	 */
 	stringify() {
 		const sql = [];
-		if (this.GIVEN_VALUE) sql.push(this.GIVEN_VALUE);
+		if (this.CASE_VALUE) sql.push(this.CASE_VALUE);
 		sql.push(`WHEN ${ this.WHEN_CLAUSES.join(' WHEN ') }`);
 		if (this.ELSE_CLAUSE) sql.push('ELSE', this.ELSE_CLAUSE);
 		return `CASE ${ sql.join(' ') } END${ this.params.dialect === 'mysql' ? ' CASE' : '' }`;
@@ -62,7 +63,7 @@ export default class CaseConstruct extends Node {
 		const { tokens: [ caseValue, ...assertions ], matches: clauses } = Lexer.lex(caseConstruct, ['WHEN','ELSE'], { useRegex: 'i' });
 		const instance = new this(context);
 		// Has given value?
-		if (caseValue.trim()) instance.given(await parseCallback(instance, caseValue.trim()));
+		if (caseValue.trim()) instance.case(await parseCallback(instance, caseValue.trim()));
 		// On to the cases
 		for (const clause of clauses) {
 			const assertStmt = assertions.shift();

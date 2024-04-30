@@ -37,7 +37,7 @@ export default class AbstractConstraint extends Node {
         const escChar = this.getEscChar(context);
         const nameRegex = `(?:CONSTRAINT(?:` + `\\s+(\\w+)` + `|` + `\\s+(${ escChar })((?:\\2\\2|[^\\2])+)\\2` + `)\\s+)?`;
         const [ , nameUnscaped, /*esc*/, nameEscaped, rest = '' ] = expr.match(new RegExp(`^${ nameRegex }([\\s\\S]+)$`, 'i')) || [];
-        return { constraintName: nameUnscaped || this.normalizeEscChars(context, nameEscaped), expr: rest.trim() };
+        return { constraintName: nameUnscaped || this.autoUnesc(context, nameEscaped), expr: rest.trim() };
     }
 
     /**

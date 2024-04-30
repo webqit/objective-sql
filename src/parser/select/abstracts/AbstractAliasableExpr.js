@@ -1,5 +1,4 @@
 
-import Lexer from '../../Lexer.js';
 import Identifier from '../../Identifier.js';
 import Node from '../../Node.js';
 
@@ -67,7 +66,7 @@ export default class AbstractAliasableExpr extends Node {
 			}
 		}
 		if (!exprNode) { exprNode = await parseCallback(context, $expr, this.exprTypes); }
-		const alias = aliasUnescaped || this.normalizeEscChars(context, aliasEscaped);
+		const alias = aliasUnescaped || this.autoUnesc(context, aliasEscaped);
 		const claused = !!$separator?.trim();
 		const instance = new this(context, exprNode);
 		instance.as(alias, claused);
@@ -77,5 +76,5 @@ export default class AbstractAliasableExpr extends Node {
 	/**
 	 * @property Array
 	 */
-	static exprTypes = [];
+	static get exprTypes() { return []; }
 }

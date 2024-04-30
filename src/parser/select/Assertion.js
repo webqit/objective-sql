@@ -1,6 +1,7 @@
 
 import { _unwrap } from '@webqit/util/str/index.js';
 import Lexer from '../Lexer.js';
+import Abstraction from './Abstraction.js';
 import Condition from './Condition.js';
 import Node from '../Node.js';
 
@@ -32,7 +33,7 @@ export default class Assertion extends Node {
 	expression(operator, ...operands) {
 		if (this.OPERATOR) this.OPERANDS.splice(0);
 		this.OPERATOR = operator;
-		return this.build('OPERANDS', operands);
+		return this.build('OPERANDS', operands, Abstraction.exprTypes);
 	}
 
 	/**

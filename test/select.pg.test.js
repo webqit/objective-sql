@@ -18,7 +18,7 @@ console.log('..........', await pgClient.query(`SELECT ${ dd } dd, 'You''re cool
 
 describe(`SELECT QUERIES`, function() {
 
-    var ast1, expr1 = `SELECT ALL aaaa, "bbb"."bb" ali, age || \'kk\' || table_schema || \'...\' concatenation, 5 + 5 "s..|""um", 'You''re cool' ffff, JSON_AGG({dd:2}) is distinct from 4, CASE subject WHEN a=1 THEN 'one' END ff, SUM(all id order by rrrrrr), (SELECT GG AS INNERALIAS FROM jj) ALIAS FROM (SELECT age as aaaa, time2 as bbbbb from table2 as t2) ta WHERE kk = 4 order by CASE WHEN 4=3 THEN 5 ELSE 6 END desc with rollup`;
+    var ast1, expr1 = `SELECT ALL aaaa, "bbb"."bb" ali, age || \'kk\' || table_schema || \'...\' concatenation, 5 + 5 "s..|""um", 'You''re cool' ffff, JSON_AGG('{dd:2}') is distinct from 4, CASE subject WHEN a=1 THEN 'one' END ff, SUM(all id order by rrrrrr), (SELECT GG AS INNERALIAS FROM jj) ALIAS FROM (SELECT age as aaaa, time2 as bbbbb from table2 as t2) ta WHERE kk = 4 order by CASE WHEN 4=3 THEN 5 ELSE 6 END desc with rollup`;
     describe(`${expr1}`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, async function() {

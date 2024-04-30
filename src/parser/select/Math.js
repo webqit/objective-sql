@@ -1,5 +1,6 @@
 
 import Lexer from '../Lexer.js';
+import Abstraction from './Abstraction.js';
 import Node from '../Node.js';
 
 export default class Math extends Node {
@@ -32,7 +33,7 @@ export default class Math extends Node {
 			return (new this.constructor(this)).expression(operator, this, ...operands);
 		}
 		this.OPERATOR = operator;
-		return (this.build('OPERANDS', operands), this);
+		return (this.build('OPERANDS', operands, Abstraction.exprTypes), this);
 	}
 
 	/**

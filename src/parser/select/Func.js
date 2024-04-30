@@ -1,6 +1,6 @@
 
 import Lexer from '../Lexer.js';
-import { _unwrap } from '@webqit/util/str/index.js';
+import Abstraction from './Abstraction.js';
 import Node from '../Node.js';
 
 export default class Func extends Node {
@@ -34,7 +34,7 @@ export default class Func extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	args(...args) { return this.build('ARGS_LIST', args); }
+	args(...args) { return this.build('ARGS_LIST', args, Abstraction.exprTypes); }
 	
 	/**
 	 * @inheritdoc

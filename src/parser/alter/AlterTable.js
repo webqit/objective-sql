@@ -225,8 +225,8 @@ export default class AlterTable extends StatementNode {
 			// RENAME ... TO ...
 			const [ renameMatch, nodeKind_a, nodeNameUnescaped_a, /*esc*/, nodeNameEscaped_a, newNodeNameUnescaped_a, /*esc*/, newNodeNameEscaped_a ] = regex('renameRe').exec(stmt) || [];
 			if (renameMatch) {
-				const nodeName = nodeNameUnescaped_a || this.normalizeEscChars(instance, nodeNameEscaped_a);
-				const newNodeName = newNodeNameUnescaped_a || this.normalizeEscChars(instance, newNodeNameEscaped_a);
+				const nodeName = nodeNameUnescaped_a || this.autoUnesc(instance, nodeNameEscaped_a);
+				const newNodeName = newNodeNameUnescaped_a || this.autoUnesc(instance, newNodeNameEscaped_a);
 				if (nodeName) {
 					const nodeKind = /KEY|INDEX/i.test(nodeKind_a) ? 'INDEX' : nodeKind_a.toUpperCase();
 					const reference = { kind: nodeKind, name: nodeName };
@@ -239,14 +239,14 @@ export default class AlterTable extends StatementNode {
 			// RELOCATE ... TO ...
 			const [ relocateMatch, newSchemaUnescaped, /*esc*/, newSchemaEscaped ] = regex('relocateRe').exec(stmt) || [];
 			if (relocateMatch) {
-				instance.relocateTo(newSchemaUnescaped || this.normalizeEscChars(instance, newSchemaEscaped));
+				instance.relocateTo(newSchemaUnescaped || this.autoUnesc(instance, newSchemaEscaped));
 				continue;
 			}
 			// DROP
 			const [ dropMatch, nodeKind_b = 'COLUMN', ifExists_b/* postgresql-specific */, nodeNameUnescaped_b, /*esc*/, nodeNameEscaped_b, flags_b/* postgresql-specific */ ] = regex('dropRe').exec(stmt) || [];
 			if (dropMatch) {
 				const nodeKind = /CONSTRAINT|PRIMARY\s+KEY|FOREIGN\s+KEY|CHECK/i.test(nodeKind_b) ? 'CONSTRAINT' : (/INDEX|KEY/i.test(nodeKind_b) ? 'INDEX' : 'COLUMN');
-				const nodeName = nodeNameUnescaped_b || this.normalizeEscChars(instance, nodeNameEscaped_b) || nodeKind_b.trim().replace(/\s+KEY/i, '').toUpperCase()/* when, in mysql, it's just: drop PRIMARY KEY */;
+				const nodeName = nodeNameUnescaped_b || this.autoUnesc(instance, nodeNameEscaped_b) || nodeKind_b.trim().replace(/\s+KEY/i, '').toUpperCase()/* when, in mysql, it's just: drop PRIMARY KEY */;
 				const argument = nodeKind === 'CONSTRAINT' ? new TableLevelConstraint(instance, nodeName, nodeKind_b.trim().toUpperCase(), []/*columns*/, null) : (
 					nodeKind === 'INDEX' ? new Index(instance, nodeName, nodeKind_b.trim().toUpperCase(), []/*columns*/) : new Column(instance, nodeName, null, [])
 				);
@@ -266,7 +266,7 @@ export default class AlterTable extends StatementNode {
 			// ALTER
 			const [ alterMatch, nodeKind_d, nodeNameUnescaped_d, /*esc*/, nodeNameEscaped_d, subAction_d = '', argument_d = '', ifNodeExits_d, constraintOrIndexAttr_d ] = regex('alterRe').exec(stmt) || [];
 			if (alterMatch) {
-				const nodeName = nodeNameUnescaped_d || this.normalizeEscChars(instance, nodeNameEscaped_d);
+				const nodeName = nodeNameUnescaped_d || this.autoUnesc(instance, nodeNameEscaped_d);
 				const nodeKind = /CONSTRAINT|CHECK/i.test(nodeKind_d) ? 'CONSTRAINT' : (/INDEX|KEY/i.test(nodeKind_d) ? 'INDEX' : 'COLUMN');
 				let subAction = subAction_d.toUpperCase() || 'SET', flags = ifNodeExits_d ? ['IF_EXISTS'] : [], $ = {};
 				let argumentNew;

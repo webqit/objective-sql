@@ -79,5 +79,5 @@ export default class JoinClause extends AbstractAliasableExpr {
 	/**
 	 * @property Array
 	 */
-	static exprTypes = [Abstraction,Identifier];
+	static get exprTypes() { return [Abstraction,Identifier]; }
 }

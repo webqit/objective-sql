@@ -27,29 +27,20 @@ import Num from './select/Num.js';
 /**
  * @var object
  */
-export default {
+export default [
 	// Statements
-	//Union,			// ... UNION ...
-	Select,				// SELECT ... FROM ...
-	Insert,				// INSERT INTO ...
-	Update,				// UPDATE ...
-	Delete,				// DELETE FROM ...
 	CreateDatabase,
-	CreateTable,
 	AlterDatabase,
-	AlterTable,
 	DropDatabase,
+	CreateTable,
+	AlterTable,
 	DropTable,
+	Insert,
+	Update,
+	Delete,
+	//Union,
+	Select,
 	// Expressions
-	Abstraction,
-	CaseConstruct,
-	PgConcat,
-	Assertion,
-	Math,
-	Aggr,
-	Func,
-	Str,
-	Num,
-	Json,
-	Identifier,
-}
+	...
+	Abstraction.exprTypes,
+]

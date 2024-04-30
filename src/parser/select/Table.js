@@ -8,5 +8,5 @@ export default class Table extends AbstractAliasableExpr {
 	/**
 	 * @property Array
 	 */
-	static exprTypes = [Abstraction,Identifier];
+	static get exprTypes() { return [Abstraction,Identifier]; }
 }

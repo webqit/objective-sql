@@ -1,5 +1,6 @@
 
 import Lexer from '../../Lexer.js';
+import Abstraction from '../Abstraction.js';
 import Node from '../../Node.js';
 
 export default class WhenClause extends Node {
@@ -17,7 +18,7 @@ export default class WhenClause extends Node {
 	 * 
 	 * @returns this
 	 */
-	criterion(criterion) { return (this.build('CRITERION', [criterion]), this); }
+	criterion(criterion) { return (this.build('CRITERION', [criterion], Abstraction.exprTypes), this); }
 
 	/**
 	 * Sets the consequence.
@@ -26,7 +27,7 @@ export default class WhenClause extends Node {
 	 * 
 	 * @returns this
 	 */
-	then_(consequence) { return this.build('CONSEQUENCE', [consequence]); }
+	then_(consequence) { return this.build('CONSEQUENCE', [consequence], Abstraction.exprTypes); }
 	
 	/**
 	 * @inheritdoc

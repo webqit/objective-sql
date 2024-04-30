@@ -59,10 +59,7 @@ export default class Delete extends StatementNode {
 	 * 
 	 * @return Void
 	 */
-	from(...tablesOrIdentifiers) {
-		const asType = (tablesOrIdentifiers[0] === false && tablesOrIdentifiers.shift() === false) || this.USING_LIST.length ? Identifier : Table;
-		return this.build('FROM_LIST', tablesOrIdentifiers, asType);
-	}
+	from(...tablesOrIdentifiers) { return this.build('FROM_LIST', tablesOrIdentifiers, [Identifier,Table]); }
 
 	/**
 	 * Builds the statement's USING_LIST
@@ -99,7 +96,7 @@ export default class Delete extends StatementNode {
 	 * 
 	 * @returns 
 	 */
-	leftJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'LEFT JOIN']); }
+	leftJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'LEFT_JOIN']); }
 
 	/**
 	 * A variant of the join()
@@ -108,7 +105,7 @@ export default class Delete extends StatementNode {
 	 * 
 	 * @returns 
 	 */
-	rightJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'RIGHT JOIN']); }
+	rightJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'RIGHT_JOIN']); }
 
 	/**
 	 * A variant of the join()
@@ -117,7 +114,7 @@ export default class Delete extends StatementNode {
 	 * 
 	 * @returns 
 	 */
-	innerJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'INNER JOIN']); }
+	innerJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'INNER_JOIN']); }
 
 	/**
 	 * A variant of the join()
@@ -126,7 +123,7 @@ export default class Delete extends StatementNode {
 	 * 
 	 * @returns 
 	 */
-	crossJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'CROSS JOIN']); }
+	crossJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'CROSS_JOIN']); }
 
 	/**
 	 * Builds the statement's WHERE_CLAUSE

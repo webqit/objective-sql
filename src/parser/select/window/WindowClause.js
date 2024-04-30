@@ -1,6 +1,6 @@
 
 import Lexer from '../../Lexer.js';
-import Window from './WindowSpec.js';
+import WindowSpec from './WindowSpec.js';
 import Node from '../../Node.js';
 
 export default class WindowClause extends Node {
@@ -17,7 +17,7 @@ export default class WindowClause extends Node {
 	 * 
 	 * @returns this
 	 */
-	define(...windows) { return this.build('WINDOWS_LIST', windows, Window); }
+	define(...windows) { return this.build('WINDOWS_LIST', windows, WindowSpec); }
 
 	
 	/**

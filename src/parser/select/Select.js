@@ -1,6 +1,7 @@
 
 import Lexer from '../Lexer.js';
 import StatementNode from '../StatementNode.js';
+import Path from './Path.js';
 import JoinClause from './JoinClause.js';
 import GroupByClause from './GroupByClause.js';
 import OrderByClause from './OrderByClause.js';
@@ -9,6 +10,7 @@ import Condition from './Condition.js';
 import Assertion from './Assertion.js';
 import Field from './Field.js';
 import Table from './Table.js';
+import Aggr from './Aggr.js';
 
 export default class Select extends StatementNode {
 	
@@ -25,6 +27,24 @@ export default class Select extends StatementNode {
 	ORDER_BY_CLAUSE = null;
 	OFFSET_CLAUSE = null;
 	LIMIT_CLAUSE = null;
+
+	/**
+	 * @properties Array
+	 */
+	AGGRS = [];
+	PATHS = [];
+
+    /**
+	 * Catalog certain nodes
+	 * 
+	 * @param Node node
+	 * 
+	 * @returns Void
+	 */
+    connectedNodeCallback(node) {
+		if (node instanceof Aggr) this.AGGRS.push(node);
+		if (node instanceof Path) this.PATHS.push(node);
+	}
 
 	/**
 	 * Builds the statement's SELECT_LIST
@@ -83,7 +103,7 @@ export default class Select extends StatementNode {
 	 * 
 	 * @returns Void
 	 */
-	leftJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'LEFT JOIN']); }
+	leftJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'LEFT_JOIN']); }
 
 	/**
 	 * A variant of the join()
@@ -92,7 +112,7 @@ export default class Select extends StatementNode {
 	 * 
 	 * @returns Void
 	 */
-	rightJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'RIGHT JOIN']); }
+	rightJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'RIGHT_JOIN']); }
 
 	/**
 	 * A variant of the join()
@@ -101,7 +121,7 @@ export default class Select extends StatementNode {
 	 * 
 	 * @returns Void
 	 */
-	innerJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'INNER JOIN']); }
+	innerJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'INNER_JOIN']); }
 
 	/**
 	 * A variant of the join()
@@ -110,7 +130,7 @@ export default class Select extends StatementNode {
 	 * 
 	 * @returns Void
 	 */
-	crossJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'CROSS JOIN']); }
+	crossJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'CROSS_JOIN']); }
 
 	/**
 	 * Builds the statement's WHERE_CLAUSE

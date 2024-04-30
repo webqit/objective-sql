@@ -1,5 +1,6 @@
 
 import Lexer from '../../Lexer.js';
+import Abstraction from '../Abstraction.js';
 import Node from '../../Node.js';
 
 export default class AbstractOrderBy extends Node {
@@ -16,7 +17,7 @@ export default class AbstractOrderBy extends Node {
 	 * 
 	 * @returns this
 	 */
-	criterion(...args) { return this.build('CRITERIA', args); }
+	criterion(...args) { return this.build('CRITERIA', args, Abstraction.exprTypes); }
 	
 	/**
 	 * @inheritdoc

@@ -90,8 +90,8 @@ export default class CreateTable extends StatementNode {
 	 */
 	static async parse(context, expr, parseCallback) {
 		const [ match, ifNotExists, rest ] = /^CREATE\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?([\s\S]+)$/i.exec(expr.trim()) || [];
-		const [ namePart, bodyPart ] = Lexer.split(rest, [], { limit: 2 });
 		if (!match) return;
+		const [ namePart, bodyPart ] = Lexer.split(rest, [], { limit: 2 });
 		const [tblName, dbName] = this.parseIdent(context, namePart.trim()) || [];
 		if (!tblName) return;
 		const instance = new this(context, tblName, dbName || context/*Database*/?.name);
