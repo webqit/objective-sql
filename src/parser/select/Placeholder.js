@@ -7,22 +7,35 @@ export default class Placeholder extends Node {
 	/**
 	 * Instance properties
 	 */
-	ID;
+	OFFSET;
 	NOTATION;
 
 	/**
 	 * @constructor
 	 */
-	constructor(context, id, notation) {
+	constructor(context, offset, notation) {
 		super(context);
-		this.ID = _isNumeric(id) ? parseInt(id) : id;
+		this.OFFSET = parseInt(offset);
 		this.NOTATION = notation;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() { return { offset: this.OFFSET, notation: this.NOTATION, }; }
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.offset === 'undefined' || typeof json.notation !== 'string') return;
+		return new this(context, json.offset, json.notation);
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	stringify() { return this.NOTATION === '?' ? '?' : this.NOTATION + this.ID; }
+	stringify() { return this.NOTATION === '?' ? '?' : this.NOTATION + this.OFFSET; }
 	
 	/**
 	 * @inheritdoc

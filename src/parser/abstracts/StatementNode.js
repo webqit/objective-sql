@@ -1,6 +1,6 @@
 
 import Node from "./Node.js";
-import Lexer from "./Lexer.js";
+import Lexer from "../Lexer.js";
 
 export default class StatementNode extends Node {
 

@@ -1,5 +1,5 @@
 
-import Node from '../Node.js';
+import Node from '../abstracts/Node.js';
 
 export default class Prim extends Node {
 
@@ -30,6 +30,19 @@ export default class Prim extends Node {
 	 * Sets the value to null
 	 */
 	null() { this.VALUE = null; }
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() { return { value: this.VALUE }; }
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.value === 'undefined') return;
+		return new this(context, json.value);
+	}
 	
 	/**
 	 * @inheritdoc

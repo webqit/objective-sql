@@ -1,7 +1,7 @@
 
 import Lexer from '../Lexer.js';
-import Abstraction from './Abstraction.js';
-import Node from '../Node.js';
+import Expr from '../abstracts/Expr.js';
+import Node from '../abstracts/Node.js';
 
 export default class Func extends Node {
 
@@ -9,7 +9,7 @@ export default class Func extends Node {
 	 * Instance properties
 	 */
 	NAME = '';
-	ARGS_LIST = [];
+	ARGS = [];
 
 	/**
 	 * @constructor
@@ -34,12 +34,33 @@ export default class Func extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	args(...args) { return this.build('ARGS_LIST', args, Abstraction.exprTypes); }
+	args(...args) { return this.build('ARGS', args, Expr.Types); }
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() {
+		return {
+			name: this.NAME,
+			args: this.ARGS.map(o => o.toJson()),
+			flags: this.FLAGS,
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.name !== 'string' || !Array.isArray(json.args)) return;
+		const instance = (new this(context, json.name)).withFlag(...(json.flags || []));
+		instance.args(...json.args);
+		return instance;
+	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	stringify() { return `${ this.NAME.toUpperCase() }(${ this.ARGS_LIST.join(',') })`; }
+	stringify() { return `${ this.NAME.toUpperCase() }(${ this.ARGS.join(',') })`; }
 	
 	/**
 	 * @inheritdoc

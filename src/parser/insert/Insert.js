@@ -1,10 +1,10 @@
 
 import { _unwrap } from '@webqit/util/str/index.js';
 import Lexer from '../Lexer.js';
-import StatementNode from '../StatementNode.js';
-import AssignmentList from '../update/AssignmentList.js';
+import StatementNode from '../abstracts/StatementNode.js';
+import AssignmentList from './AssignmentList.js';
 import OnConflictClause from './OnConflictClause.js';
-import Identifier from '../Identifier.js';
+import Identifier from '../select/Identifier.js';
 import Select from '../select/Select.js';
 import Table from '../select/Table.js';
 
@@ -84,6 +84,36 @@ export default class Insert extends StatementNode {
 	 * @return Void
 	 */
 	onConflict(...onConflictSpecs) { return this.build('ON_CONFLICT_CLAUSE', onConflictSpecs, OnConflictClause); }
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() {
+		return {
+			table: this.TABLE.toJson(),
+			columns_list: this.COLUMNS_LIST.map(c => c.toJson()),
+			values_list: this.VALUES_LIST.map(v => v),
+			set_clause: this.SET_CLAUSE?.toJson(),
+			select_clause: this.SELECT_CLAUSE?.toJson(),
+			on_conflict_clause: this.ON_CONFLICT_CLAUSE?.toJson(),
+			flags: this.FLAGS,
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (!json?.table) return;
+		const instance = (new this(context)).withFlag(...(json.flags || []));
+		instance.into(json.table);
+		if (json.columns_list?.length) instance.columns(...json.columns_list);
+		for (const values of json.values_list || []) instance.values(...values);
+		if (json.set_clause) instance.set(json.set_clause);
+		if (json.select_clause) instance.select(json.select_clause);
+		if (json.on_conflict_clause) instance.onConflict(json.on_conflict_clause);
+		return instance;
+	}
 	
 	/**
 	 * @inheritdoc
@@ -130,7 +160,7 @@ export default class Insert extends StatementNode {
 				// INSERT ... VALUES|VALUE
 				for (const rowPayload of Lexer.split(payloadSpec, [','])) {
 					const rowPayloadArray = await Promise.all(Lexer.split(_unwrap(rowPayload.trim(), '(', ')'), [',']).map(valueExpr => parseCallback(instance, valueExpr.trim())));
-					instance.values(rowPayloadArray);
+					instance.values(...rowPayloadArray);
 				}
 			}
 		}

@@ -1,6 +1,6 @@
 
 import Lexer from '../Lexer.js';
-import AssignmentList from '../update/AssignmentList.js';
+import AssignmentList from './AssignmentList.js';
 import Condition from '../select/Condition.js';
 import Assertion from '../select/Assertion.js';
 
@@ -24,6 +24,26 @@ export default class OnConflictClause extends AssignmentList {
 	 * @return Void
 	 */
 	where(...wheres) { return this.build('WHERE_CLAUSE', wheres, Condition, 'and'); }
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() {
+		return {
+			...super.toJson(),
+			where_clause: this.WHERE_CLAUSE?.toJson(),
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		const instance = super.fromJson(context, json);
+		if (!instance) return;
+		if (json.where_clause) instance.where(json.where_clause);
+		return instance;
+	}
 
 	/**
 	 * @inheritdoc

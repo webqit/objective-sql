@@ -1,6 +1,6 @@
 import Lexer from '../Lexer.js';
 import { _unwrap } from '@webqit/util/str/index.js';
-import Node from '../Node.js';
+import Node from '../abstracts/Node.js';
 
 export default class Index extends Node {
 
@@ -55,9 +55,8 @@ export default class Index extends Node {
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (json.indexName || (typeof json.type === 'string' && json.type.match(/INDEX|KEY|FULLTEXT/i))) {
-			return new this(context, json.indexName, json.type, json.columns);
-		}
+		if (typeof json.indexName !== 'string' && (typeof json?.type !== 'string' || !json.type.match(/INDEX|KEY|FULLTEXT/i))) return;
+		return new this(context, json.indexName, json.type, json.columns);
 	}
 
     /**

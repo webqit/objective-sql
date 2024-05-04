@@ -1,5 +1,5 @@
 
-import Node from './Node.js';
+import Node from '../abstracts/Node.js';
 
 export default class Identifier extends Node {
 	
@@ -25,10 +25,7 @@ export default class Identifier extends Node {
 	 * 
 	 * @returns this
 	 */
-	name(name) {
-		this.NAME = name;
-		return this;
-	}
+	name(name) { this.NAME = name; return this; }
 
 	/**
 	 * Sets the basename.
@@ -37,15 +34,21 @@ export default class Identifier extends Node {
 	 * 
 	 * @returns this
 	 */
-	basename(basename) {
-		this.BASENAME = basename;
-		return this;
-	}
+	basename(basename) { this.BASENAME = basename; return this; }
 
 	/**
 	 * @inheritdoc
 	 */
-	toJson() { return { name: this.NAME, basename: this.BASENAME }; }
+	toJson() { return { name: this.NAME, basename: this.BASENAME, flags: this.FLAGS, }; }
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json === 'string') json = { name: json };
+		else if (typeof json?.name !== 'string') return;
+		return (new this(context, json.name, json.basename)).withFlag(...(json?.flags || []));
+	}
 	
 	/**
 	 * @inheritdoc
@@ -63,13 +66,5 @@ export default class Identifier extends Node {
 		const [name, basename] = this.parseIdent(context, expr) || [];
 		if (!name) return;
 		return new this(context, name, basename);
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	static fromJson(context, json) {
-		if (!json.name) return;
-		return new this(context, json.name, json.basename);
 	}
 }

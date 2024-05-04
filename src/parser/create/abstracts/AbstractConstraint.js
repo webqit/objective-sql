@@ -1,7 +1,7 @@
 
 import { _unwrap } from '@webqit/util/str/index.js';
 import Lexer from '../../Lexer.js';
-import Node from '../../Node.js';
+import Node from '../../abstracts/Node.js';
 
 export default class AbstractConstraint extends Node {
 

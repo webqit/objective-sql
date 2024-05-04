@@ -1,6 +1,6 @@
 
 import Lexer from '../Lexer.js';
-import StatementNode from '../StatementNode.js';
+import StatementNode from '../abstracts/StatementNode.js';
 import Path from './Path.js';
 import JoinClause from './JoinClause.js';
 import GroupByClause from './GroupByClause.js';
@@ -226,6 +226,44 @@ export default class Select extends StatementNode {
 	limit(...limit) {
 		if (!limit.every(l => typeof l === 'number')) throw new Error(`Limits must be of type number.`);
 		this.LIMIT_CLAUSE = limit;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() {
+		return {
+			select_list: this.SELECT_LIST.map(s => s.toJson()),
+			from_list: this.FROM_LIST.map(t => t.toJson()),
+			join_list: this.JOIN_LIST.map(t => t.toJson()),
+			where_clause: this.WHERE_CLAUSE?.toJson(),
+			group_by_clause: this.GROUP_BY_CLAUSE?.toJson(),
+			having_clause: this.HAVING_CLAUSE?.toJson(),
+			window_clause: this.WINDOW_CLAUSE?.toJson(),
+			order_by_clause: this.ORDER_BY_CLAUSE?.toJson(),
+			offset_clause: this.OFFSET_CLAUSE,
+			limit_clause: this.LIMIT_CLAUSE,
+			flags: this.FLAGS,
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (!Array.isArray(json?.select_list)) return;
+		const instance = (new this(context)).withFlag(...(json.flags || []));
+		instance.select(...json.select_list);
+		if (json.from_list?.length) instance.from(...json.from_list);
+		if (json.join_list?.length) instance.join(...json.join_list);
+		if (json.where_clause) instance.where(json.where_clause);
+		if (json.group_by_clause) instance.groupBy(json.group_by_clause);
+		if (json.having_clause) instance.having(json.having_clause);
+		if (json.window_clause) instance.window(json.window_clause);
+		if (json.order_by_clause) instance.orderBy(json.order_by_clause);
+		if (json.offset_clause) instance.offset(json.offset_clause);
+		if (json.limit_clause) instance.limit(json.limit_clause);
+		return instance;
 	}
 	
 	/**

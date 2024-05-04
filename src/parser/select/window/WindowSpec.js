@@ -3,7 +3,7 @@ import { _unwrap } from '@webqit/util/str/index.js';
 import Lexer from '../../Lexer.js';
 import PartitionByClause from '../PartitionByClause.js';
 import OrderByClause from '../OrderByClause.js';
-import Node from '../../Node.js';
+import Node from '../../abstracts/Node.js';
 
 export default class WindowSpec extends Node {
 	
@@ -11,9 +11,9 @@ export default class WindowSpec extends Node {
 	 * Instance properties
 	 */
 	NAME;
+	WINDOW_REF;
 	PARTITION_BY_CLAUSE;
 	ORDER_BY_CLAUSE;
-	WINDOW_REF;
 
 	/**
 	 * Sets the name.
@@ -71,6 +71,31 @@ export default class WindowSpec extends Node {
 	 * @returns this
 	 */
 	orderBy(...orderBys) { return this.build('ORDER_BY_CLAUSE', orderBys, OrderByClause, 'criterion'); }
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() {
+		return {
+			name: this.NAME, 
+			window_ref: this.WINDOW_REF, 
+			partition_by_clause: this.PARTITION_BY_CLAUSE?.toJson(),
+			order_by_clause: this.ORDER_BY_CLAUSE?.toJson(),
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.name !== 'string' && typeof json?.window_ref !== 'string' && !json?.partition_by_clause && !json?.order_by_clause) return;
+		const instance = new this(context);
+		if (json.name) instance.name(json.name);
+		if (json.window_ref) instance.extends(json.window_ref);
+		if (json.partition_by_clause) instance.partitionBy(json.partition_by_clause);
+		if (json.order_by_clause) instance.orderBy(json.order_by_clause);
+		return instance;
+	}
 	
 	/**
 	 * @inheritdoc

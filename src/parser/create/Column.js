@@ -3,7 +3,7 @@ import Lexer from '../Lexer.js';
 import { _after, _before, _unwrap, _toCamel } from '@webqit/util/str/index.js';
 import ColumnLevelConstraint from './ColumnLevelConstraint.js';
 import DataType from './DataType.js';		
-import Node from '../Node.js';
+import Node from '../abstracts/Node.js';
 
 export default class Column extends Node {
 
@@ -55,6 +55,24 @@ export default class Column extends Node {
         }
         return json;
     }
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.name !== 'string') return;
+        const instance = new this(context, json.name);
+        // Constraints
+        for (const property in ColumnLevelConstraint.attrEquivalents) {
+            if (!json[property]) continue;
+            const { constraintName, ...detail } = json[property];
+            const type = ColumnLevelConstraint.attrEquivalents[property];
+            instance.constraint(ColumnLevelConstraint.fromJson(instance, { constraintName, type, detail }));
+        }
+        // An instance with just the name is used in AlterTable.fromJson() for DROP col_name
+        if (json.type) instance.type(DataType.fromJson(instance, json.type));
+		return instance;
+	}
 	
 	/**
 	 * @inheritdoc
@@ -90,22 +108,4 @@ export default class Column extends Node {
         }
         return instance;
     }
-
-	/**
-	 * @inheritdoc
-	 */
-	static fromJson(context, json) {
-		if (!json?.name) return;
-        const instance = new this(context, json.name);
-        // Constraints
-        for (const property in ColumnLevelConstraint.attrEquivalents) {
-            if (!json[property]) continue;
-            const { constraintName, ...detail } = json[property];
-            const type = ColumnLevelConstraint.attrEquivalents[property];
-            instance.constraint(ColumnLevelConstraint.fromJson(instance, { constraintName, type, detail }));
-        }
-        // An instance with just the name is used in AlterTable.fromJson() for DROP col_name
-        if (json.type) instance.type(DataType.fromJson(instance, json.type));
-		return instance;
-	}
 }

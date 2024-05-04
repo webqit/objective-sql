@@ -1,7 +1,7 @@
 
 import Lexer from '../Lexer.js';
-import Abstraction from './Abstraction.js';
-import Node from '../Node.js';
+import Expr from '../abstracts/Expr.js';
+import Node from '../abstracts/Node.js';
 
 export default class Math extends Node {
 	
@@ -28,12 +28,12 @@ export default class Math extends Node {
 	 * 
 	 * @returns this
 	 */
-	expression(operator, ...operands) {
+	calc(operator, ...operands) {
 		if (this.OPERATOR && this.OPERATOR !== operator) {
-			return (new this.constructor(this)).expression(operator, this, ...operands);
+			return (new this.constructor(this)).calc(operator, this, ...operands);
 		}
 		this.OPERATOR = operator;
-		return (this.build('OPERANDS', operands, Abstraction.exprTypes), this);
+		return (this.build('OPERANDS', operands, Expr.Types), this);
 	}
 
 	/**
@@ -43,7 +43,7 @@ export default class Math extends Node {
 	 * 
 	 * @returns this
 	 */
-	sum(...operands) { return this.expression('+', ...operands); }
+	sum(...operands) { return this.calc('+', ...operands); }
 
 	/**
 	 * API for "-"
@@ -52,7 +52,7 @@ export default class Math extends Node {
 	 * 
 	 * @returns this
 	 */
-	sub(...operands) { return this.expression('-', ...operands); }
+	sub(...operands) { return this.calc('-', ...operands); }
 
 	/**
 	 * API for "/"
@@ -61,7 +61,7 @@ export default class Math extends Node {
 	 * 
 	 * @returns this
 	 */
-	div(...operands) { return this.expression('/', ...operands); }
+	div(...operands) { return this.calc('/', ...operands); }
 
 	/**
 	 * API for "*"
@@ -70,7 +70,28 @@ export default class Math extends Node {
 	 * 
 	 * @returns this
 	 */
-	times(...operands) { return this.expression('*', ...operands); }
+	times(...operands) { return this.calc('*', ...operands); }
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() {
+		return {
+			operator: this.OPERATOR,
+			operands: this.OPERANDS.map(o => o.toJson()),
+			flags: this.FLAGS,
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.operator !== 'string' || !/\+|\-|\*|\//.test(json.operator) || !Array.isArray(json.operands)) return;
+		const instance = (new this(context)).withFlag(...(json.flags || []));
+		instance.calc(json.operator, ...json.operands);
+		return instance;
+	}
 
 	/**
 	 * @inheritdoc

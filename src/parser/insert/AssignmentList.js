@@ -1,8 +1,9 @@
 
 import { _wrapped, _unwrap } from '@webqit/util/str/index.js';
-import Identifier from '../Identifier.js';
+import Expr from '../abstracts/Expr.js';
+import Identifier from '../select/Identifier.js';
 import Lexer from '../Lexer.js';
-import Node from '../Node.js';
+import Node from '../abstracts/Node.js';
 
 export default class AssignmentList extends Node {
 
@@ -19,8 +20,39 @@ export default class AssignmentList extends Node {
 	 * @return this
 	 */
     set(target_s, value_s) {
+		if (Array.isArray(target_s)) target_s = target_s.map(t => t instanceof Node ? t : Identifier.fromJson(this, t));
+		else if (!(target_s instanceof Node)) target_s = Identifier.fromJson(this, target_s);
+		if (Array.isArray(value_s)) value_s = value_s.map(v => v instanceof Node ? v : Expr.fromJson(this, v));
+		else if (!(value_s instanceof Node)) value_s = Expr.fromJson(this, value_s);
 		this.ENTRIES.push([target_s, value_s]);
 		return this;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() {
+		return {
+			entries: this.ENTRIES.map(([target_s, value_s]) => {
+				if (Array.isArray(target_s)) target_s = target_s.map(t => t.toJson());
+				else target_s = target_s.toJson();
+				if (Array.isArray(value_s)) value_s = value_s.map(v => v.toJson());
+				else value_s = value_s.toJson();
+				return [target_s, value_s];
+			}),
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (!Array.isArray(json?.entries)) return;
+		const instance = new this(context);
+		for (let [target_s, value_s] of json.entries) {
+			instance.set(target_s, value_s);
+		};
+		return instance;
 	}
 	
 	/**

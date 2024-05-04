@@ -25,8 +25,30 @@ export default class Aggr extends Func {
 	/**
 	 * @inheritdoc
 	 */
+	toJson() {
+		return {
+			...super.toJson(), 
+			order_by_clause: this.ORDER_BY_CLAUSE?.toJson(),
+			over_clause: this.OVER_CLAUSE?.toJson(),
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		const instance = super.fromJson(context, json);
+		if (!instance) return;
+		if (json.order_by_clause) instance.orderBy(json.order_by_clause);
+		if (json.over_clause) instance.over(json.over_clause);
+		return instance;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
 	stringify() {
-		const sql = `${ this.NAME.toUpperCase() }(${ [...this.FLAGS, this.ARGS_LIST.join(','), this.ORDER_BY_CLAUSE].filter(s => s).join(' ') })`;
+		const sql = `${ this.NAME.toUpperCase() }(${ [...this.FLAGS, this.ARGS.join(','), this.ORDER_BY_CLAUSE].filter(s => s).join(' ') })`;
 		return sql + (this.OVER_CLAUSE ? ` OVER ${ this.OVER_CLAUSE }` : '');
 	}
 	

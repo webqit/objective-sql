@@ -1,5 +1,5 @@
 
-import StatementNode from '../StatementNode.js';
+import StatementNode from '../abstracts/StatementNode.js';
 
 export default class DropTable extends StatementNode {
 	
@@ -17,11 +17,37 @@ export default class DropTable extends StatementNode {
 		this.NAME = name;
 		this.BASENAME = basename;
 	}
+
+	/**
+	 * Sets the name
+	 * 
+	 * @param String name
+	 * 
+	 * @returns this
+	 */
+	name(name) { this.NAME = name; return this; }
+
+	/**
+	 * Sets the basename
+	 * 
+	 * @param String name
+	 * 
+	 * @returns this
+	 */
+	basename(basename) { this.BASENAME = basename; return this; }
 	
 	/**
 	 * @inheritdoc
 	 */
-	toJson() { return { name: this.NAME, basename: this.BASENAME }; }
+	toJson() { return { name: this.NAME, basename: this.BASENAME, flags: this.FLAGS }; }
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.name !== 'string') return;
+		return (new this(context, json.name, json.basename)).withFlag(...(json.flags || []));
+	}
 	
 	/**
 	 * @inheritdoc
@@ -39,14 +65,6 @@ export default class DropTable extends StatementNode {
 		const instance = new this(context, tblName, dbName);
 		if (ifExists) instance.withFlag('IF_EXISTS');
 		return instance;
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	static fromJson(context, json, flags = []) {
-		if (!json.name || !json.name.match(/[a-zA-Z]+/i)) return;
-		return (new this(context, json.name, json.basename)).withFlag(...flags);
 	}
 
 }

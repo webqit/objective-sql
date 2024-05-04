@@ -1,5 +1,5 @@
 
-import Node from '../Node.js';
+import Node from '../abstracts/Node.js';
 import TableLevelConstraint from '../create/TableLevelConstraint.js';
 import ColumnLevelConstraint from '../create/ColumnLevelConstraint.js';
 import DataType from '../create/DataType.js';
@@ -110,7 +110,7 @@ export default class Action extends Node {
      * @inheritdoc
      */
     static fromJson(context, json) {
-        if (!(typeof json?.type === 'string' && json.argument)) return;
+        if (typeof json?.type !== 'string' || !json.argument) return;
         const instance = (new this(context)).withFlag(...(json.flags || []));
         // RENAME/RELOCATE
         if (['RENAME','RELOCATE'].includes(json.type)) {

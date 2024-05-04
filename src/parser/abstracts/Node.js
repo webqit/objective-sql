@@ -1,4 +1,4 @@
-import Lexer from './Lexer.js';
+import Lexer from '../Lexer.js';
 
 export default class Node {
 	
@@ -212,7 +212,7 @@ export default class Node {
 				set(instance);
 				continue;
 			}
-			throw new Error(`Arguments must be of type ${ Types.map(Type => Type.name).join(', ') } or a JSON equivalent.`);
+			throw new Error(`Arguments must be of type ${ Types.map(Type => Type.name).join(', ') } or a JSON equivalent. Recieved: ${ typeof arg }`);
 		}
 	}
 	

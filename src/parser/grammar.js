@@ -12,17 +12,7 @@ import Select from './select/Select.js';
 //import Union from './select/Union.js';
 import Update from './update/Update.js';
 // Expressions
-import Identifier from './Identifier.js';
-import CaseConstruct from './select/case/CaseConstruct.js';
-import Abstraction from './select/Abstraction.js';
-import Assertion from './select/Assertion.js';
-import Math from './select/Math.js';
-import Aggr from './select/Aggr.js';
-import Func from './select/Func.js';
-import Json from './select/Json.js';
-import PgConcat from './select/str/PgConcat.js';
-import Str from './select/str/Str.js';
-import Num from './select/Num.js';
+import Expr from './abstracts/Expr.js';
 
 /**
  * @var object
@@ -42,5 +32,5 @@ export default [
 	Select,
 	// Expressions
 	...
-	Abstraction.exprTypes,
+	Expr.Types,
 ]

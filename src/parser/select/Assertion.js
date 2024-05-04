@@ -1,9 +1,9 @@
 
 import { _unwrap } from '@webqit/util/str/index.js';
 import Lexer from '../Lexer.js';
-import Abstraction from './Abstraction.js';
 import Condition from './Condition.js';
-import Node from '../Node.js';
+import Expr from '../abstracts/Expr.js';
+import Node from '../abstracts/Node.js';
 
 export default class Assertion extends Node {
 	
@@ -23,17 +23,17 @@ export default class Assertion extends Node {
 	}
 
 	/**
-	 * API for generic expressions
+	 * API for generic asserts
 	 * 
 	 * @param String operator 
 	 * @param Array operands 
 	 * 
 	 * @returns this
 	 */
-	expression(operator, ...operands) {
+	assert(operator, ...operands) {
 		if (this.OPERATOR) this.OPERANDS.splice(0);
 		this.OPERATOR = operator;
-		return this.build('OPERANDS', operands, Abstraction.exprTypes);
+		return this.build('OPERANDS', operands, Expr.Types);
 	}
 
 	/**
@@ -43,7 +43,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	equal(...operands) { return this.expression('=', ...operands); }
+	equal(...operands) { return this.assert('=', ...operands); }
 
 	/**
 	 * @alias equal
@@ -57,7 +57,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	notEqual(...operands) { return this.expression('<>', ...operands); }
+	notEqual(...operands) { return this.assert('<>', ...operands); }
 
 	/**
 	 * @alias notEqual
@@ -71,7 +71,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	lesserThan(...operands) { return this.expression('<', ...operands); }
+	lesserThan(...operands) { return this.assert('<', ...operands); }
 
 	/**
 	 * @alias lesserThan
@@ -85,7 +85,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	lessThanOrEqual(...operands) { return this.expression('<=', ...operands); }
+	lessThanOrEqual(...operands) { return this.assert('<=', ...operands); }
 
 	/**
 	 * @alias lessThanOrEqual
@@ -99,7 +99,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	greaterThan(...operands) { return this.expression('>', ...operands); }
+	greaterThan(...operands) { return this.assert('>', ...operands); }
 	
 	/**
 	 * @alias greaterThan
@@ -113,7 +113,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	greaterThanOrEqual(...operands) { return this.expression('>=', ...operands); }
+	greaterThanOrEqual(...operands) { return this.assert('>=', ...operands); }
 	
 	/**
 	 * @alias greaterThanOrEqual
@@ -127,7 +127,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	in(...operands) { return this.expression('IN', ...operands); }
+	in(...operands) { return this.assert('IN', ...operands); }
 
 	/**
 	 * API for "ANY"
@@ -136,7 +136,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	any(...operands) { return this.expression('ANY', ...operands); }
+	any(...operands) { return this.assert('ANY', ...operands); }
 
 	/**
 	 * API for "LIKE"
@@ -145,7 +145,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	like(...operands) { return this.expression('LIKE', ...operands); }
+	like(...operands) { return this.assert('LIKE', ...operands); }
 
 	/**
 	 * API for "IS NULL"
@@ -154,7 +154,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isNull(...operands) { return this.expression('IS NULL', ...operands); }
+	isNull(...operands) { return this.assert('IS NULL', ...operands); }
 
 	/**
 	 * API for "IS NOT NULL"
@@ -163,7 +163,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isNotNull(...operands) { return this.expression('IS NOT NULL', ...operands); }
+	isNotNull(...operands) { return this.assert('IS NOT NULL', ...operands); }
 
 	/**
 	 * API for "IS TRUE"
@@ -172,7 +172,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isTrue(...operands) { return this.expression('IS TRUE', ...operands); }
+	isTrue(...operands) { return this.assert('IS TRUE', ...operands); }
 
 	/**
 	 * API for "IS NOT TRUE"
@@ -181,7 +181,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isNotTrue(...operands) { return this.expression('IS NOT TRUE', ...operands); }
+	isNotTrue(...operands) { return this.assert('IS NOT TRUE', ...operands); }
 
 	/**
 	 * API for "IS FALSE"
@@ -190,7 +190,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isFalse(...operands) { return this.expression('IS FALSE', ...operands); }
+	isFalse(...operands) { return this.assert('IS FALSE', ...operands); }
 
 	/**
 	 * API for "IS NOT FALSE"
@@ -199,7 +199,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isNotFalse(...operands) { return this.expression('IS NOT FALSE', ...operands); }
+	isNotFalse(...operands) { return this.assert('IS NOT FALSE', ...operands); }
 
 	/**
 	 * API for "IS UNKNOWN"
@@ -208,7 +208,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isUnknow(...operands) { return this.expression('IS UNKNOWN', ...operands); }
+	isUnknow(...operands) { return this.assert('IS UNKNOWN', ...operands); }
 
 	/**
 	 * API for "IS NOT UNKNOWN"
@@ -217,7 +217,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isNotUnknow(...operands) { return this.expression('IS NOT UNKNOWN', ...operands); }
+	isNotUnknow(...operands) { return this.assert('IS NOT UNKNOWN', ...operands); }
 
 	/**
 	 * API for "IS DISTINCT FROM"
@@ -226,7 +226,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isDistinctFrom(...operands) { return this.expression('IS DISTINCT FROM', ...operands); }
+	isDistinctFrom(...operands) { return this.assert('IS DISTINCT FROM', ...operands); }
 
 	/**
 	 * API for "IS NOT DISTINCT FROM"
@@ -235,7 +235,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isNotDistinctFrom(...operands) { return this.expression('IS NOT DISTINCT FROM', ...operands); }
+	isNotDistinctFrom(...operands) { return this.assert('IS NOT DISTINCT FROM', ...operands); }
 
 	/**
 	 * API for "IS BETWEEN"
@@ -244,7 +244,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isBetween(...operands) { return this.expression('IS BETWEEN', ...operands); }
+	isBetween(...operands) { return this.assert('IS BETWEEN', ...operands); }
 
 	/**
 	 * API for "IS NOT BETWEEN"
@@ -253,7 +253,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isNotBetween(...operands) { return this.expression('IS NOT BETWEEN', ...operands); }
+	isNotBetween(...operands) { return this.assert('IS NOT BETWEEN', ...operands); }
 
 	/**
 	 * API for "IS BETWEEN SYMMETRIC"
@@ -262,7 +262,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isBetweenSymmetric(...operands) { return this.expression('IS BETWEEN SYMMETRIC', ...operands); }
+	isBetweenSymmetric(...operands) { return this.assert('IS BETWEEN SYMMETRIC', ...operands); }
 
 	/**
 	 * API for "IS NOT BETWEEN SYMMETRIC"
@@ -271,7 +271,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	isNotBetweenSymmetric(...operands) { return this.expression('IS NOT BETWEEN SYMMETRIC', ...operands); }
+	isNotBetweenSymmetric(...operands) { return this.assert('IS NOT BETWEEN SYMMETRIC', ...operands); }
 
 	/**
 	 * A shortcut method to Condition.
@@ -280,7 +280,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns Assertion
 	 */
-	and(...args) { return (new Condition(this, 'AND')).and(this, ...args) ;}
+	and(...args) { return (new Condition(this, 'AND')).and(this, ...args); }
 
 	/**
 	 * A shortcut method to Condition.
@@ -289,7 +289,28 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns Assertion
 	 */
-	or(...args) { return (new Condition(this, 'OR')).or(this, ...args) ;}
+	or(...args) { return (new Condition(this, 'OR')).or(this, ...args); }
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() {
+		return {
+			operator: this.OPERATOR,
+			operands: this.OPERANDS.map(o => o.toJson()),
+			flags: this.FLAGS,
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.operator !== 'string' || !(new RegExp(this.regex)).test(` ${ json.operator } `/*intentional space around*/) || !Array.isArray(json.operands)) return;
+		const instance = (new this(context)).withFlag(...(json.flags || []));
+		instance.assert(json.operator, ...json.operands);
+		return instance;
+	}
 	
 	/**
 	 * @inheritdoc
@@ -325,5 +346,8 @@ export default class Assertion extends Node {
 		return new this(context, $operator, ...(await Promise.all($operands.map(opr => parseCallback(context, opr.trim())))));
 	}
 
+	/**
+	 * @property String
+	 */
 	static regex = '((\\s+(?:NOT\\s+)?IS\\s+(?:NOT\\s+)?(TRUE|FALSE|NULL|UNKNOWN|DISTINCT\\s+FROM)\\s+)|\\s+(ISNULL|NOTNULL|IN|ANY|LIKE|(?:NOT\\s+)?BETWEEN(?:\\s+SYMMETRIC)?)\\s+|(?:\\s+)?(=|<|<=|>=|>|!=|<>)(?:\\s+)?)';
 }

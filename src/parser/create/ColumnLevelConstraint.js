@@ -58,8 +58,8 @@ export default class ColumnLevelConstraint extends AbstractConstraint {
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (!Object.values(this.attrEquivalents).includes(json.type)) return;
-		return new this(context, json.constraintName, json.type, json.detail);
+		if (!Object.values(this.attrEquivalents).includes(json?.type)) return;
+		return (new this(context, json.constraintName, json.type, json.detail)).withFlag(...(json.flags || []));
 	}
 
     /**

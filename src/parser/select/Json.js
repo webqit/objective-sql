@@ -27,7 +27,7 @@ export default class Json extends Str {
 	 * @param Object value
 	 */
 	object(value) {
-		this.VALUE = JSON.stringify(value);
+		this.VALUE = typeof value === 'object' && value ? JSON.stringify(value) : value;
 		this.TYPE = 'OBJECT';
 	}
 
@@ -37,8 +37,28 @@ export default class Json extends Str {
 	 * @param Object value
 	 */
 	array(value) {
-		this.VALUE = JSON.stringify(value);
+		this.VALUE = Array.isArray(value) ? JSON.stringify(value) : value;
 		this.TYPE = 'ARRAY';
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() {
+		return {
+			type: this.TYPE,
+			...super.toJson(),
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.type !== 'string' || !/OBJECT|ARRAY/i.test(json.type) || !json.value) return;
+		const instance = new this(context);
+		instance[json.type.toLowerCase()](json.value);
+		return instance;
 	}
 	
 	/**

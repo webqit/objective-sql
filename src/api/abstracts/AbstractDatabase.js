@@ -1,6 +1,4 @@
 
-import { _isObject, _isNumeric, _isBoolean } from '@webqit/util/js/index.js';
-import { _from as _arrFrom, _intersect, _unique, _difference } from '@webqit/util/arr/index.js';
 import CreateTable from '../../parser/create/CreateTable.js';
 import AlterTable from '../../parser/alter/AlterTable.js';
 import DropTable from '../../parser/drop/DropTable.js';
@@ -216,8 +214,11 @@ export default class AbstractDatabase {
                 if (tblSchema.basename && tblSchema.basename !== this.name) {
                     throw new Error(`A table schema of database ${ tblSchema.basename } is being passed to ${ this.name }.`);
                 }
-                tblCreateRequest = CreateTable.fromJson(this/*IMPORTANT: not client API*/, tblSchema);
+                tblCreateRequest = CreateTable.fromJson(this.client/*IMPORTANT: client API*/, tblSchema);
+                if (params.ifNotExists) tblCreateRequest.withFlag('IF_NOT_EXISTS');
             }
+            // Important:
+            tblCreateRequest.basename(this.name);
             // Create savepoint
             dbSchemaEdit.tablesSavepoints.add({
                 // Snapshot
@@ -261,7 +262,10 @@ export default class AbstractDatabase {
             } else if (typeof editCallback === 'function') {
                 // First we validate operation
                 const tblFound = (await this.tables({ name: tblName }))[0];
-                if (!tblFound) throw new Error(`Table ${ tblName } does not exist.`);
+                if (!tblFound) {
+                    if (params.ifExists) return;
+                    throw new Error(`Table ${ tblName } does not exist.`);
+                }
                 // Singleton TBL schema
                 tblSchema = await this.describeTable(tblName, params);
                 // For recursive edits
@@ -272,11 +276,14 @@ export default class AbstractDatabase {
                 // Call for modification
                 await editCallback(tblSchema.schemaEdit);
                 // Diff into a AlterTable instance
-                tblAlterRequest = AlterTable.fromDiffing(this/*IMPORTANT: not client API*/, tblSchema, tblSchema.schemaEdit);
+                tblAlterRequest = AlterTable.fromDiffing(this.client/*IMPORTANT: client API*/, tblSchema, tblSchema.schemaEdit);
+                if (params.ifExists) tblAlterRequest.withFlag('IF_EXISTS');
                 delete tblSchema.schemaEdit;
             } else {
                 throw new Error(`Alter table "${ tblName }" called with invalid arguments.`);
             }
+            // Important:
+            tblAlterRequest.basename(this.name);
             const newTblName = tblAlterRequest.ACTIONS.find(action => action.TYPE === 'RENAME' && !action.REFERENCE)?.ARGUMENT;
             const newTblLocation = tblAlterRequest.ACTIONS.find(action => action.TYPE === 'RELOCATE')?.ARGUMENT;
             if (tblAlterRequest.ACTIONS.length) {
@@ -335,8 +342,11 @@ export default class AbstractDatabase {
                     throw new Error(`Table ${ tblName } does not exist.`);
                 }
                 // Then forward the operation for execution
-                tblDropRequest = new DropTable(this/*IMPORTANT: not client API*/, tblName, this.name);
+                tblDropRequest = new DropTable(this.client/*IMPORTANT: client API*/, tblName, this.name);
+                if (params.ifExists) tblDropRequest.withFlag('IF_EXISTS');
             }
+            // Important:
+            tblDropRequest.basename(this.name);
             // Create savepoint
             const tblSchema = await this.describeTable(tblName, params);
             if (tblSchema.schemaEdit) throw new Error(`Cannot delete table when already in edit mode.`);

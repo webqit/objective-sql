@@ -1,5 +1,5 @@
 
-import StatementNode from '../StatementNode.js';
+import StatementNode from '../abstracts/StatementNode.js';
 
 export default class DropDatabase extends StatementNode {
 	 
@@ -15,11 +15,28 @@ export default class DropDatabase extends StatementNode {
 		super(context);
 		this.NAME = name;
 	}
+
+	/**
+	 * Sets the name
+	 * 
+	 * @param String name
+	 * 
+	 * @returns this
+	 */
+	name(name) { this.NAME = name; return this; }
 	
 	/**
 	 * @inheritdoc
 	 */
-	toJson() { return { name: this.NAME }; }
+	toJson() { return { name: this.NAME, flags: this.FLAGS }; }
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.name !== 'string') return;
+		return (new this(context, json.name)).withFlag(...(json.flags || []));;
+	}
 	
 	/**
 	 * @inheritdoc
@@ -37,14 +54,6 @@ export default class DropDatabase extends StatementNode {
 		const instance = new this(context, dbName);
 		if (ifExists) instance.withFlag('IF_EXISTS');
 		return instance;
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	static fromJson(context, json, flags = []) {
-		if (!json.name || !json.name.match(/[a-zA-Z]+/i)) throw new Error(`Could not assertain database name or database name invalid.`);
-		return (new this(context, json.name)).withFlag(...flags);;
 	}
 
 }

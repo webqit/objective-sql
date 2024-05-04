@@ -1,7 +1,7 @@
 
 import Lexer from '../Lexer.js';
 import { _unwrap } from '@webqit/util/str/index.js';
-import StatementNode from '../StatementNode.js';
+import StatementNode from '../abstracts/StatementNode.js';
 import TableLevelConstraint from './TableLevelConstraint.js';
 import Column from './Column.js';
 import Index from './Index.js';		
@@ -25,6 +25,24 @@ export default class CreateTable extends StatementNode {
 		this.NAME = name;
 		this.BASENAME = basename;
 	}
+
+	/**
+	 * Sets the name
+	 * 
+	 * @param String name
+	 * 
+	 * @returns this
+	 */
+	name(name) { this.NAME = name; return this; }
+
+	/**
+	 * Sets the basename
+	 * 
+	 * @param String name
+	 * 
+	 * @returns this
+	 */
+	basename(basename) { this.BASENAME = basename; return this; }
 
 	/**
 	 * Adds a column to the schema,
@@ -62,10 +80,25 @@ export default class CreateTable extends StatementNode {
 			basename: this.BASENAME,
             columns: this.COLUMNS.map(column => column.toJson()),
             constraints: this.CONSTRAINTS.map(constraint => constraint.toJson()),
-            indexes: this.INDEXES.map(index => index.toJson())
+            indexes: this.INDEXES.map(index => index.toJson()),
+			flags: this.FLAGS,
         }
         return json;
     }
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.name !== 'string' || !Array.isArray(json.columns)) return;
+		const instance = (new this(context, json.name, json.basename)).withFlag(...(json.flags || []));
+		// Lists
+		instance.column(...json.columns);
+		if (json.constraints?.length) instance.constraint(...json.constraints);
+		if (json.indexes?.length) instance.index(...json.indexes);
+		// Instance
+		return instance;
+	}
 	
 	/**
 	 * @inheritdoc
@@ -104,20 +137,6 @@ export default class CreateTable extends StatementNode {
 			else if (def instanceof Index) instance.index(def);
 			else instance.column(def);
 		}
-		return instance;
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	static fromJson(context, json, flags = []) {
-		if (!json.name || !json.name.match(/[a-zA-Z]+/i)) return;
-		const instance = (new this(context, json.name, json.basename || context/*Database*/?.name)).withFlag(...flags);
-		// Lists
-		instance.column(...json.columns);
-		instance.constraint(...(json.constraints || []));
-		instance.index(...(json.indexes || []));
-		// Instance
 		return instance;
 	}
 	

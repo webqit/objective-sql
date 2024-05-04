@@ -1,7 +1,7 @@
 
 import Lexer from '../Lexer.js';
 import { _isObject, _isFunction } from '@webqit/util/js/index.js';
-import StatementNode from '../StatementNode.js';
+import StatementNode from '../abstracts/StatementNode.js';
 import CreateTable from '../create/CreateTable.js';
 import TableLevelConstraint from '../create/TableLevelConstraint.js';
 import ColumnLevelConstraint from '../create/ColumnLevelConstraint.js';
@@ -29,6 +29,24 @@ export default class AlterTable extends StatementNode {
 		this.BASENAME = basename;
 		this.JSON_BEFORE = jsonBefore;
 	}
+
+	/**
+	 * Sets the name
+	 * 
+	 * @param String name
+	 * 
+	 * @returns this
+	 */
+	name(name) { this.NAME = name; return this; }
+
+	/**
+	 * Sets the basename
+	 * 
+	 * @param String name
+	 * 
+	 * @returns this
+	 */
+	basename(basename) { this.BASENAME = basename; return this; }
 
 	/**
 	 * Adds a "RENAME" action to the instance,
@@ -84,7 +102,20 @@ export default class AlterTable extends StatementNode {
 			basename: this.BASENAME,
 			jsonBefore: this.JSON_BEFORE,
 			actions: this.ACTIONS.map(action => action.toJson()),
+			flags: this.FLAGS,
 		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.name !== 'string' || !Array.isArray(json.actions)) return;
+		const instance = (new this(context, json.name, json.basename, json.jsonBefore)).withFlag(...(json.flags || []));
+		for (const action of json.actions) {
+			instance.ACTIONS.push(Action.fromJson(instance, action));
+		}
+		return instance;
 	}
 	
 	/**
@@ -297,22 +328,10 @@ export default class AlterTable extends StatementNode {
 		return instance;
 	}
 
-	/**
-	 * @inheritdoc
-	 */
-	static fromJson(context, json, flags = []) {
-		if (!json.name) return;
-		const instance = (new this(context, json.name, json.basename || context/*Database*/?.name, json.jsonBefore)).withFlag(...flags);
-		for (const action of json.actions) {
-			instance.ACTIONS.push(Action.fromJson(instance, action));
-		}
-		return instance;
-	}
-
 	static fromDiffing(context, jsonA, jsonB, flags = []) {
 		if (!jsonA?.name) throw new Error(`Could not assertain table1 name or table1 name invalid.`);
 		if (!jsonB?.name) throw new Error(`Could not assertain table2 name or table2 name invalid.`);
-		const instance = (new this(context, jsonA.name, jsonA.basename || context/* databaseApi */?.name, jsonA)).withFlag(...flags);
+		const instance = (new this(context, jsonA.name, jsonA.basename, jsonA)).withFlag(...flags);
 		// RENAME TO...
 		if (jsonB.name !== jsonA.name) {
 			instance.renameTo(jsonB.name);

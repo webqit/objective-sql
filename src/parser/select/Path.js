@@ -1,8 +1,8 @@
 
 import Lexer from '../Lexer.js';
-import Identifier from '../Identifier.js';
-import Node from '../Node.js';
-		
+import Identifier from './Identifier.js';
+import Node from '../abstracts/Node.js';
+
 export default class Path extends Node {
 
 	/**
@@ -17,6 +17,25 @@ export default class Path extends Node {
 	DIR = '';
 	LHS = null;
 	RHS = null;
+	UUID = null;
+
+	/**
+	 * @property Bool
+	 */
+	get isOutgoing() { return this.DIR === this.constructor.ARR_RIGHT; }
+
+	/**
+	 * @property Bool
+	 */
+	get isIncoming() { return this.DIR === this.constructor.ARR_LEFT; }
+
+	/**
+	 * @property String
+	 */
+	get uuid() {
+		if (!this.UUID) { this.UUID = `$path:${ ( 0 | Math.random() * 9e6 ).toString( 36 ) }`; }
+		return this.UUID;
+	}
 
 	/**
 	 * Builds the operands.
@@ -36,6 +55,113 @@ export default class Path extends Node {
 	}
 
 	/**
+	 * Evaluates the relationship 
+	 * and returns the parameters for plotting the join.
+	 * 
+	 * @returns Object
+	 */
+	async resolve() {
+		const getPrimaryKey = schema => schema.columns.find(col => col.primaryKey)?.name || schema.constraints.find(cons => cons.type === 'PRIMARY_KEY')?.columns[0];
+		const getKeyDef = (schema, foreignKey) => schema.columns.find(col => col.name === foreignKey.NAME)?.references || schema.constraints.find(cons => cons.type === 'FOREIGN_KEY' && cons.columns.includes(foreignKey.NAME))?.references;
+		const getSchema = async (tblName, dbName) => {
+			const clientApi = this.rootNode.CONTEXT;
+			const basename = dbName || await clientApi.getBasename(tblName);
+			const dbApi = clientApi.database(basename);
+			return await dbApi.describeTable(tblName);
+		};
+		if (this.isIncoming) {
+			if (!(this.RHS instanceof Path)) throw new Error(`Unterminated path: ${ this.RHS }`);
+			// --------------------------
+			// === {foreignKey}LHS<-RHS{table...}
+			let foreignKey_rhs, table_rhs, schema_rhs, path;
+			if (this.RHS.isIncoming) {
+				if (!(this.RHS.RHS instanceof Path)) throw new Error(`Unterminated path: ${ this.RHS.RHS }`);
+				// === {foreignKey}LHS<-RHS{foreignKey_rhs<-table->?...}
+				({ LHS: foreignKey_rhs/*Identifier*/, RHS/*Path*/: path } = this);
+				schema_rhs = (await path.resolve()).lhs.schema;
+				table_rhs = Identifier.fromJson(this, schema_rhs);
+			} else {
+				// === {foreignKey}LHS<-RHS{table->path}
+				({ LHS: foreignKey_rhs/*Identifier*/, RHS/*Path*/: { LHS: table_rhs/*Identifier*/, RHS: path/*Identifier|Path*/ } } = this);
+				schema_rhs = await getSchema(table_rhs.NAME, table_rhs.BASENAME);
+				if (!schema_rhs) throw new Error(`[${ this }]: The implied table ${ table_rhs } does not exist.`);
+			}
+			const keyDef_rhs = getKeyDef(schema_rhs, foreignKey_rhs);
+			// Validate that schema_rhs has the implied foreign key (actingKey)
+			if (!keyDef_rhs) throw new Error(`[${ this }]: Table ${ table_rhs } does not define the implied foreign key ${ foreignKey_rhs }.`);
+			// -------------
+			// Get schema_lhs from keyDef
+			const table_lhs = Identifier.fromJson(this, keyDef_rhs);
+			const schema_lhs = await getSchema(table_lhs.NAME, table_lhs.BASENAME);
+			if (!schema_lhs) throw new Error(`[${ this }]: The implied table ${ table_lhs } does not exist.`);
+			// Get shcema_lhs's acting key (primary key) and validate
+			const primaryKey_lhs = getPrimaryKey(schema_lhs);
+			if (!primaryKey_lhs) throw new Error(`[${ this }]: Table ${ schema_lhs.name } does not define a primary key.`);
+			// -------------
+			// Put together
+			return {
+				lhs: { schema: schema_lhs, primaryKey: primaryKey_lhs, },
+				rhs: { schema: schema_rhs, foreignKey: foreignKey_rhs, path, },
+			};
+		}
+		// -------------
+		// reference === {foreignKey}LHS->RHS{path}
+		const table_lhs = this.statementNode.FROM_LIST[0]/*Table*/.EXPR/*Identifier*/;
+		if (!(table_lhs instanceof Identifier)) throw new Error(`[${ this }]: Base query must not be derived.`);
+		// Get lhs schema
+		const schema_lhs = await getSchema(table_lhs.NAME, table_lhs.BASENAME);
+		const { LHS: foreignKey_lhs/*Identifier*/, RHS: path/*Identifier|Path*/ } = this;
+		// We get schema2 from schema_lhs
+		const keyDef_lhs = getKeyDef(schema_lhs, foreignKey_lhs);
+		// Validate that schema_lhs has the implied foreign key (foreignKey)
+		if (!keyDef_lhs) throw new Error(`[${ this }]: Table ${ table_lhs } does not define the implied foreign key ${ foreignKey_lhs }.`);
+		// -------------
+		// Get schema_rhs from keyDef!
+		const table_rhs = Identifier.fromJson(this, keyDef_lhs);
+		const schema_rhs = await getSchema(table_rhs.NAME, table_rhs.BASENAME || table_lhs.BASENAME);
+		if (!schema_rhs) throw new Error(`[${ this }]: The implied table ${ table_rhs } does not exist.`);
+		// Get shcema_lhs's acting key (primary key) and validate
+		const primaryKey_rhs = getPrimaryKey(schema_rhs);
+		if (!primaryKey_rhs) throw new Error(`[${ this }]: Table ${ table_rhs } does not define a primary key.`);
+		// -------------
+		// Put together
+		return {
+			lhs: { schema: schema_lhs, foreignKey: foreignKey_lhs, },
+			rhs: { schema: schema_rhs, primaryKey: primaryKey_rhs, path, },
+		};
+	}
+
+	/**
+	 * Plots the relationship.
+	 * 
+	 * @returns Void
+	 */
+	async plot() {
+		// Resolve relation and validate
+		const { lhs, rhs } = await this.resolve();
+		const baseTable = this.statementNode.FROM_LIST[0]/*Table*/;
+		if (!(baseTable.EXPR instanceof Identifier)) throw new Error(`[${ this }]: Base query must not be derived.`);
+		if (lhs.primaryKey/*then incoming reference*/ && lhs.schema.table !== baseTable.EXPR.NAME) throw new Error(`[${ this }]: Cannot resolve incoming path to base table ${ baseTable.EXPR }.`);
+		// Do plotting
+		const joinAlias = `$view:${ [lhs.foreignKey || lhs.primaryKey, rhs.schema.table, rhs.schema.basename, rhs.primaryKey || rhs.foreignKey].join(':') }`;
+		const joint = () => this.JOINT = this.statementNode.JOINS.find(joint => joint.ALIAS.NAME === joinAlias);
+		if (!joint()) {
+			// Implement the join for the first time
+			const baseAlias = ['ALIAS','EXPR'].reduce((prev, key) => prev || this.statementNode.FROM_LIST[0]/*Table*/[key]?.NAME, null);
+			this.statementNode.leftJoin(
+				join => join.expr( expr => expr.from({ name: rhs.schema.table, basename: rhs.schema.basename }) )
+					.with({ IS_SMART_JOIN: true }).as({ name: joinAlias }).on( on => on.equal({ name: rhs.schema.primaryKey || rhs.schema.foreignKey, basename: joinAlias }, { name: lhs.schema.foreignKey || lhs.schema.primaryKey, basename: baseAlias }) )
+			);
+			joint();
+		}
+		// For something like: author~>name, select "$view:fk_name:tbl_name:db_name:pk_name"."name" as "$path:unxnj"
+		// Now on outer query, that would resolve to selecting "$view:fk_name:tbl_name:db_name:pk_name"."$path:unxnj" as "author"->"name"
+		// For something like: author~>country->name, select "$view:fk_name:tbl_name:db_name:pk_name"."country"->"name" as "$path:unxnj"
+		// Now on outer query, that would resolve to selecting "$view:fk_name:tbl_name:db_name:pk_name"."$path:unxnj" as "author"~>"country"->"name"
+		this.JOINT.EXPR/*Query*/.select( field => field.expr(rhs.path).as({ name: this.uuid }) );
+	}
+
+	/**
 	 * @inheritdoc
 	 */
 	static async parse(context, expr, parseCallback) {
@@ -48,126 +174,5 @@ export default class Path extends Node {
 			await parseCallback(instance, tokens[0], [Identifier,this]),
 		);
 		return instance;
-	}
-
-	// ------------------------
-
-	/**
-	 * Gets the immediate target in a reference path.
-	 * 
-	 * @param {Object} schema1
-	 * @param {Object} dbClient
-	 * 
-	 * @return {Object}
-	 */
-	async process(schema1, dbClient = null) {
-		const reference = this.interpreted ? this.interpreted.toString() : this.toString();
-		return await this.constructor.process(schema1, reference.replace(/`/g, ''), dbClient);
-	}
-
-	/**
-	 * Tells if a column is a reference.
-	 *
-	 * @param String str
-	 *
-	 * @return Bool
-	 */
-	static isReference(str) { return !!Lexer.match(str, [this.ARR_LEFT, this.ARR_RIGHT]).length; }
-	
-	/**
-	 * Tells if a path is an outgoing reference in direction.
-	 *
-	 * @param String reference
-	 *
-	 * @return bool
-	 */
-	static isOutgoing(reference) { return Lexer.match(reference, [this.ARR_RIGHT, this.ARR_LEFT])[0] === this.ARR_RIGHT; }
-	
-	/**
-	 * Tells if a path is an incoming reference in direction.
-	 *
-	 * @param {String} reference
-	 *
-	 * @return bool
-	 */
-	static isIncoming(reference) { return Lexer.match(reference, [this.ARR_LEFT, this.ARR_RIGHT])[0] === this.ARR_LEFT; }
-	
-	/**
-	 * Returns the relationshipPath in reverse direction.
-	 *
-	 * @param {String} reference
-	 *
-	 * @return string
-	 */
-	static reverse(reference) {
-		const { tokens, matches } = Lexer.lex(reference, [this.ARR_LEFT, this.ARR_RIGHT]);
-		return tokens.reduce((tokens, t, i) => tokens.concat(t, matches[i] === this.ARR_RIGHT ? this.ARR_LEFT : this.ARR_RIGHT), []).reverse().join('');
-	}
-
-	/**
-	 * Gets the immediate target in a reference path.
-	 * 
-	 * @param Object dbClient 
-	 * @param Object schema1 
-	 * @param String reference 
-	 * 
-	 * @return Object
-	 */
-    static async process(database, schema1, reference) {
-		const getPrimaryKey = schema => schema.columns.find(col => col.primaryKey)?.name || schema.constraints.find(cons => cons.type === 'PRIMARY_KEY')?.columns[0];
-		const getReferenceDef = (schema, actingKey) => schema.columns.find(col => col.name === actingKey)?.references || schema.constraints.find(cons => cons.type === 'FOREIGN_KEY' && cons.columns.includes(actingKey))?.references;
-		const getSchema = async (tblName, dbName) => {
-			let $database = database;
-			if (dbName && $database.name !== dbName) { $database = database.client.database(dbName); }
-			return await $database.describeTable(tblName);
-		};
-		if (this.isIncoming(reference)) {
-			// --------------------------
-			// reference === actingKey<-table
-			let actingKey, sourceTable, basename, select, schema2;
-			[ actingKey, sourceTable ] = Lexer.split(reference, [this.ARR_LEFT], { limit: 1 });
-			if (this.isIncoming(sourceTable)) {
-				// reference === actingKey<-actingKey2<-table->?...
-				schema2 = (await this.process(database, null, sourceTable/* as new reference */))[0].schema;
-				select = sourceTable;
-			} else {
-				// reference === actingKey<-table->?...
-				[sourceTable, select] = Lexer.split(sourceTable, [this.ARR_RIGHT]);
-				[sourceTable, basename] = this.parseIdent(database, sourceTable);
-				schema2 = await getSchema(sourceTable, basename);
-				if (!schema2) throw new Error(`[${ reference }]: The implied table "${ sourceTable }" does not exist.`);
-			}
-			const referenceDef = getReferenceDef(schema2, actingKey);
-			// Validate that schema2 has the implied foreign key (actingKey)
-			if (!referenceDef) throw new Error(`[${ reference }]: The "${ schema2.name }" table does not define the implied foreign key "${ actingKey }".`);
-			// Validate that schema2's actingKey is a reference to schema1
-			if (schema1 && referenceDef.table !== schema1.name) throw new Error(`[${ reference }]: "${ schema2.name }"."${ actingKey }" table does not reference "${ schema1.name }".`);
-			// Get schema1 from schema2?
-			if (!schema1) { schema1 = await getSchema(referenceDef.table, referenceDef.basename); }
-			// Get shcema1's acting key (primary key) and validate
-			const schema1ActingKey = getPrimaryKey(schema1);
-			if (!schema1ActingKey) throw new Error(`[${ reference }]: "${ schema1.name }" does not define a primary key.`);
-			// Put together
-			return [
-				{ schema: schema1, actingKey: schema1ActingKey, },
-				{ schema: schema2, actingKey, select, },
-			];
-		}
-		// --------------------------
-		// reference === foreignKey->...
-		const [foreignKey, select] = Lexer.split(reference, [this.ARR_RIGHT]);
-		// We get schema2 from schema1
-		const referenceDef = getReferenceDef(schema1, foreignKey);
-		// Validate that schema1 has the implied foreign key (foreignKey)
-		if (!referenceDef) throw new Error(`[${ reference }]: The "${ schema1.name }" table does not define the implied foreign key "${ foreignKey }".`);
-		const schema2 = await database.describeTable(referenceDef.table);
-		// Get shcema1's acting key (primary key) and validate
-		const schema2ActingKey = getPrimaryKey(schema2);
-		if (!schema2ActingKey) throw new Error(`[${ reference }]: "${ schema2.name }" does not define a primary key.`);
-		// Put together
-		return [
-			{ schema: schema1, actingKey: foreignKey, },
-			{ schema: schema2, actingKey: schema2ActingKey, select, },
-		];
 	}
 }

@@ -1,12 +1,12 @@
 
 import AbstractAliasableExpr from './abstracts/AbstractAliasableExpr.js';
-import Abstraction from './Abstraction.js';
-import Identifier from '../Identifier.js';
+import Identifier from './Identifier.js';
+import Parens from './Parens.js';
 
 export default class Table extends AbstractAliasableExpr {
 
 	/**
 	 * @property Array
 	 */
-	static get exprTypes() { return [Abstraction,Identifier]; }
+	static get exprTypes() { return [Parens,Identifier]; }
 }

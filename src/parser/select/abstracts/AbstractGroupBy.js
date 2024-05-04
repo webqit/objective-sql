@@ -1,7 +1,7 @@
 
 import Lexer from '../../Lexer.js';
-import Abstraction from '../Abstraction.js';
-import Node from '../../Node.js';
+import Node from '../../abstracts/Node.js';
+import Expr from '../../abstracts/Expr.js';
 
 export default class AbstractGroupBy extends Node {
 	
@@ -17,12 +17,27 @@ export default class AbstractGroupBy extends Node {
 	 * 
 	 * @returns this
 	 */
-	criterion(...args) { return this.build('CRITERIA', args, Abstraction.exprTypes); }
+	criterion(...args) { return this.build('CRITERIA', args, Expr.Types); }
 
 	/**
 	 * @inheritdoc
 	 */
 	stringify() { return this.CRITERIA.map(criterion => criterion.stringify()).join(','); }
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() { return { criteria: this.CRITERIA.map(c => c.toJson()), flags: this.FLAGS }; }
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (!Array.isArray(json?.criteria)) return;
+		const instance = (new this(context)).withFlag(...(json.flags || []));
+		instance.criterion(...json.criteria);
+		return instance;
+	}
 	
 	/**
 	 * @inheritdoc

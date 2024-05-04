@@ -60,7 +60,7 @@ describe(`Postgres Savepoints & Rollbacks`, function() {
             expect(databases).to.be.an('array').that.includes('private').and.not.includes('public');
         });
 
-        it(`ROLLBACK: ${ desc0 }`, async function() {
+        it(`ROLLBACK (2): ${ desc0 }`, async function() {
             const savepoint = await dbApi.savepoint();
             const success = await savepoint.rollback();
             expect(success).to.be.true;

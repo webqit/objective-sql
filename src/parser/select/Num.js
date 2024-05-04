@@ -1,5 +1,5 @@
 
-import Node from "../Node.js";
+import Node from "../abstracts/Node.js";
 
 export default class Num extends Node {
 	
@@ -14,6 +14,19 @@ export default class Num extends Node {
 	constructor(context, value) {
 		super(context);
 		this.VALUE = value;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() { return { value: this.VALUE, flags: this.FLAGS, }; }
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.value !== 'number') return;
+		return (new this(context, json.value)).withFlag(...(json.flags || []));
 	}
 	
 	/**

@@ -1,7 +1,7 @@
 
 import Lexer from '../../Lexer.js';
 import WindowSpec from './WindowSpec.js';
-import Node from '../../Node.js';
+import Node from '../../abstracts/Node.js';
 
 export default class WindowClause extends Node {
 	
@@ -18,6 +18,21 @@ export default class WindowClause extends Node {
 	 * @returns this
 	 */
 	define(...windows) { return this.build('WINDOWS_LIST', windows, WindowSpec); }
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() { return { window_list: this.WINDOWS_LIST.map(w => w.toJson()) }; }
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (!Array.isArray(json?.window_list)) return;
+		const instance = new this(context);
+		instance.define(...json.window_list);
+		return instance;
+	}
 
 	
 	/**

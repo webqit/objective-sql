@@ -1,7 +1,7 @@
 
 import Lexer from '../Lexer.js';
-import Identifier from '../Identifier.js';
-import StatementNode from '../StatementNode.js';
+import Identifier from '../select/Identifier.js';
+import StatementNode from '../abstracts/StatementNode.js';
 import JoinClause from '../select/JoinClause.js';
 import OrderByClause from '../select/OrderByClause.js';
 import Condition from '../select/Condition.js';
@@ -163,6 +163,38 @@ export default class Delete extends StatementNode {
 	limit(...limit) {
 		if (!limit.every(l => typeof l === 'number')) throw new Error(`Limits must be of type number.`);
 		this.LIMIT_CLAUSE = limit;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() {
+		return {
+			delete_list: this.DELETE_LIST.map(t => t.toJson()),
+			from_list: this.FROM_LIST.map(t => t.toJson()),
+			using_list: this.USING_LIST.map(t => t.toJson()),
+			join_list: this.JOIN_LIST.map(t => t.toJson()),
+			where_clause: this.WHERE_CLAUSE?.toJson(),
+			order_by_clause: this.ORDER_BY_CLAUSE?.toJson(),
+			limit_clause: this.LIMIT_CLAUSE,
+			flags: this.FLAGS,
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (!Array.isArray(json?.from_list)) return;
+		const instance = (new this(context)).withFlag(...(json.flags || []));
+		if (json.delete_list?.length) instance.delete(...json.delete_list);
+		instance.from(...json.from_list);
+		if (json.using_list?.length) instance.using(...json.using_list);
+		if (json.join_list?.length) instance.join(...json.join_list);
+		if (json.where_clause) instance.where(json.where_clause);
+		if (json.order_by_clause) instance.orderBy(json.order_by_clause);
+		if (json.limit_clause) instance.limit(json.limit_clause);
+		return instance;
 	}
 	
 	/**

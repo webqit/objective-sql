@@ -1,6 +1,6 @@
 
 import { _after, _before } from '@webqit/util/str/index.js';
-import Node from '../Node.js';		
+import Node from '../abstracts/Node.js';		
 
 export default class DataType extends Node {
 
@@ -37,7 +37,7 @@ export default class DataType extends Node {
 	 */
 	static fromJson(context, json) {
 		if (typeof json === 'string') { json = { name: json }; }
-		if (!(typeof json === 'object' && json) || !json.name) return;
+		if (!(typeof json === 'object' && json) || typeof json.name !== 'string') return;
 		const expr = json.name + (json.precision ? `(${ json.precision })` : '');
 		const [name, precision] = parse(expr);
 		if (!name) return;

@@ -1,14 +1,9 @@
 
-
+import Identifier from '../../parser/select/Identifier.js';
+import Lexer from '../../parser/Lexer.js';
 import Parser from '../../parser/Parser.js';
 import AbstractClient from '../abstracts/AbstractClient.js';
-import SQLDatabase from './SQLDatabase.js';
-
-/**
- * ---------------------------
- * SQLClient class
- * ---------------------------
- */				
+import SQLDatabase from './SQLDatabase.js';	
 
 export default class SQLClient extends AbstractClient {
 
@@ -52,21 +47,30 @@ export default class SQLClient extends AbstractClient {
      * 
      * @return String|Null
 	 */
-	async defaultDatabase(...args) {
-        return this.defaultDatabaseCallback(dbName => {
+	async searchPath(...args) {
+        return this.searchPathCallback(path => {
             return new Promise((resolve, reject) => {
                 const driver = this.driver;
-                if (dbName) {
-                    return driver.query('USE ' + dbName, (err, result) => {
+                if (path) {
+                    path = path.map(name => Identifier.fromJson(this, name));
+                    const sql = this.params.dialect === 'mysql' ? `USE ${ path[0] }` : `SET SEARCH_PATH TO ${ path.join(',') }`;
+                    return driver.query(sql, (err, result) => {
                         if (err) return reject(err);
                         resolve(result);
                     });
                 }
-                const sql = `SELECT ${ this.params.dialect === 'mysql' ? 'database()' : 'current_database()' } AS default_db`;
+                let sql, key;
+                if (this.params.dialect === 'mysql') {
+                    sql = 'SELECT database() AS default_db', key = 'default_db';
+                } else {
+                    // Here, what we need is SHOW SEARCH_PATH not SELECT current_database()
+                    sql = `SHOW SEARCH_PATH`, key = 'search_path';
+                    sql = `SELECT current_setting('SEARCH_PATH')`, key = 'current_setting';
+                }
                 return driver.query(sql, (err, result) => {
                     if (err) return reject(err);
                     const rows = result.rows || result;
-                    resolve((rows[0] || {}).default_db);
+                    resolve(Promise.all(Lexer.split((rows[0] || {})[key], [',']).map(s => Identifier.parse(this, s.trim())[0])));
                 });
             });
         }, ...args);

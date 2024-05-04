@@ -86,7 +86,7 @@ export default class TableLevelConstraint extends AbstractConstraint {
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (!json.constraintName && !(typeof json.type === 'string' && json.type.match(/PRIMARY_KEY|UNIQUE|CHECK|FOREIGN_KEY/i))) return;
+		if (typeof json.constraintName !== 'string' && (typeof json?.type !== 'string' || !json.type.match(/PRIMARY_KEY|UNIQUE|CHECK|FOREIGN_KEY/i))) return;
 		return new this(context, json.constraintName, json.type.replace(/UNIQUE_KEY/i, 'UNIQUE'), json.columns, json.references/*from user-defined schema*/ || json.expr/*from user-defined schema*/ || json.detail/*the standard*/ );
 	}
 

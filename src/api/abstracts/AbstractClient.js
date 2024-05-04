@@ -50,7 +50,7 @@ export default class AbstractClient {
      * 
      * @return String
      */
-    async defaultDatabase(...args) { return this.defaultDatabaseCallback(() => {}, ...arguments); }
+    async searchPath(...args) { return this.searchPathCallback(() => {}, ...arguments); }
 
     /**
      * Returns list of databases.
@@ -129,33 +129,41 @@ export default class AbstractClient {
      */
 
     /**
-     * Base logic for the defaultDatabase() method.
+     * Base logic for the searchPath() method.
      * 
-     * @param Function callback
-     * @param Array args
+     * @param Function          callback
+     * @param Array             path
      * 
      * @return String
      */
-    async defaultDatabaseCallback(callback, ...args) {
-        let dbName, params = {};
-        if (args.length === 2 || (args.length === 1 && _isObject(args[0]))) { params = args.pop(); }
-        if (dbName = args.pop()) {
-            this.$.defaultDB = dbName;
-            return await callback(dbName);
+    async searchPathCallback(callback, ...path) {
+        if (path.length) {
+            const returnValue = await callback(path);
+            this.$.searchPath = path;
+            return returnValue;
         }
-        if (!this.$.defaultDB || params.force) {
-            const defaultDB = await callback() || (await this.databases())[0];
-            this.$.defaultDB = defaultDB;
-        }
-        return this.$.defaultDB;
+        if (!this.$.searchPath) { this.$.searchPath = await callback(); }
+        return this.$.searchPath;
+    }
+
+    /**
+     * Base logic for the searchPath() method.
+     * 
+     * @param String          tblName
+     * 
+     * @return String
+     */
+    async getBasename(tblName) {
+        const searchPath = await this.searchPath();
+        return searchPath.reduce(async (prev, dbName) => (await prev) || (await this.database(dbName).tables({ name: tblName })).length ? dbName : null, null);
     }
 
     /**
      * Base logic for the databases() method.
      * 
-     * @param Function callback
-     * @param Object filter
-     * @param Array standardExclusions
+     * @param Function          callback
+     * @param Object            filter
+     * @param Array             standardExclusions
      * 
      * @return Array
      */
@@ -205,7 +213,8 @@ export default class AbstractClient {
                 throw new Error(`Database ${ dbSchema.name } already exists.`);
             }
             // Then forward the operation for execution
-            dbCreateInstance = CreateDatabase.fromJson(this/*IMPORTANT: not db API*/, dbSchema, params.ifNotExists ? ['IF_NOT_EXISTS'] : []);
+            dbCreateInstance = CreateDatabase.fromJson(this/*IMPORTANT: not db API*/, dbSchema);
+            if (params.ifNotExists) dbCreateInstance.withFlag('IF_NOT_EXISTS');
         }
         // ------
         // Must be before db changes below
@@ -470,5 +479,4 @@ export default class AbstractClient {
         }
         return savepoint;
     }
-
 }

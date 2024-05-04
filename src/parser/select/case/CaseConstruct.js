@@ -1,8 +1,8 @@
 
 import Lexer from '../../Lexer.js';
 import WhenClause from './WhenClause.js';
-import Abstraction from '../Abstraction.js';
-import Node from '../../Node.js';
+import Node from '../../abstracts/Node.js';
+import Expr from '../../abstracts/Expr.js';
 
 export default class CaseConstruct extends Node {
 	
@@ -20,7 +20,10 @@ export default class CaseConstruct extends Node {
 	 * 
 	 * @returns this
 	 */
-	case(caseValue) { return this.build('CASE_VALUE', [caseValue], Abstraction.exprTypes); }
+	case(caseValue) {
+		if (this.WHEN_CLAUSES.length || this.ELSE_CLAUSE) throw new Error(`A "case" clause must come before any "when" or "else" clauses.`);
+		return this.build('CASE_VALUE', [caseValue], Expr.Types);
+	}
 
 	/**
 	 * Adds a "when" expression
@@ -30,6 +33,7 @@ export default class CaseConstruct extends Node {
 	 * @returns WhenClause
 	 */
 	when(whenExpr) {
+		if (this.ELSE_CLAUSE) throw new Error(`A "when" clause cannot come after an "else" clause.`);
 		this.build('WHEN_CLAUSES', [whenExpr], WhenClause, 'criterion');
 		return this.WHEN_CLAUSES[this.WHEN_CLAUSES.length - 1];
 	}
@@ -41,7 +45,34 @@ export default class CaseConstruct extends Node {
 	 * 
 	 * @returns this
 	 */
-	else(elseClause) { return this.build('ELSE_CLAUSE', [elseClause], Abstraction.exprTypes); }
+	else(elseClause) {
+		if (!this.WHEN_CLAUSES.length) throw new Error(`An "else" clause cannot come before "when" clauses.`);
+		return this.build('ELSE_CLAUSE', [elseClause], Expr.Types);
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	toJson() {
+		return {
+			case_value: this.CASE_VALUE?.toJson(),
+			when_clauses: this.WHEN_CLAUSES.map(c => c.toJson()),
+			else_clause: this.ELSE_CLAUSE?.toJson(),
+			flags: this.FLAGS,
+		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (!Array.isArray(json?.when_clauses)) return;
+		const instance = (new this(context)).withFlag(...(json.flags || []));
+		if (json.case_value) instance.case(json.case_value);
+		for (const whenClause of json.when_clauses) instance.when(whenClause);
+		if (json.else_clause) instance.else(json.else_clause);
+		return instance;
+	}
 	
 	/**
 	 * @inheritdoc

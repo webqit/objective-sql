@@ -1,5 +1,5 @@
 
-import StatementNode from '../StatementNode.js';
+import StatementNode from '../abstracts/StatementNode.js';
 import Action from './Action.js';
 
 export default class AlterDatabase extends StatementNode {
@@ -19,6 +19,15 @@ export default class AlterDatabase extends StatementNode {
 	}
 
 	/**
+	 * Sets the name
+	 * 
+	 * @param String name
+	 * 
+	 * @returns this
+	 */
+	name(name) { this.NAME = name; return this; }
+
+	/**
 	 * Adds a "RENAME" action to the instance,
 	 * 
 	 * @param String newName
@@ -34,7 +43,20 @@ export default class AlterDatabase extends StatementNode {
 		return {
 			name: this.NAME,
 			actions: this.ACTIONS.map(action => action.toJson()),
+			flags: this.FLAGS,
 		};
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	static fromJson(context, json) {
+		if (typeof json?.name !== 'string') return;
+		const instance = (new this(context, json.name)).withFlag(...(json.flags || []));
+		for (const action of json.actions) {
+			instance.ACTIONS.push(Action.fromJson(context, action));
+		}
+		return instance;
 	}
 	
 	/**
@@ -59,18 +81,6 @@ export default class AlterDatabase extends StatementNode {
 		const instance = new this(context, name1);
 		if (ifExists) instance.withFlag('IF_EXISTS');
 		return instance.renameTo(name2);
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	static fromJson(context, json, flags = []) {
-		if (!json.name) return;
-		const instance = (new this(context, json.name)).withFlag(...flags);
-		for (const action of json.actions) {
-			instance.ACTIONS.push(Action.fromJson(context, action));
-		}
-		return instance;
 	}
 	
 	/**
