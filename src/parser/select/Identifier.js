@@ -10,44 +10,33 @@ export default class Identifier extends Node {
 	NAME;
 
 	/**
-	 * @constructor
-	 */
-	constructor(context, name, basename = null) {
-		super(context);
-		this.NAME = name;
-		this.BASENAME = basename;
-	}
-
-	/**
 	 * Sets the name.
 	 * 
-	 * @param String name
+	 * @param Array|String name
 	 * 
 	 * @returns this
 	 */
-	name(name) { this.NAME = name; return this; }
-
-	/**
-	 * Sets the basename.
-	 * 
-	 * @param String basename
-	 * 
-	 * @returns this
-	 */
-	basename(basename) { this.BASENAME = basename; return this; }
+	name(name) {
+		const nameParts = Array.isArray(name) ? [...name] : [name];
+		this.NAME = nameParts.pop();
+		this.BASENAME = nameParts.pop();
+		if (nameParts.length) throw new Error(`Idents can be maximum of two parts. Recieved: ${ nameParts.reverse().join('.') }.${ this.BASENAME }.${ this.NAME }`);
+	}
 
 	/**
 	 * @inheritdoc
 	 */
-	toJson() { return { name: this.NAME, basename: this.BASENAME, flags: this.FLAGS, }; }
+	toJson() { return { name: this.BASENAME ? [this.BASENAME,this.NAME] : this.NAME, flags: this.FLAGS }; }
 
 	/**
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (typeof json === 'string') json = { name: json };
-		else if (typeof json?.name !== 'string') return;
-		return (new this(context, json.name, json.basename)).withFlag(...(json?.flags || []));
+		if (typeof json === 'string' || Array.isArray(json)) json = { name: json };
+		else if (typeof json?.name !== 'string' && !Array.isArray(json?.name)) return;
+		const instance = (new this(context)).withFlag(...(json?.flags || []));
+		instance.name(json.name);
+		return instance;
 	}
 	
 	/**
@@ -62,9 +51,11 @@ export default class Identifier extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
-		const [name, basename] = this.parseIdent(context, expr) || [];
+	static parse(context, expr) {
+		const [name, basename] = this.parseIdent(context, expr, true) || [];
 		if (!name) return;
-		return new this(context, name, basename);
+		const instance = new this(context);
+		instance.name(basename ? [basename,name] : name);
+		return instance;
 	}
 }

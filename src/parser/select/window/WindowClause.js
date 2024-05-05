@@ -43,12 +43,12 @@ export default class WindowClause extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ windowMatch, windowSpec ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
 		if (!windowMatch) return;
 		const instance = new this(context);
 		for (const spec of Lexer.split(windowSpec, [','])) {
-			instance.define(await parseCallback(instance, spec.trim(), [Window]));
+			instance.define(parseCallback(instance, spec.trim(), [Window]));
 		}
 		return instance;
 	}

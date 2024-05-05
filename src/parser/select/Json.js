@@ -69,7 +69,7 @@ export default class Json extends Str {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
+	static parse(context, expr) {
 		const braces = [['{','}'], ['[',']']], $ = {};
 		const [text, quote] = this.parseText(context, expr) || [];
 		if (!quote) return;

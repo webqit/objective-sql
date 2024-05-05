@@ -23,9 +23,9 @@ export default class AlterDatabase extends StatementNode {
 	 * 
 	 * @param String name
 	 * 
-	 * @returns this
+	 * @returns Void
 	 */
-	name(name) { this.NAME = name; return this; }
+	name(name) { this.NAME = name; }
 
 	/**
 	 * Adds a "RENAME" action to the instance,
@@ -71,12 +71,12 @@ export default class AlterDatabase extends StatementNode {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
+	static parse(context, expr) {
 		const [ match, ifExists, rest ] = /^ALTER\s+DATABASE\s+(IF\s+EXISTS\s+)?([\s\S]+)$/i.exec(expr) || [];
 		if (!match) return;
 		const [ name1Part, name2Part ] = Lexer.split(rest, ['RENAME\s+TO'], { useRegex: 'i' });
-		const [name1] = this.parseIdent(context, name1Part.trim()) || [];
-		const [name2] = this.parseIdent(context, name2Part.trim()) || [];
+		const [name1] = this.parseIdent(context, name1Part.trim(), true) || [];
+		const [name2] = this.parseIdent(context, name2Part.trim(), true) || [];
 		if (!name1 || !name2) return;
 		const instance = new this(context, name1);
 		if (ifExists) instance.withFlag('IF_EXISTS');

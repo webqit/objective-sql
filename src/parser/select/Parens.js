@@ -1,8 +1,7 @@
 
 import { _wrapped, _unwrap } from '@webqit/util/str/index.js';
-import Identifier from './Identifier.js';
 import Node from '../abstracts/Node.js';
-import Expr from '../abstracts/Expr.js';
+import Expr from './abstracts/Expr.js';
 import Select from './Select.js';
 import Lexer from '../Lexer.js';
 
@@ -37,40 +36,22 @@ export default class Parens extends Node {
 	get EXPR() { return this.$EXPR?.EXPR || this.$EXPR; }
 
 	/**
-	 * Sets the name
-	 * 
-	 * @param String name
-	 * 
-	 * @returns this
-	 */
-	name(name) { return (this.build('$EXPR', [name], Identifier, 'name'), this); }
-
-	/**
-	 * Sets the basename
-	 * 
-	 * @param String basename
-	 * 
-	 * @returns this
-	 */
-	basename(name) { return (this.build('$EXPR', [name], Identifier, 'basename'), this); }
-
-	/**
 	 * Helper method to start a subquery.
 	 * 
-	 * @param  Array args
+	 * @param  Array fns
 	 * 
 	 * @returns Void
 	 */
-	query(...args) { return this.build('$EXPR', args, Select, 'select'); }
+	query(...fns) { return (this.build('$EXPR', fns, Select), this.$EXPR); }
 
 	/**
 	 * Sets the expr
 	 * 
-	 * @param Any expr
+	 * @param Array fns
 	 * 
 	 * @returns this
 	 */
-	expr(expr) { return (this.build('$EXPR', [expr], [Select, ...Expr.Types]), this); }
+	expr(...fns) { return (this.build('$EXPR', fns, [Select, ...Expr.Types]), this.$EXPR); }
 
 	/**
 	 * @inheritdoc
@@ -95,8 +76,8 @@ export default class Parens extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		if (!_wrapped(expr, '(', ')') || Lexer.match(expr, [' ']).length && Lexer.split(expr, []).length === 2/* recognizing the first empty slot */) return;
-		return new this(context, await parseCallback(context, _unwrap(expr, '(', ')'), [Select, ...Expr.Types]));
+		return new this(context, parseCallback(context, _unwrap(expr, '(', ')'), [Select, ...Expr.Types]));
 	}
 }

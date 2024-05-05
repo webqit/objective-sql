@@ -1,7 +1,7 @@
 
 import Lexer from '../../Lexer.js';
-import Expr from '../../abstracts/Expr.js';
 import Node from '../../abstracts/Node.js';
+import Expr from '../abstracts/Expr.js';
 
 export default class PgConcat extends Node {
 	
@@ -38,11 +38,11 @@ export default class PgConcat extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		let { tokens, matches } = Lexer.lex(expr, [`||`]);
 		if (!matches.length) return;
 		const instance = new this(context);
-		instance.concat(...(await Promise.all(tokens.map(expr => parseCallback(instance, expr.trim())))));
+		instance.concat(...tokens.map(expr => parseCallback(instance, expr.trim())));
 		return instance;
 	}
 }

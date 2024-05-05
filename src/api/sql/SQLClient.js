@@ -70,7 +70,8 @@ export default class SQLClient extends AbstractClient {
                 return driver.query(sql, (err, result) => {
                     if (err) return reject(err);
                     const rows = result.rows || result;
-                    resolve(Promise.all(Lexer.split((rows[0] || {})[key], [',']).map(s => Identifier.parse(this, s.trim())[0])));
+                    const value = (rows[0] || {})[key];
+                    resolve(Lexer.split(value, [',']).map(s => Identifier.parseIdent(this, s.trim())[0]));
                 });
             });
         }, ...args);
@@ -164,13 +165,14 @@ export default class SQLClient extends AbstractClient {
 	/**
      * @inheritdoc
 	 */
-	async query(query, vars = [], params = {}) {
-        //const sql = params.isStandardSql || !/^SELECT[ ]/i.test(query) ? query : (await Parser.parse({}, query, null, { ...params, vars, dbClient: this })).stringify({ interpreted: true });
-        return new Promise((resolve, reject) => {
-            this.driver.query(query, (err, result) => {
-                if (err) return reject(err);
-                resolve(result.rows || result);
+	async query(query, params = {}) {
+        return this.queryCallback((query, params) => {
+            return new Promise((resolve, reject) => {
+                this.driver.query(`${ query }`, (err, result) => {
+                    if (err) return reject(err);
+                    resolve(result.rows || result);
+                });
             });
-        });
+        }, query, params, true/*acceptsSql*/);
     }
 }

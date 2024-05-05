@@ -40,7 +40,7 @@ export default class Placeholder extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
+	static parse(context, expr) {
 		if (expr.startsWith('?') || expr.startsWith(':')) {
 			return new this(context, expr.substr(1), expr.substr(0, 1));
 		}

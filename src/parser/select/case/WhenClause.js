@@ -1,7 +1,7 @@
 
 import Lexer from '../../Lexer.js';
 import Node from '../../abstracts/Node.js';
-import Expr from '../../abstracts/Expr.js';
+import Expr from '../abstracts/Expr.js';
 
 export default class WhenClause extends Node {
 	
@@ -59,11 +59,11 @@ export default class WhenClause extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const tokens = Lexer.split(expr, [`\\s+THEN\\s+`], { useRegex: 'i' });
 		if (tokens.length !== 2) return;
 		const instance = new this(context);
-		const [condition, consequence] = await Promise.all(tokens.map($expr => parseCallback(instance, $expr.trim())));
+		const [condition, consequence] = tokens.map($expr => parseCallback(instance, $expr.trim()));
 		instance.condition(condition).then_(consequence);
 		return instance;
 	}

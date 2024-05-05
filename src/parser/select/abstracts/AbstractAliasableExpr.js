@@ -1,8 +1,9 @@
 
-import Identifier from '../Identifier.js';
 import Node from '../../abstracts/Node.js';
+import Expr from './Expr.js';
+import Identifier from '../Identifier.js';
 import Parens from '../Parens.js';
-import Expr from '../../abstracts/Expr.js';
+import Path from '../Path.js';
 
 export default class AbstractAliasableExpr extends Node {
 	
@@ -12,15 +13,7 @@ export default class AbstractAliasableExpr extends Node {
 	$EXPR;
 	ALIAS;
 	CLAUSED;
-
-	/**
-	 * @constructor
-	 */
-	constructor(context, expr) {
-		super(context);
-		this.$EXPR = expr;
-	}
-
+	
 	/**
 	 * @property String
 	 */
@@ -39,29 +32,20 @@ export default class AbstractAliasableExpr extends Node {
 	/**
 	 * Sets the name
 	 * 
-	 * @param String name
+	 * @param Array|String name
 	 * 
 	 * @returns this
 	 */
 	name(name) { return (this.build('$EXPR', [name], Identifier, 'name'), this); }
 
 	/**
-	 * Sets the basename
-	 * 
-	 * @param String basename
-	 * 
-	 * @returns this
-	 */
-	basename(name) { return (this.build('$EXPR', [name], Identifier, 'basename'), this); }
-
-	/**
 	 * Sets the expr
 	 * 
-	 * @param Any expr
+	 * @param Array fns
 	 * 
 	 * @returns this
 	 */
-	query(expr) { return (this.build('$EXPR', [expr], Parens, 'query'), this); }
+	query(...fns) { return (this.build('$EXPR', fns, Parens, 'query'), this); }
 
 	/**
 	 * Sets the expr
@@ -105,14 +89,17 @@ export default class AbstractAliasableExpr extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	stringify() { return [this.$EXPR, this.CLAUSED ? 'AS' : '', this.ALIAS].filter(s => s).join(' '); }
+	stringify() {
+		const alias = this.ALIAS || this.$EXPR instanceof Path && this.$EXPR.JOINT && this.autoEsc(this.$EXPR.clone().stringify());
+		return [this.$EXPR, this.CLAUSED ? 'AS' : '', alias].filter(s => s).join(' ');
+	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const instance = new this(context);
-		const escChar = this.getEscChar(context);
+		const escChar = this.getEscChar(context, true);
 		// With an "AS" clause, its easy to obtain the alias...
 		// E.g: SELECT first_name AS fname, 4 + 5 AS result, 5 + 5
 		// Without an "AS" clause, its hard to determine if an expression is actually aliased...
@@ -120,16 +107,16 @@ export default class AbstractAliasableExpr extends Node {
 		let [ , $expr, $separator, aliasUnescaped, /*esc*/, aliasEscaped ] = (new RegExp(`^([\\s\\S]+?)` + `(?:` + `(\\s+AS\\s+|\\s+)` + `(?:([\\w]+)|(${ escChar })((?:\\4\\4|[^\\4])+)\\4)` + `)?$`, 'i')).exec(expr.trim()) || [];
 		let exprNode;
 		if (!$separator?.trim() && !$expr.trim().endsWith(')')) {
-			exprNode = await parseCallback(instance, $expr, this.exprTypes, { assert: false });
+			exprNode = parseCallback(instance, $expr, this.exprTypes, { assert: false });
 			if (!exprNode) {
 				aliasUnescaped = aliasEscaped = null;
 				$expr = expr; // IMPORTANT
 			}
 		}
-		if (!exprNode) { exprNode = await parseCallback(instance, $expr, this.exprTypes); }
+		if (!exprNode) { exprNode = parseCallback(instance, $expr, this.exprTypes); }
 		instance.expr(exprNode);
 		if (aliasUnescaped || aliasEscaped) {
-			const alias = new Identifier(instance, aliasUnescaped || this.autoUnesc(instance, aliasEscaped));
+			const alias = aliasUnescaped || this.autoUnesc(instance, aliasEscaped);
 			const claused = !!$separator?.trim();
 			instance.as(alias, claused);
 		}

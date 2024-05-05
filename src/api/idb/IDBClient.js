@@ -151,6 +151,6 @@ export default class IDBClient extends AbstractClient {
      * @inheritdoc
 	 */
 	async query(query, vars = [], params = {}) {
-        return (await Parser.parse(query, null, { ...params, vars, dbClient: this })).eval(this);
+        return Parser.parse(query, null, { ...params, vars, dbClient: this }).eval(this);
     }
 }

@@ -65,9 +65,9 @@ export default class ColumnLevelConstraint extends AbstractConstraint {
     /**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
+	static parse(context, expr) {
 		// Splice out the name part of the expression
-		const { constraintName, expr: $expr } = this.parseName(context, expr);
+		const { constraintName, expr: $expr } = this.parseName(context, expr, true);
 		// GENERATED
 		if (/^GENERATED/i.test($expr)) {
 			const [ , alwaysOrByDefault, /*identity*/, expr ] = $expr.match(new RegExp(`^GENERATED\\s+` + `(ALWAYS|BY[ ]+DEFAULT)` + `\\s+AS` + `(?:\\s+(IDENTITY)?` + `|` + `(?:\\s+)?\\(` + `([\\s\\S]+)` + `` + `\\)(?:\\s+)?STORED$` + `)`, 'i'));

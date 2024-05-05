@@ -87,9 +87,9 @@ export default class Column extends Node {
     /**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ namePart, bodyPart ] = Lexer.split(expr, ['\\s+'], { useRegex: true, limit: 1 });
-        const [name] = this.parseIdent(context, namePart.trim()) || [];
+        const [name] = this.parseIdent(context, namePart.trim(), true) || [];
         if (!name) return;
         const instance = new this(context, name);
         // Parse into "type" and constraints
@@ -101,10 +101,10 @@ export default class Column extends Node {
         ];
         const [ columnType, ...tokens ] = Lexer.split(bodyPart, regexes, { useRegex:'i', preserveDelims: true });
         // Type
-        instance.type(await parseCallback(instance, columnType.trim(), [DataType]));
+        instance.type(parseCallback(instance, columnType.trim(), [DataType]));
         // Constraints
         for (const constraint of tokens) {
-            instance.constraint(await parseCallback(instance, constraint, [ColumnLevelConstraint]));
+            instance.constraint(parseCallback(instance, constraint, [ColumnLevelConstraint]));
         }
         return instance;
     }

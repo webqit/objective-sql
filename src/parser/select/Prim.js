@@ -34,14 +34,14 @@ export default class Prim extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	toJson() { return { value: this.VALUE }; }
+	toJson() { return this.VALUE; }
 
 	/**
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (typeof json?.value === 'undefined') return;
-		return new this(context, json.value);
+		if (![true,false,null].includes(json)) return;
+		return new this(context, json);
 	}
 	
 	/**
@@ -52,7 +52,7 @@ export default class Prim extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
+	static parse(context, expr) {
 		if (!/^(TRUE|FALSE|NULL)$/i.test(expr)) return;
 		return new this(context, JSON.parse(expr));
 	}

@@ -29,7 +29,7 @@ export default class Condition extends Node {
 	and(...assertions) {
 		if (this.LOGIC === 'OR') return (new this.constructor(this)).and(this, ...assertions);
 		this.LOGIC = 'AND';
-		return (this.build('ASSERTIONS', assertions, [Assertion,Condition]), this);
+		return (this.build('ASSERTIONS', assertions, [Condition,Assertion]), this);
 	}
 
 	/**
@@ -42,7 +42,7 @@ export default class Condition extends Node {
 	or(...assertions) {
 		if (this.LOGIC === 'AND') return (new this.constructor(this)).or(this, ...assertions);
 		this.LOGIC = 'OR';
-		return (this.build('ASSERTIONS', assertions, [Assertion,Condition]), this);
+		return (this.build('ASSERTIONS', assertions, [Condition,Assertion]), this);
 	}
 
 	/**
@@ -69,17 +69,17 @@ export default class Condition extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	stringify() { return this.ASSERTIONS.map(expr => expr.stringify()).join(' ' + this.LOGIC + ' '); }
+	stringify() { return this.ASSERTIONS.map(expr => expr instanceof Condition ? `(${ expr.stringify() })` : expr.stringify()).join(' ' + this.LOGIC + ' '); }
 	
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		for (const logic of ['AND', 'OR']) {
 			const tokens = Lexer.split(expr, [`\\s+${ logic }\\s+`], { useRegex: 'i' });
 			if (tokens.length > 1) {
 				const instance = new this(context, logic);
-				for (const $expr of tokens) instance[logic.toLowerCase()](await parseCallback(instance, $expr));
+				for (const $expr of tokens) instance[logic.toLowerCase()](parseCallback(instance, $expr));
 				return instance;
 			}
 		}

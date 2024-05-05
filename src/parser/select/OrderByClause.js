@@ -19,9 +19,9 @@ export default class OrderByClause extends AbstractOrderBy {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const { tokens: [$expr], matches } = Lexer.lex(expr, ['\\s+WITH\\s+ROLLUP$'], { useRegex: 'i' });
-		const instance = await super.parse(context, $expr.trim(), parseCallback);
+		const instance = super.parse(context, $expr.trim(), parseCallback);
 		if (!instance) return;
 		if (matches.length) instance.withFlag('WITH_ROLLUP');
 		return instance;

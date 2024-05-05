@@ -21,6 +21,11 @@ export default class Update extends StatementNode {
 	LIMIT_CLAUSE = null;
 
 	/**
+	 * @returns Array
+	 */
+	get TABLES() { return this.TABLE_LIST; }
+
+	/**
 	 * Builds the statement's TABLE_LIST
 	 * 
 	 * .table(
@@ -46,43 +51,43 @@ export default class Update extends StatementNode {
 	 * 
 	 * @return array
 	 */
-	join(...tables) { return this.build('JOIN_LIST', tables, JoinClause); }
+	join(table) { return this.build('JOIN_LIST', ['JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
 	 * @returns 
 	 */
-	leftJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'LEFT_JOIN']); }
+	leftJoin(table) { return this.build('JOIN_LIST', ['LEFT_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
 	 * @returns 
 	 */
-	rightJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'RIGHT_JOIN']); }
+	rightJoin(table) { return this.build('JOIN_LIST', ['RIGHT_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
 	 * @returns 
 	 */
-	innerJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'INNER_JOIN']); }
+	innerJoin(table) { return this.build('JOIN_LIST', ['INNER_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
 	 * @returns 
 	 */
-	crossJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'CROSS_JOIN']); }
+	crossJoin(table) { return this.build('JOIN_LIST', ['CROSS_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * Builds the statement's SET_CLAUSE
@@ -184,7 +189,7 @@ export default class Update extends StatementNode {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ match, withUac, mysqlIgnore, body ] = /^UPDATE(\s+WITH\s+UAC)?(?:\s+(IGNORE))?([\s\S]+)$/i.exec(expr) || [];
 		if (!match) return;
 		const instance = new this(context);
@@ -194,7 +199,7 @@ export default class Update extends StatementNode {
 		const { tokens: [ tableSpec, ...tokens ], matches: clauses } = Lexer.lex(body.trim(), Object.values(clausesMap).map(x => typeof x === 'string' || x.test ? x : x.regex), { useRegex: 'i' });
 		// TABLE_LIST
 		for (const tblExpr of Lexer.split(tableSpec, [','])) {
-			const node = await parseCallback(instance, tblExpr.trim(), [Table]);
+			const node = parseCallback(instance, tblExpr.trim(), [Table]);
 			instance.table(node);
 		}
 		// CLAUSES
@@ -202,12 +207,12 @@ export default class Update extends StatementNode {
 			const clauseRe = new RegExp(clause.replace(/\s+/g, ''), 'i'), clauseKey = Object.keys(clausesMap).find(key => clauseRe.test(key));
 			// TABLE_REFERENCES
 			if (clauseKey === 'set') {
-				const node = await parseCallback(instance, tokens.shift().trim(), [AssignmentList]);
+				const node = parseCallback(instance, tokens.shift().trim(), [AssignmentList]);
 				instance.set(node);
 			}
 			// WHERE_CLAUSE
 			else if (clauseKey === 'where') {
-				const node = await parseCallback(instance, tokens.shift().trim(), [Condition,Assertion]);
+				const node = parseCallback(instance, tokens.shift().trim(), [Condition,Assertion]);
 				instance.where(node);
 			}
 			// LIMIT
@@ -216,7 +221,7 @@ export default class Update extends StatementNode {
 			}
 			// JOIN|ORDER_BY
 			else {
-				const node = await parseCallback(instance, `${ clause } ${ tokens.shift().trim() }`, [clausesMap[clauseKey]]);
+				const node = parseCallback(instance, `${ clause } ${ tokens.shift().trim() }`, [clausesMap[clauseKey]]);
 				instance[clauseKey](node);
 			}
 		}

@@ -2,7 +2,7 @@
 import { _unwrap } from '@webqit/util/str/index.js';
 import Lexer from '../Lexer.js';
 import Condition from './Condition.js';
-import Expr from '../abstracts/Expr.js';
+import Expr from './abstracts/Expr.js';
 import Node from '../abstracts/Node.js';
 
 export default class Assertion extends Node {
@@ -33,7 +33,7 @@ export default class Assertion extends Node {
 	assert(operator, ...operands) {
 		if (this.OPERATOR) this.OPERANDS.splice(0);
 		this.OPERATOR = operator;
-		return this.build('OPERANDS', operands, Expr.Types);
+		return (this.build('OPERANDS', operands, Expr.Types), this);
 	}
 
 	/**
@@ -43,7 +43,7 @@ export default class Assertion extends Node {
 	 * 
 	 * @returns this
 	 */
-	equal(...operands) { return this.assert('=', ...operands); }
+	equals(...operands) { return this.assert('=', ...operands); }
 
 	/**
 	 * @alias equal
@@ -331,7 +331,7 @@ export default class Assertion extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const { tokens: [lhs, rhs = ''], matches: [operator] } = Lexer.lex(expr, [this.regex], { useRegex: 'i' });
 		if (!operator) return;
 		const $operator = operator.trim().toUpperCase();
@@ -343,7 +343,7 @@ export default class Assertion extends Node {
 		} else if (rhs) {
 			$operands.push(rhs);
 		}
-		return new this(context, $operator, ...(await Promise.all($operands.map(opr => parseCallback(context, opr.trim())))));
+		return new this(context, $operator, ...$operands.map(opr => parseCallback(context, opr.trim())));
 	}
 
 	/**

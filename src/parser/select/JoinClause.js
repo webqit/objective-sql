@@ -14,11 +14,15 @@ export default class JoinClause extends Table {
 	CORRELATION = null;
 
 	/**
-	 * @constructor
+	 * Sets the tyoe
+	 * 
+	 * @param String type
+	 * 
+	 * @returns Void
 	 */
-	constructor(context, expr = null, type = null) {
-		super(context, expr);
-		this.TYPE = type;
+	join(type, table) {
+		this.TYPE = type.toUpperCase();
+		return (this.expr(table), this);
 	}
 
 	/**
@@ -75,15 +79,16 @@ export default class JoinClause extends Table {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ joinMatch, type, joinSpec ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
 		if (!joinMatch) return;
 		const { tokens: [ $table, $correlation ], matches } = Lexer.split(joinSpec, ['ON|USING'], { useRegex:'i' });
-		const instance = (await super.parse(context, $table.trim(), parseCallback)).with({ TYPE: type.replace(/\s+/g, '_').toUpperCase() });
+		const instance = super.parse(context, $table.trim(), parseCallback);
+		instance.TYPE = type.replace(/\s+/g, '_');
 		if (/^USING$/i.test(matches[0])) {
-			instance.using(await parseCallback(instance, $correlation.trim(), [Identifier]));
+			instance.using(parseCallback(instance, $correlation.trim(), [Identifier]));
 		} else if (/^ON$/i.test(matches[0])) {
-			instance.on(await parseCallback(instance, $correlation.trim(), [Condition,Assertion]));
+			instance.on(parseCallback(instance, $correlation.trim(), [Condition,Assertion]));
 		}
 		return instance;
 	}

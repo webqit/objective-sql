@@ -1,7 +1,7 @@
 
 import Lexer from '../../Lexer.js';
 import Node from '../../abstracts/Node.js';
-import Expr from '../../abstracts/Expr.js';
+import Expr from './Expr.js';
 
 export default class AbstractGroupBy extends Node {
 	
@@ -42,12 +42,12 @@ export default class AbstractGroupBy extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ groupByMatch, criteriaExpr ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
 		if (!groupByMatch) return;
 		const instance = new this(context);
 		for (const criterionExpr of Lexer.split(criteriaExpr.trim(), [','])) {
-			instance.criterion(await parseCallback(instance, criterionExpr));
+			instance.criterion(parseCallback(instance, criterionExpr));
 		}
 		return instance;
 	}

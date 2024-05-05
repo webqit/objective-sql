@@ -21,6 +21,11 @@ export default class Insert extends StatementNode {
 	ON_CONFLICT_CLAUSE = null;
 
 	/**
+	 * @returns Array
+	 */
+	get TABLES() { return this.TABLE ? [this.TABLE] : []; }
+
+	/**
 	 * Builds the statement's TABLE
 	 * 
 	 * .into(
@@ -135,7 +140,7 @@ export default class Insert extends StatementNode {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ match, withUac, mysqlIgnore, body ] = /^INSERT(\s+WITH\s+UAC)?(?:\s+(IGNORE))?(?:\s+INTO)?([\s\S]+)$/i.exec(expr) || [];
 		if (!match ) return;
 		const { tokens: [ tableSpec, payloadSpec, onConflictSpec ], matches: [insertType, onConflictClause] } = Lexer.lex(body.trim(), ['(VALUES|VALUE|SET|SELECT)', 'ON\\s+(DUPLICATE\\s+KEY|CONFLICT)'], { useRegex:'i' });
@@ -144,27 +149,27 @@ export default class Insert extends StatementNode {
 		if (mysqlIgnore) instance.withFlag(mysqlIgnore);
 		if (/^SET$/i.test(insertType)) {
 			// INSERT ... SET
-			instance.into(await parseCallback(instance, tableSpec, [Table]));
-			instance.set(await parseCallback(instance, payloadSpec.trim(), [AssignmentList]));
+			instance.into(parseCallback(instance, tableSpec, [Table]));
+			instance.set(parseCallback(instance, payloadSpec.trim(), [AssignmentList]));
 		} else {
 			const tableColumnSplit = Lexer.split(tableSpec, []);
-			instance.into(await parseCallback(instance, tableColumnSplit.shift().trim(), [Table]));
+			instance.into(parseCallback(instance, tableColumnSplit.shift().trim(), [Table]));
 			if (tableColumnSplit.length) {
-				const columns = await Promise.all(Lexer.split(_unwrap(tableColumnSplit.shift().trim(), '(', ')'), [',']).map(c => parseCallback(instance, c.trim(), [Identifier])));
+				const columns = Lexer.split(_unwrap(tableColumnSplit.shift().trim(), '(', ')'), [',']).map(c => parseCallback(instance, c.trim(), [Identifier]));
 				instance.columns(...columns);
 			}
 			if (/^SELECT$/i.test(insertType)) {
 				// INSERT ... SELECT
-				instance.select(await parseCallback(instance, `SELECT ${ payloadSpec }`));
+				instance.select(parseCallback(instance, `SELECT ${ payloadSpec }`));
 			} else {
 				// INSERT ... VALUES|VALUE
 				for (const rowPayload of Lexer.split(payloadSpec, [','])) {
-					const rowPayloadArray = await Promise.all(Lexer.split(_unwrap(rowPayload.trim(), '(', ')'), [',']).map(valueExpr => parseCallback(instance, valueExpr.trim())));
+					const rowPayloadArray = Lexer.split(_unwrap(rowPayload.trim(), '(', ')'), [',']).map(valueExpr => parseCallback(instance, valueExpr.trim()));
 					instance.values(...rowPayloadArray);
 				}
 			}
 		}
-		if (onConflictClause) { instance.onConflict(await parseCallback(instance, `${ onConflictClause } ${ onConflictSpec }`, [OnConflictClause])); }
+		if (onConflictClause) { instance.onConflict(parseCallback(instance, `${ onConflictClause } ${ onConflictSpec }`, [OnConflictClause])); }
 		return instance;
 	}
 }

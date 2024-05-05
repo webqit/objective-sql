@@ -60,13 +60,13 @@ export default class OnConflictClause extends AssignmentList {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ onConflictMatch, conflictTarget/* TODO */, action, updateSpec ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
 		if (!onConflictMatch) return;
         if (/DO\s+NOTHING/i.test(action)) return new this(context);
         const [assignmentList, whereSpec] = Lexer.split(updateSpec, ['WHERE'], { ci: true });
-        const instance = await super.parse(context, assignmentList, parseCallback);
-        if (whereSpec) instance.where(await parseCallback(instance, whereSpec.trim(), [Condition,Assertion]));
+        const instance = super.parse(context, assignmentList, parseCallback);
+        if (whereSpec) instance.where(parseCallback(instance, whereSpec.trim(), [Condition,Assertion]));
         return instance;
     }
 

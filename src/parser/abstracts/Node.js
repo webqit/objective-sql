@@ -13,8 +13,12 @@ export default class Node {
 	 */
 	constructor(context) {
 		this.CONTEXT = context;
-		const statementNode = this.statementNode;
-		statementNode.connectedNodeCallback?.(this);
+		let statementNode = this.statementNode;
+		if (statementNode === this) {
+			// Subquery case
+			statementNode = statementNode.CONTEXT?.statementNode;
+		}
+		statementNode?.connectedNodeCallback?.(this);
 	}
 	
 	/**
@@ -53,7 +57,10 @@ export default class Node {
 	 * 
 	 * @returns Array
 	 */
-	static getQuoteChars(context) { return context?.params?.dialect === 'mysql' && !context.params.ansiQuotes ? ['"', "'"] : ["'"]; }
+	static getQuoteChars(context, asInputDialect = false) {
+		const dialect = (asInputDialect && context?.params?.inputDialect) || context?.params?.dialect;
+		return dialect === 'mysql' && !context.params.ansiQuotes ? ['"', "'"] : ["'"];
+	}
 
 	/**
 	 * @property Array
@@ -67,7 +74,10 @@ export default class Node {
 	 * 
 	 * @returns String
 	 */
-	static getEscChar(context) { return context?.params?.dialect === 'mysql' && !context.params.ansiQuotes ? '`' : '"'; }
+	static getEscChar(context, asInputDialect = false) {
+		const dialect = (asInputDialect && context?.params?.inputDialect) || context?.params?.dialect;
+		return dialect === 'mysql' && !context.params.ansiQuotes ? '`' : '"';
+	}
 
 	/**
 	 * @property String
@@ -77,16 +87,16 @@ export default class Node {
 	/**
 	 * @inheritdoc
 	 */
-	static autoUnesc(context, expr) {
-		const escChar = this.getEscChar(context);
+	static autoUnesc(context, expr, asInputDialect = false) {
+		const escChar = this.getEscChar(context, asInputDialect);
 		return (expr || '').replace(new RegExp(escChar + escChar, 'g'), escChar);
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	static parseIdent(context, expr) {
-		const escChar = this.getEscChar(context);
+	static parseIdent(context, expr, asInputDialect = false) {
+		const escChar = this.getEscChar(context, asInputDialect);
 		const parts = Lexer.split(expr, ['.']);
 		const parses = parts.map(s => (new RegExp(`^(?:(\\*|[\\w]+)|(${ escChar })((?:\\2\\2|[^\\2])+)\\2)$`)).exec(s.trim())).filter(s => s);
 		if (parses.length !== parts.length) return;
@@ -102,7 +112,7 @@ export default class Node {
 	 * @returns String
 	 */
 	autoEsc(string_s) {
-		const $strings = (Array.isArray(string_s) ? string_s : [string_s]).map(s => s && !/^[*\w]+$/.test(s) ? `${ this.escChar }${ s.replace(new RegExp(this.escChar, 'g'), this.escChar.repeat(2)) }${ this.escChar }` : s );
+		const $strings = (Array.isArray(string_s) ? string_s : [string_s]).map(s => s && !/^(\*|[\w]+)$/.test(s) ? `${ this.escChar }${ s.replace(new RegExp(this.escChar, 'g'), this.escChar.repeat(2)) }${ this.escChar }` : s );
 		return Array.isArray(string_s) ? $strings : $strings[0];
 	}
 
@@ -152,11 +162,10 @@ export default class Node {
 	 * @params Array args
 	 * @params Node|Array Type
 	 * @params String delegate
-	 * @params Array defaultArgs
 	 * 
 	 * @return this
 	 */
-	build(attrName, args, Type, delegate, defaultArgs = []) {
+	build(attrName, args, Type, delegate) {
 		const Types = Array.isArray(Type) ? Type : (Type ? [Type] : []);
 		if (!Types.length) throw new Error(`At least one node type must be defined.`);
 		// ---------
@@ -176,7 +185,7 @@ export default class Node {
 		// Handle delegation cases
 		if (delegate) {
 			if (Types.length !== 1) throw new Error(`To support argument delegation, number of node types must be 1.`);
-			const instance = this[attrName] && !Array.isArray(this[attrName]) ? this[attrName] : new Types[0](this, ...defaultArgs);
+			const instance = this[attrName] && !Array.isArray(this[attrName]) ? this[attrName] : new Types[0](this);
 			set(instance);
 			return instance[delegate](...args);
 		}
@@ -191,19 +200,20 @@ export default class Node {
 				}
 				// New instance and may be or not be singleton
 				if (Types.length === 1) {
-					const instance = new Types[0](this, ...defaultArgs);
+					const instance = new Types[0](this);
 					set(instance);
 					arg(instance);
 					continue;
 				}
 				// Any!!!
-				arg(new Proxy({}, { get: (t, name) => (...args) => {
-					const Type = Types.find(Type => name in Type.prototype);
-					if (!Type) throw new Error(`Unknow method: ${ name }()`);
-					const instance = new Type(this, ...defaultArgs);
+				const router = methodName => (...args) => {
+					const instance = Types.reduce((prev, Type) => prev || (Type.factoryMethods ? (methodName in Type.factoryMethods && Type.factoryMethods[methodName](this, ...args)) : (methodName in Type.prototype && new Type(this))), null);
+					if (!instance) throw new Error(`Unknow method: ${ methodName }()`);
 					set(instance);
-					instance[name](...args);
-				} }));
+					if (instance[methodName]) return instance[methodName](...args); // Foward the call
+					for (const f of args) f(instance); // It's just magic method mode
+				};
+				arg(new Proxy({}, { get: (t, name) => router(name) }));
 				continue;
 			}
 			// Attempt to cast to type
@@ -215,6 +225,11 @@ export default class Node {
 			throw new Error(`Arguments must be of type ${ Types.map(Type => Type.name).join(', ') } or a JSON equivalent. Recieved: ${ typeof arg }`);
 		}
 	}
+
+	/**
+	 * Clones the instance.
+	 */
+	clone() { return this.constructor.fromJson(this.CONTEXT, this.toJson()); }
 	
 	/**
 	 * -----------
@@ -231,7 +246,7 @@ export default class Node {
 	 *
 	 * @return Node
 	 */
-	static async parse(context, expr, parseCallback = null) {}
+	static parse(context, expr, parseCallback = null) {}
 
 	/**
 	 * Serializes the instance.
@@ -241,7 +256,7 @@ export default class Node {
 	toString() { return this.stringify(); }
 	
 	/**
-	 * SAttempts to parse a string into the class instance.
+	 * Attempts to cast a string into the class instance.
 	 *
 	 * @param Any context
 	 * @param Object json

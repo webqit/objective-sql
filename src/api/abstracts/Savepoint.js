@@ -82,7 +82,11 @@ export default class Savepoint {
      */
     async getAssociatedSnapshots() {
         const OBJ_INFOSCHEMA_DB = this.client.constructor.OBJ_INFOSCHEMA_DB;
-        return this.client.query(`SELECT * FROM ${ OBJ_INFOSCHEMA_DB }.table_savepoints WHERE table_savepoints.savepoint_id = '${ this.id }'`, [], { isStandardSql: true });
+        return this.client.query(q => {
+            q.select('*');
+            q.from([OBJ_INFOSCHEMA_DB,'table_savepoints']);
+            q.where( c => c.equals('savepoint_id', q => q.literal(this.id)) );
+        });
     }
 
     /**
@@ -101,8 +105,9 @@ export default class Savepoint {
             const tableSnapshots = await this.getAssociatedSnapshots();
             return tableSnapshots.map(tableSnapshot => ({
                 // Identity
-                ...(this.direction === 'for_ward' ? { name: tableSnapshot.current_name, $name: tableSnapshot.name_snapshot } : { name: tableSnapshot.name_snapshot, $name: tableSnapshot.current_name }),
-                ...(this.direction === 'for_ward' ? { database: this.name_snapshot } : { database: this.current_name }),
+                name: tableSnapshot.name_snapshot,
+                $name: tableSnapshot.current_name,
+                database: this.current_name,
                 // Lists
                 columns: tableSnapshot.columns_snapshot.map(col => ({
                     ...col,
@@ -140,13 +145,24 @@ export default class Savepoint {
         if (Object.keys(errors).length) return false;
         // Update records now
         const OBJ_INFOSCHEMA_DB = this.client.constructor.OBJ_INFOSCHEMA_DB;
-        const dbName = `${ OBJ_INFOSCHEMA_DB }.database_savepoints`;
+        const dbName = [OBJ_INFOSCHEMA_DB,'database_savepoints'];
         if (this.direction === 'forward') {
             this.$.details.rollback_date = null;
-            await this.client.query(`UPDATE ${ dbName } SET rollback_date = NULL WHERE current_name = '${ this.name_snapshot }' AND rollback_date IS NOT NULL`, [], { isStandardSql: true });
+            await this.client.query(q => {
+                q.table(dbName);
+                q.set('rollback_date', null);
+                q.where( x => x.equals('current_name', y => y.literal(this.name_snapshot)), x => x.isNotNull('rollback_date') );
+            }, { type: 'update' });
         } else {
             this.$.details.rollback_date = new Date;
-            await this.client.query(`UPDATE ${ dbName } AS current SET rollback_date = now() WHERE id = '${ this.id }' OR (name_snapshot = '${ this.current_name }' AND rollback_date IS NULL)`, [], { isStandardSql: true });
+            await this.client.query(q => {
+                q.table(dbName);
+                q.set('rollback_date', x => x.call('now'));
+                q.where( x => x.or(
+                    y => y.equals('id', z => z.literal(this.id)),
+                    y => y.and( z => z.equals('name_snapshot', z => z.literal(this.current_name) ), z => z.isNull('rollback_date') )
+                ) );
+            }, { type: 'update' });
         }
         return true;
     }

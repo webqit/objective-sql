@@ -11,16 +11,25 @@ export default class Aggr extends Func {
 	 */
 	ORDER_BY_CLAUSE;
 	OVER_CLAUSE;
+
+	/**
+	 * @inheritdoc
+	 */
+	call(...args) { return (super.call(...args), this); }
 	
 	/**
 	 * Adds an OVER clause
 	 */
-	orderBy(...orderBys) { return this.build('ORDER_BY_CLAUSE', orderBys, OrderByClause, 'criterion'); }
+	orderBy(...orderBys) { return (this.build('ORDER_BY_CLAUSE', orderBys, OrderByClause, 'criterion'), this); }
 
 	/**
 	 * Adds an OVER clause
 	 */
-	over(window) { return this.build('OVER_CLAUSE', [window], WindowSpec); }
+	over(window) {
+		// For expressions like SUM OVER ()
+		if (!window) window = { name: '' }; // At least an empty string to help pass the WindowSpec.fromJson() validation
+		return (this.build('OVER_CLAUSE', [window], WindowSpec), this.OVER_CLAUSE);
+	}
 
 	/**
 	 * @inheritdoc
@@ -39,6 +48,7 @@ export default class Aggr extends Func {
 	static fromJson(context, json) {
 		const instance = super.fromJson(context, json);
 		if (!instance) return;
+		if (!this.names.flat().includes(instance.NAME.toUpperCase())) return instance;
 		if (json.order_by_clause) instance.orderBy(json.order_by_clause);
 		if (json.over_clause) instance.over(json.over_clause);
 		return instance;
@@ -55,7 +65,7 @@ export default class Aggr extends Func {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		// Break off any OVER clause, then assert that it's a function
 		const [ func, over ] = Lexer.split(expr, ['OVER\\s+'], { useRegex: 'i' }).map(s => s.trim());
 		if (!func.endsWith(')') || Lexer.match(func, [' ']).length) return;
@@ -64,12 +74,14 @@ export default class Aggr extends Func {
 		if (!this.names.flat().includes(name.toUpperCase())) return;
 		// Break off any ORDER BY clause, then render
 		const [ , $args, orderByClause ] = /^([\s\S]+)(?:\s+(ORDER\s+BY\s+.+))$/i.exec(args) || [ , args ];
-		const instance = await super.parse(context, `${ name }(${ $args })`, parseCallback);
+		const instance = super.parse(context, `${ name }(${ $args })`, parseCallback);
 		if (allOrDistinct) instance.withFlag(allOrDistinct);
-		if (orderByClause) instance.orderBy(await parseCallback(instance, orderByClause, [OrderByClause]));
-		else if (over) instance.over(await parseCallback(instance, over, [WindowSpec]));
+		if (orderByClause) instance.orderBy(parseCallback(instance, orderByClause, [OrderByClause]));
+		else if (over) instance.over(parseCallback(instance, over, [WindowSpec]));
 		return instance;
 	}
+
+	static factoryMethods = { call: (context, name, ...args) => this.names.flat().includes(name?.toUpperCase()) && new this(context) };
 
 	static names = [
 		[

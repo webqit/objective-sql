@@ -129,11 +129,23 @@ export default class AbstractDatabase {
     async savepoint(params = {}) {
         const OBJ_INFOSCHEMA_DB = this.client.constructor.OBJ_INFOSCHEMA_DB;
         if ((await this.client.databases({ name: OBJ_INFOSCHEMA_DB }))[0]) {
-            const dbName = `${ OBJ_INFOSCHEMA_DB }.database_savepoints`;
-            const sql = params.direction === 'forward'
-                ? `SELECT following.*, active.id AS id_active FROM ${ dbName } AS active RIGHT JOIN ${ dbName } AS following ON following.name_snapshot = active.current_name WHERE '${ this.name }' IN (active.name_snapshot,active.current_name) AND active.rollback_date IS NOT NULL ORDER BY active.savepoint_date ASC LIMIT 1`
-                : `SELECT preceding.*, active.id AS id_active FROM ${ dbName } AS preceding LEFT JOIN ${ dbName } AS active ON active.name_snapshot = preceding.current_name WHERE '${ this.name }' IN (preceding.name_snapshot,preceding.current_name) AND preceding.rollback_date IS NULL ORDER BY preceding.savepoint_date DESC LIMIT 1`;
-            const result = await this.client.query(sql, [], { isStandardSql: true });
+            const forward = params.direction === 'forward';
+            const dbName = [OBJ_INFOSCHEMA_DB,'database_savepoints'];
+            const result = await this.client.query(q => {
+                q.from(dbName).as(forward ? 'active' : 'preceding');
+                if (forward) {
+                    q.select( ['following','*'], f => f.name(['active','id']).as('id_active') );
+                    q.rightJoin(dbName).as('following').on( x => x.equals(['following','name_snapshot'], ['active','current_name']) );
+                    q.where( x => x.in( x => x.literal(this.name), ['active','name_snapshot'], ['active','current_name'] ), x => x.isNotNull(['active','rollback_date']) );
+                    q.orderBy(['active','savepoint_date']).withFlag('ASC');
+                } else {
+                    q.select( ['preceding','*'], f => f.name(['active','id']).as('id_active') );
+                    q.leftJoin(dbName).as('active').on( x => x.equals(['active','name_snapshot'], ['preceding','current_name']) );
+                    q.where( x => x.in( x => x.literal(this.name), ['preceding','name_snapshot'], ['preceding','current_name'] ), x => x.isNull(['preceding','rollback_date']) );
+                    q.orderBy(['preceding','savepoint_date']).withFlag('DESC');
+                }
+                q.limit(1);
+            });
             return result[0] && new Savepoint(this.client, result[0], params.direction);
         }
     }
@@ -177,7 +189,7 @@ export default class AbstractDatabase {
         const isAll = tblNames.length === 1 && tblNames[0] === '*';
         if (this.dropped) return isAll || isMultiple ? [] : undefined;
         const tablesMap = this.$.schema.tables;
-        const requestList = isAll ? ['*'] : tblNames.filter(tblName => !tablesMap.get(tblName)?.columns && !tablesMap.get(tblName)?.hiddenAs);
+        const requestList = isAll ? ['*'] : tblNames;//TODO.filter(tblName => !tablesMap.get(tblName)?.columns && !tablesMap.get(tblName)?.hiddenAs);
         if (requestList.length) {
             const tblSchemas = await callback(requestList, params); // Describe should always add constraint names
             for (const tblSchema of tblSchemas) {
@@ -218,7 +230,7 @@ export default class AbstractDatabase {
                 if (params.ifNotExists) tblCreateRequest.withFlag('IF_NOT_EXISTS');
             }
             // Important:
-            tblCreateRequest.basename(this.name);
+            tblCreateRequest.name([this.name,tblCreateRequest.NAME]);
             // Create savepoint
             dbSchemaEdit.tablesSavepoints.add({
                 // Snapshot
@@ -283,7 +295,7 @@ export default class AbstractDatabase {
                 throw new Error(`Alter table "${ tblName }" called with invalid arguments.`);
             }
             // Important:
-            tblAlterRequest.basename(this.name);
+            tblAlterRequest.name([this.name,tblAlterRequest.NAME]);
             const newTblName = tblAlterRequest.ACTIONS.find(action => action.TYPE === 'RENAME' && !action.REFERENCE)?.ARGUMENT;
             const newTblLocation = tblAlterRequest.ACTIONS.find(action => action.TYPE === 'RELOCATE')?.ARGUMENT;
             if (tblAlterRequest.ACTIONS.length) {
@@ -344,9 +356,10 @@ export default class AbstractDatabase {
                 // Then forward the operation for execution
                 tblDropRequest = new DropTable(this.client/*IMPORTANT: client API*/, tblName, this.name);
                 if (params.ifExists) tblDropRequest.withFlag('IF_EXISTS');
+                if (params.cascade) tblDropRequest.withFlag('CASCADE');
             }
             // Important:
-            tblDropRequest.basename(this.name);
+            tblDropRequest.name([this.name,tblDropRequest.NAME]);
             // Create savepoint
             const tblSchema = await this.describeTable(tblName, params);
             if (tblSchema.schemaEdit) throw new Error(`Cannot delete table when already in edit mode.`);

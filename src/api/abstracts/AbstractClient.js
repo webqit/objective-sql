@@ -3,8 +3,14 @@ import { _isObject } from '@webqit/util/js/index.js';
 import CreateDatabase from '../../parser/create/CreateDatabase.js';
 import AlterDatabase from '../../parser/alter/AlterDatabase.js';
 import DropDatabase from '../../parser/drop/DropDatabase.js';
-import AlterTable from '../../parser/alter/AlterTable.js';
 import CreateTable from '../../parser/create/CreateTable.js';
+import AlterTable from '../../parser/alter/AlterTable.js';
+import DropTable from '../../parser/drop/DropTable.js';
+import Select from '../../parser/select/Select.js';
+import Insert from '../../parser/insert/Insert.js';
+import Update from '../../parser/update/Update.js';
+import Delete from '../../parser/delete/Delete.js';
+import Parser from '../../parser/Parser.js';
 import Savepoint from './Savepoint.js';
 
 const objInternals = {
@@ -423,6 +429,28 @@ export default class AbstractClient {
     }
 
     /**
+     * Base logic for dropDatabase()
+     * 
+     * @param Function          callback
+     * @param String|Function   query
+     * @param Object            params
+     * @param Bool              acceptsSql
+     * 
+     * @return Object
+     */
+    async queryCallback(callback, query, params = {}, acceptsSql = false) {
+        if (typeof query === 'string' && (!acceptsSql/*always parse*/ || (/^SELECT[ ]/i.test(query) && !params.isStandardSql/*needs parsing*/))) {
+            query = Parser.parse(this, query);
+        } else if (typeof query === 'function') {
+            const Types = { Insert, Update, Delete, Select, DropDatabase, DropTable, CreateDatabase, CreateTable, AlterDatabase, AlterTable };
+            const type = params.type?.toLowerCase().replace(/^\w|_./g, m => m.toUpperCase().replace('_', '')) || 'Select';
+            const $query = new Types[type](this);
+            query = (query($query), $query);
+        }
+        return await callback(query, params);
+    }
+
+    /**
      * Method for saving snapshots to internal OBJ_INFOSCHEMA db.
      * 
      * @param Object            entry
@@ -461,12 +489,25 @@ export default class AbstractClient {
         }
         // ------------------
         // Resolve forward histories before creating new one
-        const dbSavepointsTblName = `${ OBJ_INFOSCHEMA_DB }.database_savepoints`;
-        let where = `'${ entry.name_snapshot || entry.current_name }' IN (active.name_snapshot,active.current_name)`;
+        const dbName = [OBJ_INFOSCHEMA_DB,'database_savepoints'];
+        let where = x => x.in( y => y.literal(entry.name_snapshot || entry.current_name), ['active','name_snapshot'], ['active','current_name']);
         while(where) {
-            const rolledbackSavepoints = await this.query(`SELECT active.id, following.id AS id_following FROM ${ dbSavepointsTblName } AS active LEFT JOIN ${ dbSavepointsTblName } AS following ON following.name_snapshot = active.current_name WHERE ${ where } AND active.rollback_date IS NOT NULL ORDER BY active.savepoint_date ASC LIMIT 1`, [], { isStandardSql: true });
-            if (rolledbackSavepoints[0]?.id) { await this.query(`DELETE FROM ${ dbSavepointsTblName } WHERE id = '${ rolledbackSavepoints[0].id }'`, [], { isStandardSql: true }); }
-            if (rolledbackSavepoints[0]?.id_following) { where = `active.id = '${ rolledbackSavepoints[0].id_following }'`; }
+            const rolledbackSavepoints = await this.query(q => {
+                q.select(['active','id'], x => x.name(['following','id']).as('id_following'));
+                q.from(dbName).as('active');
+                q.leftJoin(dbName).as('following').on( x => x.equals(['following','name_snapshot'], ['active','current_name']) );
+                q.where( where );
+                q.where( x => x.isNotNull(['active','rollback_date']) );
+                q.orderBy(['active','savepoint_date']).withFlag('ASC');
+                q.limit(1);
+            });
+            if (rolledbackSavepoints[0]?.id) {
+                await this.query(q => {
+                    q.from(dbName);
+                    q.where( x => x.equals('id', y => y.literal(rolledbackSavepoints[0].id) ) );
+                }, { type: 'delete' });
+            }
+            if (rolledbackSavepoints[0]?.id_following) { where = x => x.equals(['active','id'], y => y.literal(rolledbackSavepoints[0].id_following) ); }
             else { where = null; }
         }
         // ------------------

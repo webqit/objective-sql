@@ -56,12 +56,12 @@ export default class TableLevelConstraint extends AbstractConstraint {
     /**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
+	static parse(context, expr) {
 		const parseColumns = columnsExpr => Lexer.split(_unwrap(columnsExpr, '(', ')'), [',']).map(columnExpr => {
-			return this.parseIdent(context, columnExpr.trim())[0];
+			return this.parseIdent(context, columnExpr.trim(), true)[0];
 		});
 		// Splice out the name part of the expression
-		const { constraintName = '', expr: $expr } = this.parseName(context, expr);
+		const { constraintName = '', expr: $expr } = this.parseName(context, expr, true);
 		if (!$expr) return; // Not a constraint
 		const [ $$expr, columnsExpr, ...rest ] = Lexer.split($expr, []);
 		// PRIMARY KEY

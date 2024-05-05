@@ -9,6 +9,7 @@ import WindowClause from './window/WindowClause.js';
 import Condition from './Condition.js';
 import Assertion from './Assertion.js';
 import Field from './Field.js';
+import Parens from './Parens.js';
 import Table from './Table.js';
 import Aggr from './Aggr.js';
 
@@ -29,22 +30,16 @@ export default class Select extends StatementNode {
 	LIMIT_CLAUSE = null;
 
 	/**
+	 * @returns Array
+	 */
+	get TABLES() { return this.FROM_LIST; }
+
+	/**
 	 * @properties Array
 	 */
 	AGGRS = [];
 	PATHS = [];
-
-    /**
-	 * Catalog certain nodes
-	 * 
-	 * @param Node node
-	 * 
-	 * @returns Void
-	 */
-    connectedNodeCallback(node) {
-		if (node instanceof Aggr) this.AGGRS.push(node);
-		if (node instanceof Path) this.PATHS.push(node);
-	}
+	SUBQUERIES = [];
 
 	/**
 	 * Builds the statement's SELECT_LIST
@@ -78,10 +73,10 @@ export default class Select extends StatementNode {
 	 * 
 	 * @return Void
 	 */
-	from(...tables) { return this.build('FROM_LIST', tables, Table); }
+	from(...tables) { return (this.build('FROM_LIST', tables, Table), this.FROM_LIST[this.FROM_LIST.length - 1]/* for: .as() */); }
 
 	/**
-	 * Builds the statement's JOIN_LIST
+	 * Builds the statement's JOIN_LIST (MySQL-specific)
 	 * 
 	 * .join(
 	 * 		j1 => j1.name('tbl1').using('col').as('alias1'),
@@ -92,45 +87,45 @@ export default class Select extends StatementNode {
 	 * 		).as('alias2')
 	 * );
 	 * 
-	 * @return Void
+	 * @return array
 	 */
-	join(...tables) { return this.build('JOIN_LIST', tables, JoinClause); }
+	join(table) { return this.build('JOIN_LIST', ['JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
-	 * @returns Void
+	 * @returns 
 	 */
-	leftJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'LEFT_JOIN']); }
+	leftJoin(table) { return this.build('JOIN_LIST', ['LEFT_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
-	 * @returns Void
+	 * @returns 
 	 */
-	rightJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'RIGHT_JOIN']); }
+	rightJoin(table) { return this.build('JOIN_LIST', ['RIGHT_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
-	 * @returns Void
+	 * @returns 
 	 */
-	innerJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'INNER_JOIN']); }
+	innerJoin(table) { return this.build('JOIN_LIST', ['INNER_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
-	 * @returns Void
+	 * @returns 
 	 */
-	crossJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'CROSS_JOIN']); }
+	crossJoin(table) { return this.build('JOIN_LIST', ['CROSS_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * Builds the statement's WHERE_CLAUSE
@@ -228,6 +223,35 @@ export default class Select extends StatementNode {
 		this.LIMIT_CLAUSE = limit;
 	}
 
+    /**
+	 * Catalog certain nodes
+	 * 
+	 * @param Node node
+	 * 
+	 * @returns Void
+	 */
+    connectedNodeCallback(node) {
+		if (node instanceof Aggr) this.AGGRS.push(node);
+		if (node instanceof Path && !(node.CONTEXT instanceof Path)) this.PATHS.push(node);
+		if (node instanceof Select) this.SUBQUERIES.push(node);
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	get expandable() { return this.PATHS.length > 0 || this.SUBQUERIES.some(q => q.expandable); }
+
+	/**
+	 * @inheritdoc
+	 */
+	async expand(asClone = false) {
+		const instance = asClone ? this.clone() : this;
+		if (!instance.expandable) return instance;
+		for (const path of instance.PATHS) await path.plot();
+		for (const query of instance.SUBQUERIES) await query.expand();
+		return instance;
+	}
+
 	/**
 	 * @inheritdoc
 	 */
@@ -288,7 +312,7 @@ export default class Select extends StatementNode {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ match, withUac, allOrDistinct, body ] = /^SELECT\s+(?:(WITH\s+UAC)\s+)?(ALL|DISTINCT)?([\s\S]+)$/i.exec(expr) || [];
 		if (!match) return;
 		const instance = new this(context);
@@ -298,7 +322,7 @@ export default class Select extends StatementNode {
 		const { tokens: [ fieldsSpec, ...tokens ], matches: clauses } = Lexer.lex(body.trim(), Object.values(clausesMap).map(x => typeof x === 'string' || x.test ? x : x.regex), { useRegex: 'i' });
 		// SELECT_LIST
 		for (const fieldExpr of Lexer.split(fieldsSpec, [','])) {
-			const field = await parseCallback(instance, fieldExpr.trim(), [Field]);
+			const field = parseCallback(instance, fieldExpr.trim(), [Field]);
 			instance.select(field);
 		}
 		// CLAUSES
@@ -307,13 +331,13 @@ export default class Select extends StatementNode {
 			// FROM_LIST
 			if (clauseKey === 'from') {
 				for (const tblExpr of Lexer.split(tokens.shift(), [','])) {
-					const node = await parseCallback(instance, tblExpr.trim(), [Table]);
+					const node = parseCallback(instance, tblExpr.trim(), [Table]);
 					instance.from(node);
 				}
 			}
 			// WHERE_CLAUSE|HAVING_CLAUSE
 			else if (['where', 'having'].includes(clauseKey)) {
-				const node = await parseCallback(instance, tokens.shift().trim(), [Condition,Assertion]);
+				const node = parseCallback(instance, tokens.shift().trim(), [Condition,Assertion]);
 				instance[clauseKey](node);
 			}
 			// OFFSET|LIMIT
@@ -323,7 +347,7 @@ export default class Select extends StatementNode {
 			}
 			// JOIN|GROUP_BY|WINDOW|ORDER_BY
 			else {
-				const node = await parseCallback(instance, `${ clause } ${ tokens.shift().trim() }`, [clausesMap[clauseKey]]);
+				const node = parseCallback(instance, `${ clause } ${ tokens.shift().trim() }`, [clausesMap[clauseKey]]);
 				instance[clauseKey](node);
 			}
 		}

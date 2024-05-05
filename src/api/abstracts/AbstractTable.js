@@ -52,9 +52,20 @@ export default class AbstractTable {
     async savepoint(params = {}) {
 		const OBJ_INFOSCHEMA_DB = this.database.client.constructor.OBJ_INFOSCHEMA_DB;
 		if ((await this.database.client.databases({ name: OBJ_INFOSCHEMA_DB }))[0]) {
+			const forward = params.direction === 'forward';
+            const dbName = [OBJ_INFOSCHEMA_DB,'database_savepoints'];
+            const tblName = [OBJ_INFOSCHEMA_DB,'table_savepoints'];
 			const tblFields = ['name_snapshot', 'columns_snapshot', 'constraints_snapshot', 'indexes_snapshot', 'current_name'];
 			const dbFields = ['id', 'name_snapshot', 'savepoint_desc', 'savepoint_date', 'rollback_date', 'current_name'];
-			const result = await this.database.client.query(`SELECT ${ tblFields.map(f => `tbl.${ f }` ).join(',') }, ${ dbFields.map(f => `db.${ f } AS db_${ f }` ).join(',') } FROM ${ OBJ_INFOSCHEMA_DB }.table_savepoints AS tbl RIGHT JOIN ${ OBJ_INFOSCHEMA_DB }.database_savepoints AS db ON db.id = tbl.savepoint_id AND '${ this.database.name }' IN (db.name_snapshot,db.current_name) AND db.rollback_date ${ params.direction === 'forward' ? 'IS NOT NULL' : 'IS NULL' } WHERE '${ this.name }' IN (tbl.name_snapshot,tbl.current_name) ORDER BY db.savepoint_date ${ params.direction === 'forward' ? 'ASC' : 'DESC' } LIMIT 1`, [], { isStandardSql: true });
+            const result = await this.database.client.query(q => {
+                q.from(tblName).as('tbl');
+				q.select( ...tblFields.map(name => ['tbl',name]) );
+				q.select( ...dbFields.map(name => f => f.name(['db',name]).as(`db_${ name }`)) );
+				q.rightJoin(dbName).as('db').on( x => x.equals(['db','id'], ['tbl','savepoint_id']), x => x.in( y => y.literal(this.database.name), ['db','name_snapshot'], ['db','current_name'] ), x => x[forward ? 'isNotNull' : 'isNull'](['db','rollback_date']) );
+				q.where( x => x.in( x => x.literal(this.name), ['tbl','name_snapshot'], ['tbl','current_name'] ) );
+				q.orderBy(['db','savepoint_date']).withFlag(forward ? 'ASC' : 'DESC');
+                q.limit(1);
+            });
 			if (!result[0]) return;
 			const [ tblDetails, dbDetails ] = Object.keys(result[0]).reduce(([tblDetails, dbDetails], key) => {
 				if (key.startsWith('db_')) return [tblDetails, { ...dbDetails, [key.replace('db_', '')]: result[0][key] }];

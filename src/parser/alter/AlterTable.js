@@ -33,20 +33,16 @@ export default class AlterTable extends StatementNode {
 	/**
 	 * Sets the name
 	 * 
-	 * @param String name
+	 * @param Array|String name
 	 * 
-	 * @returns this
+	 * @returns Void
 	 */
-	name(name) { this.NAME = name; return this; }
-
-	/**
-	 * Sets the basename
-	 * 
-	 * @param String name
-	 * 
-	 * @returns this
-	 */
-	basename(basename) { this.BASENAME = basename; return this; }
+	name(name) {
+		const nameParts = Array.isArray(name) ? [...name] : [name];
+		this.NAME = nameParts.pop();
+		this.BASENAME = nameParts.pop();
+		if (nameParts.length) throw new Error(`Idents can be maximum of two parts. Recieved: ${ nameParts.reverse().join('.') }.${ this.BASENAME }.${ this.NAME }`);
+	}
 
 	/**
 	 * Adds a "RENAME" action to the instance,
@@ -241,11 +237,11 @@ export default class AlterTable extends StatementNode {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ match, ifExists, rest ] = /^ALTER\s+TABLE\s+(IF\s+EXISTS\s+)?([\s\S]+)$/i.exec(expr.trim()) || [];
 		if (!match) return;
 		const [ namePart, bodyPart ] = Lexer.split(rest, ['\\s+'], { useRegex: true, limit: 1 });
-		const [tblName, dbName] = this.parseIdent(context, namePart.trim()) || [];
+		const [tblName, dbName] = this.parseIdent(context, namePart.trim(), true) || [];
 		if (!tblName) return;
 		const instance = new this(context, tblName, dbName || context/*Database*/?.name);
 		if (ifExists) instance.withFlag('IF_EXISTS');
@@ -289,7 +285,7 @@ export default class AlterTable extends StatementNode {
 			const [ addMatch, columnKeyword_c, ifColumnNotExists_c, spec_c ] = regex('addRe').exec(stmt) || [];
 			if (addMatch) {
 				const [ , $spec, $flags ] = spec_c.match(/([\s\S]+)\s+(FIRST|AFTER\s+.+)$/i) || [ , spec_c ];
-				const argument = await parseCallback(instance, $spec.trim(), columnKeyword_c ? [Column] : [TableLevelConstraint,Index,Column]); // Note that Column must come last
+				const argument = parseCallback(instance, $spec.trim(), columnKeyword_c ? [Column] : [TableLevelConstraint,Index,Column]); // Note that Column must come last
 				const flags = [ifColumnNotExists_c, $flags].filter(s => s).map(s => s.trim().replace(/\s+/g, '_').toUpperCase());
 				instance.add(argument).withFlag(...flags);
 				continue;
@@ -303,11 +299,11 @@ export default class AlterTable extends StatementNode {
 				let argumentNew;
 				// Is column data type?
 				if (subAction.endsWith('TYPE')) {
-					argumentNew = await parseCallback(instance, argument_d, [DataType]);
+					argumentNew = parseCallback(instance, argument_d, [DataType]);
 					subAction = 'SET';
 				}
 				// Is column constraint?
-				else if ($.argument = await parseCallback(instance, argument_d, [ColumnLevelConstraint], { assert: false })) {
+				else if ($.argument = parseCallback(instance, argument_d, [ColumnLevelConstraint], { assert: false })) {
 					argumentNew = $.argument;
 				}
 				// Is SET|DROP|ADD flag?

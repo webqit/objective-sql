@@ -21,9 +21,9 @@ export default class CreateDatabase extends StatementNode {
 	 * 
 	 * @param String name
 	 * 
-	 * @returns this
+	 * @returns Void
 	 */
-	name(name) { this.NAME = name; return this; }
+	name(name) { this.NAME = name; }
 
 	/**
 	 * @inheritdoc
@@ -46,10 +46,10 @@ export default class CreateDatabase extends StatementNode {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
+	static parse(context, expr) {
 		const [ match, ifNotExists, namePart ] = /^CREATE\s+DATABASE\s+(IF\s+NOT\s+EXISTS\s+)?(.+)$/i.exec(expr) || [];
 		if (!match) return;
-		const [name] = this.parseIdent(context, namePart.trim()) || [];
+		const [name] = this.parseIdent(context, namePart.trim(), true) || [];
 		if (!name) return;
 		const instance = new this(context, name, params);
 		if (ifNotExists) instance.withFlag('IF_NOT_EXISTS');

@@ -38,6 +38,11 @@ export default class Delete extends StatementNode {
 	LIMIT_CLAUSE = null;
 
 	/**
+	 * @returns Array
+	 */
+	get TABLES() { return this.USING_LIST.length ? this.USING_LIST : this.FROM_LIST; }
+
+	/**
 	 * Builds an optional DELETE_LIST (for use with a FROM_LIST) (MySQL-specific)
 	 * 
 	 * .delete('t11, 't2');
@@ -87,43 +92,43 @@ export default class Delete extends StatementNode {
 	 * 
 	 * @return array
 	 */
-	join(...tables) { return this.build('JOIN_LIST', tables, JoinClause); }
+	join(table) { return this.build('JOIN_LIST', ['JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
 	 * @returns 
 	 */
-	leftJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'LEFT_JOIN']); }
+	leftJoin(table) { return this.build('JOIN_LIST', ['LEFT_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
 	 * @returns 
 	 */
-	rightJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'RIGHT_JOIN']); }
+	rightJoin(table) { return this.build('JOIN_LIST', ['RIGHT_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
 	 * @returns 
 	 */
-	innerJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'INNER_JOIN']); }
+	innerJoin(table) { return this.build('JOIN_LIST', ['INNER_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * A variant of the join()
 	 * 
-	 * @param  ...Any tables 
+	 * @param  String table
 	 * 
 	 * @returns 
 	 */
-	crossJoin(...tables) { return this.build('JOIN_LIST', tables, JoinClause, null, [null, 'CROSS_JOIN']); }
+	crossJoin(table) { return this.build('JOIN_LIST', ['CROSS_JOIN',table], JoinClause, 'join'); }
 
 	/**
 	 * Builds the statement's WHERE_CLAUSE
@@ -216,7 +221,7 @@ export default class Delete extends StatementNode {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ match, withUac, mysqlIgnore, body ] = /^DELETE(\s+WITH\s+UAC)?(?:\s+(IGNORE))?([\s\S]+)$/i.exec(expr.trim()) || [];
 		if (!match) return;
 		const instance = new this(context);
@@ -226,7 +231,7 @@ export default class Delete extends StatementNode {
 		const { tokens: [ maybeTablesSpec, ...tokens ], matches: clauses } = Lexer.lex(body.trim(), Object.values(clausesMap).map(x => typeof x === 'string' || x.test ? x : x.regex), { useRegex: 'i' });
 		// MAYBE_TABLES_SPEC (BEFORE A FROM CLAUSE) - MYSQL
 		for (const tblExpr of Lexer.split(maybeTablesSpec, [','])) {
-			const node = await parseCallback(instance, tblExpr.trim(), [Identifier]);
+			const node = parseCallback(instance, tblExpr.trim(), [Identifier]);
 			instance.delete(node);
 		}
 		// CLAUSES
@@ -237,13 +242,13 @@ export default class Delete extends StatementNode {
 				for (const tblExpr of Lexer.split(tokens.shift(), [','])) {
 					// If we have both "from" and "using" clauses (Syntax 3 above), then "using" is the main table references
 					const asType = clauseKey === 'from' && clauses.some(s => s.toLowerCase() === 'using') ? Identifier : Table;
-					const node = await parseCallback(instance, tblExpr.trim(), [asType]);
+					const node = parseCallback(instance, tblExpr.trim(), [asType]);
 					instance[clauseKey](node);
 				}
 			}
 			// WHERE_CLAUSE
 			else if (clauseKey === 'where') {
-				const node = await parseCallback(instance, tokens.shift().trim(), [Condition,Assertion]);
+				const node = parseCallback(instance, tokens.shift().trim(), [Condition,Assertion]);
 				instance.where(node);
 			}
 			// LIMIT
@@ -252,7 +257,7 @@ export default class Delete extends StatementNode {
 			}
 			// JOIN|ORDER_BY
 			else {
-				const node = await parseCallback(instance, `${ clause } ${ tokens.shift().trim() }`, [clausesMap[clauseKey]]);
+				const node = parseCallback(instance, `${ clause } ${ tokens.shift().trim() }`, [clausesMap[clauseKey]]);
 				instance[clauseKey](node);
 			}
 		}

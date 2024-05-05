@@ -33,8 +33,8 @@ export default class AbstractConstraint extends Node {
     /**
      * @returns Object
      */
-    static parseName(context, expr) {
-        const escChar = this.getEscChar(context);
+    static parseName(context, expr, asInputDialect = false) {
+        const escChar = this.getEscChar(context, asInputDialect);
         const nameRegex = `(?:CONSTRAINT(?:` + `\\s+(\\w+)` + `|` + `\\s+(${ escChar })((?:\\2\\2|[^\\2])+)\\2` + `)\\s+)?`;
         const [ , nameUnscaped, /*esc*/, nameEscaped, rest = '' ] = expr.match(new RegExp(`^${ nameRegex }([\\s\\S]+)$`, 'i')) || [];
         return { constraintName: nameUnscaped || this.autoUnesc(context, nameEscaped), expr: rest.trim() };
@@ -45,8 +45,8 @@ export default class AbstractConstraint extends Node {
      */
     static parseReference(context, expr) {
         const [ table_maybeQualified, cols, opts = '' ] = Lexer.split(expr, []);
-        const [table, basename] = this.parseIdent(context, table_maybeQualified.trim());
-        const columns = Lexer.split(_unwrap(cols, '(', ')'), [',']).map(col => this.parseIdent(context, col.trim())[0]);
+        const [table, basename] = this.parseIdent(context, table_maybeQualified.trim(), true);
+        const columns = Lexer.split(_unwrap(cols, '(', ')'), [',']).map(col => this.parseIdent(context, col.trim(), true)[0]);
         const matchReferentialRule = (str, type) => {
             if (type === 'MATCH') return str.match(/MATCH\s+(\w+)/i)?.[1];
             const referentialActionRe = /(NO\s+ACTION|RESTRICT|CASCADE|(SET\s+NULL|SET\s+DEFAULT)(?:\s+\(([^\)]+)\))?)/;

@@ -47,7 +47,7 @@ export default class DataType extends Node {
     /**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
+	static parse(context, expr) {
 		const [name, precision] = parse(expr);
 		if (!name) return;
         return new this(context, name.toUpperCase(), precision);

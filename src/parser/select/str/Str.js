@@ -19,6 +19,13 @@ export default class Str extends Node {
 		this.VALUE = expr;
 		this.QUOTE = quote;
 	}
+
+	/**
+	 * Sets the value
+	 * 
+	 * @param String expr 
+	 */
+	literal(expr) { this.VALUE = expr; }
 	
 	/**
 	 * @inheritdoc
@@ -44,8 +51,8 @@ export default class Str extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
-		const [text, quote] = this.parseText(context, expr) || [];
+	static parse(context, expr) {
+		const [text, quote] = this.parseText(context, expr, true) || [];
 		if (!quote) return;
 		return new this(
 			context,
@@ -54,8 +61,8 @@ export default class Str extends Node {
 		);
 	}
 
-	static parseText(context, expr) {
-		const quoteChars = this.getQuoteChars(context), $ = {};
+	static parseText(context, expr, asInputDialect = false) {
+		const quoteChars = this.getQuoteChars(context, asInputDialect), $ = {};
 		if (!($.quote = quoteChars.find(q => _wrapped(expr, q, q))) || Lexer.match(expr, [' ']).length) return;
 		return [
 			_unwrap(expr, $.quote, $.quote).replace(new RegExp($.quote + $.quote, 'g'), $.quote),

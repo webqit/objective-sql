@@ -21,20 +21,16 @@ export default class DropTable extends StatementNode {
 	/**
 	 * Sets the name
 	 * 
-	 * @param String name
+	 * @param Array|String name
 	 * 
-	 * @returns this
+	 * @returns Void
 	 */
-	name(name) { this.NAME = name; return this; }
-
-	/**
-	 * Sets the basename
-	 * 
-	 * @param String name
-	 * 
-	 * @returns this
-	 */
-	basename(basename) { this.BASENAME = basename; return this; }
+	name(name) {
+		const nameParts = Array.isArray(name) ? [...name] : [name];
+		this.NAME = nameParts.pop();
+		this.BASENAME = nameParts.pop();
+		if (nameParts.length) throw new Error(`Idents can be maximum of two parts. Recieved: ${ nameParts.reverse().join('.') }.${ this.BASENAME }.${ this.NAME }`);
+	}
 	
 	/**
 	 * @inheritdoc
@@ -52,15 +48,15 @@ export default class DropTable extends StatementNode {
 	/**
 	 * @inheritdoc
 	 */
-	stringify() { return `DROP TABLE${ this.hasFlag('IF_EXISTS') ? ' IF EXISTS' : '' } ${ this.autoEsc([this.BASENAME, this.NAME].filter(s => s)).join('.') }`; }
+	stringify() { return `DROP TABLE${ this.hasFlag('IF_EXISTS') ? ' IF EXISTS' : '' } ${ this.autoEsc([this.BASENAME, this.NAME].filter(s => s)).join('.') }${ this.hasFlag('CASCADE') ? ' CASCADE' : '' }`; }
 	
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
+	static parse(context, expr) {
 		const [ match, ifExists, namePart ] = /^DROP\s+TABLE\s+(IF\s+EXISTS\s+)?([\s\S]+)$/i.exec(expr) || [];
 		if (!match) return;
-		const [tblName, dbName] = this.parseIdent(context, namePart.trim()) || [];
+		const [tblName, dbName] = this.parseIdent(context, namePart.trim(), true) || [];
 		if (!tblName) return;
 		const instance = new this(context, tblName, dbName);
 		if (ifExists) instance.withFlag('IF_EXISTS');

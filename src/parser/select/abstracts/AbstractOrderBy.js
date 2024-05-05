@@ -1,7 +1,7 @@
 
 import Lexer from '../../Lexer.js';
 import Node from '../../abstracts/Node.js';
-import Expr from '../../abstracts/Expr.js';
+import Expr from './Expr.js';
 
 export default class AbstractOrderBy extends Node {
 	
@@ -42,13 +42,13 @@ export default class AbstractOrderBy extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ orderByMatch, criteriaExpr ] = expr.match(new RegExp(`^${ this.regex }([\\s\\S]*)$`, 'i')) || [];
 		if (!orderByMatch) return;
 		const instance = new this(context);
 		for (const criterionExpr of Lexer.split(criteriaExpr.trim(), [','])) {
 			const [ , expr, sort ] = /([\s\S]+)\s+(ASC|DESC)$/i.exec(criterionExpr) || [ , criterionExpr ];
-			instance.criterion((await parseCallback(instance, expr)).withFlag(sort));
+			instance.criterion((parseCallback(instance, expr)).withFlag(sort));
 		}
 		return instance;
 	}

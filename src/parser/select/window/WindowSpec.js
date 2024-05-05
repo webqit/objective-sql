@@ -88,7 +88,8 @@ export default class WindowSpec extends Node {
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (typeof json?.name !== 'string' && typeof json?.window_ref !== 'string' && !json?.partition_by_clause && !json?.order_by_clause) return;
+		if (typeof json === 'string') json = { window_ref: json };
+		else if (typeof json?.name !== 'string' && typeof json?.window_ref !== 'string' && !json?.partition_by_clause && !json?.order_by_clause) return;
 		const instance = new this(context);
 		if (json.name) instance.name(json.name);
 		if (json.window_ref) instance.extends(json.window_ref);
@@ -121,7 +122,7 @@ export default class WindowSpec extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const instance = new this(context);
 		const parseEnclosure = async enclosure => {
 			const { tokens: [ definedRef, ...clauses ], matches: clauseTypes } = Lexer.split(_unwrap(enclosure.trim(), '(', ')'), ['PARTITION\\s+BY', 'ORDER\\s+BY'], { useRegex:'i', preserveDelims: true });
@@ -129,11 +130,11 @@ export default class WindowSpec extends Node {
 			for (const clauseType of clauseTypes) {
 				// PARTITION BY
 				if (/PARTITION\s+BY/i.test(clauseType)) {
-					instance.partitionBy(await parseCallback(instance, clauses.shift().trim(), [PartitionByClause]));
+					instance.partitionBy(parseCallback(instance, clauses.shift().trim(), [PartitionByClause]));
 					continue;
 				}
 				// ORDER BY
-				instance.orderBy(await parseCallback(instance, clauses.shift().trim(), [OrderByClause]));
+				instance.orderBy(parseCallback(instance, clauses.shift().trim(), [OrderByClause]));
 			}
 		};
 		const hasEnclosure = expr.endsWith(')');
@@ -143,9 +144,9 @@ export default class WindowSpec extends Node {
 			// NOTICE below the space around "AS", important in view of "city ASC"
 			const [ name, enclosure ] = spec.split(new RegExp(' AS ', 'i'));
 			instance.name(name.trim());
-			await parseEnclosure(enclosure);
+			parseEnclosure(enclosure);
 		} else if (hasEnclosure) {
-			await parseEnclosure(expr);
+			parseEnclosure(expr);
 		} else {
 			// FUNC OVER w
 			instance.existing(expr);

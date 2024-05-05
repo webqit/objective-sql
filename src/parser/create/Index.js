@@ -40,13 +40,13 @@ export default class Index extends Node {
     /**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr) {
+	static parse(context, expr) {
 		const [ match, type, rest ] = /^((?:(?:FULLTEXT|SPATIAL)(?:\s+INDEX|\s+KEY)?)|(?:INDEX|KEY))([\s\S]+)$/i.exec(expr) || [];
         if (!match) return;
 		const [ namePart, columnsPart ] = Lexer.split(rest, []);
-		const [name] = this.parseIdent(context, namePart.trim());
+		const [name] = this.parseIdent(context, namePart.trim(), true);
 		const columns = Lexer.split(_unwrap(columnsPart, '(', ')'), [',']).map(columnExpr => {
-			return this.parseIdent(context, columnExpr.trim())[0];
+			return this.parseIdent(context, columnExpr.trim(), true)[0];
 		});
         return new this(context, name, type.toUpperCase(), columns);
     }

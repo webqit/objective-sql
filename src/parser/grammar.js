@@ -12,7 +12,7 @@ import Select from './select/Select.js';
 //import Union from './select/Union.js';
 import Update from './update/Update.js';
 // Expressions
-import Expr from './abstracts/Expr.js';
+import Expr from './select/abstracts/Expr.js';
 
 /**
  * @var object

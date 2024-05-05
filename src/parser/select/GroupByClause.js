@@ -18,9 +18,9 @@ export default class GroupByClause extends AbstractGroupBy {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const { tokens: [$expr], matches } = Lexer.lex(expr, ['\\s+WITH\\s+ROLLUP$'], { useRegex: 'i' });
-		const instance = await super.parse(context, $expr, parseCallback);
+		const instance = super.parse(context, $expr, parseCallback);
 		if (!instance) return;
 		if (matches.length) instance.withFlag('WITH_ROLLUP');
 		return instance;

@@ -29,20 +29,16 @@ export default class CreateTable extends StatementNode {
 	/**
 	 * Sets the name
 	 * 
-	 * @param String name
+	 * @param Array|String name
 	 * 
-	 * @returns this
+	 * @returns Void
 	 */
-	name(name) { this.NAME = name; return this; }
-
-	/**
-	 * Sets the basename
-	 * 
-	 * @param String name
-	 * 
-	 * @returns this
-	 */
-	basename(basename) { this.BASENAME = basename; return this; }
+	name(name) {
+		const nameParts = Array.isArray(name) ? [...name] : [name];
+		this.NAME = nameParts.pop();
+		this.BASENAME = nameParts.pop();
+		if (nameParts.length) throw new Error(`Idents can be maximum of two parts. Recieved: ${ nameParts.reverse().join('.') }.${ this.BASENAME }.${ this.NAME }`);
+	}
 
 	/**
 	 * Adds a column to the schema,
@@ -121,17 +117,17 @@ export default class CreateTable extends StatementNode {
 	/**
 	 * @inheritdoc
 	 */
-	static async parse(context, expr, parseCallback) {
+	static parse(context, expr, parseCallback) {
 		const [ match, ifNotExists, rest ] = /^CREATE\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?([\s\S]+)$/i.exec(expr.trim()) || [];
 		if (!match) return;
 		const [ namePart, bodyPart ] = Lexer.split(rest, [], { limit: 2 });
-		const [tblName, dbName] = this.parseIdent(context, namePart.trim()) || [];
+		const [tblName, dbName] = this.parseIdent(context, namePart.trim(), true) || [];
 		if (!tblName) return;
 		const instance = new this(context, tblName, dbName || context/*Database*/?.name);
 		if (ifNotExists) instance.withFlag('IF_NOT_EXISTS');
-		const defs = await Promise.all(Lexer.split(_unwrap(bodyPart, '(', ')'), [',']).map(def => {
+		const defs = Lexer.split(_unwrap(bodyPart, '(', ')'), [',']).map(def => {
 			return parseCallback(instance, def.trim(), [TableLevelConstraint,Index,Column]); // Note that Column must come last
-		}));
+		});
 		for (const def of defs) {
 			if (def instanceof TableLevelConstraint) instance.constraint(def);
 			else if (def instanceof Index) instance.index(def);
