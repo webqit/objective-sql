@@ -1,7 +1,7 @@
 
-import CreateTable from '../../parser/create/CreateTable.js';
-import AlterTable from '../../parser/alter/AlterTable.js';
-import DropTable from '../../parser/drop/DropTable.js';
+import CreateTable from '../../query/create/CreateTable.js';
+import AlterTable from '../../query/alter/AlterTable.js';
+import DropTable from '../../query/drop/DropTable.js';
 import Savepoint from './Savepoint.js';
 
 export default class AbstractDatabase {

@@ -4,7 +4,7 @@
  */
 import chai, { expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-import Parser from '../src/parser/Parser.js';
+import Parser from '../src/query/Parser.js';
 
 chai.use(chaiAsPromised);
 

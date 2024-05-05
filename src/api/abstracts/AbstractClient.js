@@ -1,16 +1,16 @@
 
 import { _isObject } from '@webqit/util/js/index.js';
-import CreateDatabase from '../../parser/create/CreateDatabase.js';
-import AlterDatabase from '../../parser/alter/AlterDatabase.js';
-import DropDatabase from '../../parser/drop/DropDatabase.js';
-import CreateTable from '../../parser/create/CreateTable.js';
-import AlterTable from '../../parser/alter/AlterTable.js';
-import DropTable from '../../parser/drop/DropTable.js';
-import Select from '../../parser/select/Select.js';
-import Insert from '../../parser/insert/Insert.js';
-import Update from '../../parser/update/Update.js';
-import Delete from '../../parser/delete/Delete.js';
-import Parser from '../../parser/Parser.js';
+import CreateDatabase from '../../query/create/CreateDatabase.js';
+import AlterDatabase from '../../query/alter/AlterDatabase.js';
+import DropDatabase from '../../query/drop/DropDatabase.js';
+import CreateTable from '../../query/create/CreateTable.js';
+import AlterTable from '../../query/alter/AlterTable.js';
+import DropTable from '../../query/drop/DropTable.js';
+import Select from '../../query/select/Select.js';
+import Insert from '../../query/insert/Insert.js';
+import Update from '../../query/update/Update.js';
+import Delete from '../../query/delete/Delete.js';
+import Parser from '../../query/Parser.js';
 import Savepoint from './Savepoint.js';
 
 const objInternals = {

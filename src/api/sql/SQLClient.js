@@ -1,7 +1,7 @@
 
-import Identifier from '../../parser/select/Identifier.js';
-import Lexer from '../../parser/Lexer.js';
-import Parser from '../../parser/Parser.js';
+import Identifier from '../../query/select/Identifier.js';
+import Lexer from '../../query/Lexer.js';
+import Parser from '../../query/Parser.js';
 import AbstractClient from '../abstracts/AbstractClient.js';
 import SQLDatabase from './SQLDatabase.js';	
 

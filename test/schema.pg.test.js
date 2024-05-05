@@ -5,9 +5,9 @@
 import pg from 'pg';
 import { expect } from 'chai';
 import SQLClient from '../src/api/sql/SQLClient.js';
-import CreateTable from '../src/parser/create/CreateTable.js';
-import AlterTable from '../src/parser/alter/AlterTable.js';
-import Parser from '../src/parser/Parser.js';
+import CreateTable from '../src/query/create/CreateTable.js';
+import AlterTable from '../src/query/alter/AlterTable.js';
+import Parser from '../src/query/Parser.js';
 
 // --------------------------
 const pgClient = new pg.Client({

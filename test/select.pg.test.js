@@ -4,10 +4,10 @@
  */
 import Lexer from '@webqit/util/str/Lexer.js';
 import { expect } from 'chai';
-import Parser from '../src/parser/Parser.js';
+import Parser from '../src/query/Parser.js';
 import pg from 'pg';
 import SQLClient from '../src/api/sql/SQLClient.js';
-import Select from '../src/parser/select/Select.js';
+import Select from '../src/query/select/Select.js';
 
 const pgClient = new pg.Client({
     host: 'localhost',
