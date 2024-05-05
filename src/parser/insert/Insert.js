@@ -143,7 +143,8 @@ export default class Insert extends StatementNode {
 	static parse(context, expr, parseCallback) {
 		const [ match, withUac, mysqlIgnore, body ] = /^INSERT(\s+WITH\s+UAC)?(?:\s+(IGNORE))?(?:\s+INTO)?([\s\S]+)$/i.exec(expr) || [];
 		if (!match ) return;
-		const { tokens: [ tableSpec, payloadSpec, onConflictSpec ], matches: [insertType, onConflictClause] } = Lexer.lex(body.trim(), ['(VALUES|VALUE|SET|SELECT)', 'ON\\s+(DUPLICATE\\s+KEY|CONFLICT)'], { useRegex:'i' });
+		const $body = this.mySubstitutePlaceholders(context, body.trim());
+		const { tokens: [ tableSpec, payloadSpec, onConflictSpec ], matches: [insertType, onConflictClause] } = Lexer.lex($body, ['(VALUES|VALUE|SET|SELECT)', 'ON\\s+(DUPLICATE\\s+KEY|CONFLICT)'], { useRegex:'i' });
 		const instance = new this(context);
 		if (withUac) instance.withFlag('WITH_UAC');
 		if (mysqlIgnore) instance.withFlag(mysqlIgnore);

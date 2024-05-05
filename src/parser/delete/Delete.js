@@ -227,8 +227,9 @@ export default class Delete extends StatementNode {
 		const instance = new this(context);
 		if (withUac) instance.withFlag('WITH_UAC');
 		if (mysqlIgnore) instance.withFlag(mysqlIgnore);
+		const $body = this.mySubstitutePlaceholders(instance, body.trim());
 		const clausesMap = { from: { backtest: '^(?!.*\\s+DISTINCT\\s+$)', test: 'FROM' }, using: { backtest: '^(?!.*\\s+JOIN\\s+)', test: 'USING' }, join:JoinClause, where:'WHERE', orderBy:OrderByClause, limit:'LIMIT' };
-		const { tokens: [ maybeTablesSpec, ...tokens ], matches: clauses } = Lexer.lex(body.trim(), Object.values(clausesMap).map(x => typeof x === 'string' || x.test ? x : x.regex), { useRegex: 'i' });
+		const { tokens: [ maybeTablesSpec, ...tokens ], matches: clauses } = Lexer.lex($body, Object.values(clausesMap).map(x => typeof x === 'string' || x.test ? x : x.regex), { useRegex: 'i' });
 		// MAYBE_TABLES_SPEC (BEFORE A FROM CLAUSE) - MYSQL
 		for (const tblExpr of Lexer.split(maybeTablesSpec, [','])) {
 			const node = parseCallback(instance, tblExpr.trim(), [Identifier]);

@@ -3,7 +3,7 @@ import Lexer from '../../Lexer.js';
 import Node from '../../abstracts/Node.js';
 import Expr from '../abstracts/Expr.js';
 
-export default class PgConcat extends Node {
+export default class StrJoin extends Node {
 	
 	/**
 	 * Instance properties
@@ -13,7 +13,7 @@ export default class PgConcat extends Node {
 	/**
 	 * @inheritdoc
 	 */
-	concat(...strings) { return this.build('STRINGS', strings, Expr.Types); }
+	join(...strings) { return this.build('STRINGS', strings, Expr.Types); }
 	
 	/**
 	 * @inheritdoc
@@ -31,7 +31,7 @@ export default class PgConcat extends Node {
 	static fromJson(context, json) {
 		if (!Array.isArray(json?.strings)) return;
 		const instance = (new this(context)).withFlag(...(json.flags || []));
-		instance.concat(...json.strings);
+		instance.join(...json.strings);
 		return instance;
 	}
 	 
@@ -42,7 +42,7 @@ export default class PgConcat extends Node {
 		let { tokens, matches } = Lexer.lex(expr, [`||`]);
 		if (!matches.length) return;
 		const instance = new this(context);
-		instance.concat(...tokens.map(expr => parseCallback(instance, expr.trim())));
+		instance.join(...tokens.map(expr => parseCallback(instance, expr.trim())));
 		return instance;
 	}
 }

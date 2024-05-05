@@ -1,6 +1,6 @@
 
 import { _isNumeric } from '@webqit/util/js/index.js';
-import Node from '../Node.js';
+import Node from '../abstracts/Node.js';
 		
 export default class Placeholder extends Node {
 
@@ -8,41 +8,40 @@ export default class Placeholder extends Node {
 	 * Instance properties
 	 */
 	OFFSET;
-	NOTATION;
 
 	/**
 	 * @constructor
 	 */
-	constructor(context, offset, notation) {
+	constructor(context, offset) {
 		super(context);
 		this.OFFSET = parseInt(offset);
-		this.NOTATION = notation;
 	}
 
 	/**
 	 * @inheritdoc
 	 */
-	toJson() { return { offset: this.OFFSET, notation: this.NOTATION, }; }
+	toJson() { return { offset: this.OFFSET }; }
 
 	/**
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (typeof json?.offset === 'undefined' || typeof json.notation !== 'string') return;
-		return new this(context, json.offset, json.notation);
+		if (typeof json?.offset !== 'number') return;
+		return new this(context, json.offset);
 	}
 	
 	/**
 	 * @inheritdoc
 	 */
-	stringify() { return this.NOTATION === '?' ? '?' : this.NOTATION + this.OFFSET; }
+	stringify() { return this.params.dialect === 'mysql' ? '?' : '$' + this.OFFSET; }
 	
 	/**
 	 * @inheritdoc
 	 */
 	static parse(context, expr) {
-		if (expr.startsWith('?') || expr.startsWith(':')) {
-			return new this(context, expr.substr(1), expr.substr(0, 1));
-		}
+		const notation = (context?.params?.inputDialect || context?.params?.dialect) === 'mysql' ? '?' : '$';
+		const [ match, offset ] = (new RegExp(`^\\${ notation }(\\d)$`)).exec(expr) || [];
+		if (!match) return;
+		return new this(context, parseInt(offset));
 	}
 }

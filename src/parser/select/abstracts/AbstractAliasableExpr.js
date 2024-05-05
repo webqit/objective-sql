@@ -105,9 +105,11 @@ export default class AbstractAliasableExpr extends Node {
 		// Without an "AS" clause, its hard to determine if an expression is actually aliased...
 		// E.g: In the statement SELECT first_name fname, 4 + 5 result, 5 + 5, (SELECT ...) alias FROM ...,
 		let [ , $expr, $separator, aliasUnescaped, /*esc*/, aliasEscaped ] = (new RegExp(`^([\\s\\S]+?)` + `(?:` + `(\\s+AS\\s+|\\s+)` + `(?:([\\w]+)|(${ escChar })((?:\\4\\4|[^\\4])+)\\4)` + `)?$`, 'i')).exec(expr.trim()) || [];
-		let exprNode;
-		if (!$separator?.trim() && !$expr.trim().endsWith(')')) {
-			exprNode = parseCallback(instance, $expr, this.exprTypes, { assert: false });
+		let exprNode, $alias = aliasUnescaped || aliasEscaped;
+		if ($alias && !$separator?.trim() && !$expr.trim().endsWith(')')) {
+			try {
+				exprNode = parseCallback(instance, $expr, this.exprTypes);
+			} catch(e) {}
 			if (!exprNode) {
 				aliasUnescaped = aliasEscaped = null;
 				$expr = expr; // IMPORTANT
@@ -115,7 +117,7 @@ export default class AbstractAliasableExpr extends Node {
 		}
 		if (!exprNode) { exprNode = parseCallback(instance, $expr, this.exprTypes); }
 		instance.expr(exprNode);
-		if (aliasUnescaped || aliasEscaped) {
+		if ($alias) {
 			const alias = aliasUnescaped || this.autoUnesc(instance, aliasEscaped);
 			const claused = !!$separator?.trim();
 			instance.as(alias, claused);

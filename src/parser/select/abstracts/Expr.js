@@ -9,7 +9,8 @@ import Aggr from '../Aggr.js';
 import Func from '../Func.js';
 import Json from '../Json.js';
 import Prim from '../Prim.js';
-import PgConcat from '../str/PgConcat.js';
+import Placeholder from '../Placeholder.js';
+import StrJoin from '../str/StrJoin.js';
 import Path from '../Path.js';
 import Str from '../str/Str.js';
 import Num from '../Num.js';
@@ -61,7 +62,7 @@ export default class Expr {
 		return [
 			Parens,
 			CaseConstruct,
-			PgConcat,
+			StrJoin,
 			Condition,
 			Assertion,
 			Math,
@@ -72,6 +73,7 @@ export default class Expr {
 			Num,
 			Prim,
 			Path,
+			Placeholder,
 			Identifier,
 		];
 	}

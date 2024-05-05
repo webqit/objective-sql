@@ -22,9 +22,9 @@ export default class StatementNode extends Node {
     /**
      * @returns String
      */
-    substitutePlaceholders(expr) {
-        if (expr.indexOf('?') === -1) return;
-		return Lexer.split(expr, ['?'], { blocks:[] }).reduce((expr, t, i) => expr ? expr + '?' + (i - 1) + t : t, null);
+    static mySubstitutePlaceholders(context, expr) {
+        if ((context?.params?.inputDialect || context?.params?.dialect) !== 'mysql' || expr.indexOf('?') === -1) return expr;
+		return Lexer.split(expr, ['?'], { blocks:[] }).reduce((expr, chunk, i) => !expr ? chunk : expr + '?' + i + chunk, null);
     }
 
     /**

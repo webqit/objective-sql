@@ -318,8 +318,9 @@ export default class Select extends StatementNode {
 		const instance = new this(context);
 		if (withUac) instance.withFlag('WITH_UAC');
 		if (allOrDistinct) instance.withFlag(allOrDistinct);
+		const $body = this.mySubstitutePlaceholders(instance, body.trim());
 		const clausesMap = { from: { backtest: '^(?!.*\\s+DISTINCT\\s+$)', test: 'FROM' }, join:JoinClause, where:'WHERE', groupBy:GroupByClause, having:'HAVING', window:WindowClause, orderBy:OrderByClause, offset:'OFFSET', limit:'LIMIT' };
-		const { tokens: [ fieldsSpec, ...tokens ], matches: clauses } = Lexer.lex(body.trim(), Object.values(clausesMap).map(x => typeof x === 'string' || x.test ? x : x.regex), { useRegex: 'i' });
+		const { tokens: [ fieldsSpec, ...tokens ], matches: clauses } = Lexer.lex($body, Object.values(clausesMap).map(x => typeof x === 'string' || x.test ? x : x.regex), { useRegex: 'i' });
 		// SELECT_LIST
 		for (const fieldExpr of Lexer.split(fieldsSpec, [','])) {
 			const field = parseCallback(instance, fieldExpr.trim(), [Field]);
