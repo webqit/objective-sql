@@ -66,7 +66,7 @@ export default class TypeCast extends Node {
 			syntax2 = true;
 		}
 		const instance = new this(context);
-		instance.cast(parseCallback(instance, operand.trim()), type, syntax2);
+		instance.cast(parseCallback(instance, operand.trim()), type.trim(), syntax2);
 		return instance;
 	}
 }

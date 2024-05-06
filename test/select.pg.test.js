@@ -22,7 +22,7 @@ const sqlClient = new SQLClient(pgClient, { dialect: 'postgres' });
 
 describe(`SELECT QUERIES`, function() {
 
-    const expr1 = `SELECT ALL aaaa::int, a ~> b -> '{c,d}', "bbb"."bb" "a li", age || \'kk\' || table_schema || \'...\' || $2 concatenation, 5 + 5 "s..|""um", 'You''re cool' ffff, JSON_AGG('{dd:2}') is distinct from 4, CASE subject WHEN a=1 THEN 'one' END ff, SUM(all id order by rrrrrr), (SELECT GG AS INNERALIAS FROM jj) ALIAS FROM (SELECT age as aaaa, time2 as bbbbb from table2 as t2) ta WHERE kk = 4 order by CASE WHEN 4=3 THEN 5 ELSE 6 END desc with rollup`;
+    const expr1 = `SELECT ALL aaaa::int, cast(col1 as text), a ~> b -> '{c,d}', "bbb"."bb" "a li", age || \'kk\' || table_schema || \'...\' || $2 concatenation, 5 + 5 "s..|""um", 'You''re cool' ffff, JSON_AGG('{dd:2}') is distinct from 4, CASE subject WHEN a=1 THEN 'one' END ff, SUM(all id order by rrrrrr), (SELECT GG AS INNERALIAS FROM jj) ALIAS FROM (SELECT age as aaaa, time2 as bbbbb from table2 as t2) ta WHERE kk = 4 order by CASE WHEN 4=3 THEN 5 ELSE 6 END desc with rollup`;
     describe(`Parse a complex select statement`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, async function() {
@@ -92,7 +92,7 @@ describe(`SELECT QUERIES`, function() {
                 field => field.query(
                     q => q.select('id'),
                     q => q.from(['base0','t1'], ['base0','t2']),
-                    q => q.leftJoin( j => j.name('j1') ).as('j1').using('correlation1'),
+                    q => q.leftJoin( q => q.name('j1') ).as('j1').using('correlation1'),
                     q => q.crossJoin(['base2','j2']).as('j2').on(
                         q => q.equals(['j2','col1'], ['j1','col1'])
                     ),
