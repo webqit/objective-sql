@@ -1,6 +1,7 @@
 
 import Lexer from '../Lexer.js';
 import Identifier from './Identifier.js';
+import JsonPath from './json/JsonPath.js';
 import Node from '../abstracts/Node.js';
 
 export default class Path extends Node {
@@ -14,7 +15,7 @@ export default class Path extends Node {
 	/**
 	 * Instance propeties
 	 */
-	DIR = '';
+	OPERATOR = '';
 	LHS = null;
 	RHS = null;
 	UUID = null;
@@ -22,12 +23,12 @@ export default class Path extends Node {
 	/**
 	 * @property Bool
 	 */
-	get isOutgoing() { return this.DIR === this.constructor.ARR_RIGHT; }
+	get isOutgoing() { return this.OPERATOR === this.constructor.ARR_RIGHT; }
 
 	/**
 	 * @property Bool
 	 */
-	get isIncoming() { return this.DIR === this.constructor.ARR_LEFT; }
+	get isIncoming() { return this.OPERATOR === this.constructor.ARR_LEFT; }
 
 	/**
 	 * @property String
@@ -41,17 +42,17 @@ export default class Path extends Node {
 	 * Builds the operands.
 	 * 
 	 * @param Identifier lhs 
-	 * @param String dir
+	 * @param String operator
 	 * @param Identifier,Path rhs 
 	 * 
 	 * @returns Void
 	 */
-	path(lhs, dir, rhs) {
+	path(lhs, operator, rhs) {
 		const $static = this.constructor;
-		if (![$static.ARR_LEFT, $static.ARR_RIGHT].includes(dir)) throw new Error(`Unknown operator: "${ dir }".`);
+		if (![$static.ARR_LEFT, $static.ARR_RIGHT].includes(operator)) throw new Error(`Unknown operator: "${ operator }".`);
 		this.build('LHS', [lhs], Identifier);
-		this.build('RHS', [rhs], [$static,Identifier]);
-		this.DIR = dir;
+		this.build('RHS', [rhs], [$static,JsonPath,Identifier]);
+		this.OPERATOR = operator;
 	}
 
 	/**
@@ -174,9 +175,9 @@ export default class Path extends Node {
 	 */
 	toJson() {
 		return {
-			dir: this.DIR,
 			lhs: this.LHS?.toJson(),
 			rhs: this.RHS?.toJson(),
+			operator: this.OPERATOR,
 			flags: this.FLAGS,
 		};
 	}
@@ -185,9 +186,9 @@ export default class Path extends Node {
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (![this.ARR_LEFT, this.ARR_RIGHT].includes(json?.dir)) return;
+		if (![this.ARR_LEFT, this.ARR_RIGHT].includes(json?.operator)) return;
 		const instance = (new this(context)).withFlag(...(json.flags || []));
-		instance.path(json.lhs, json.dir, json.rhs);
+		instance.path(json.lhs, json.operator, json.rhs);
 		return instance;
 	}
 
@@ -196,21 +197,21 @@ export default class Path extends Node {
 	 */
 	stringify() {
 		if (this.JOINT) return this.autoEsc([this.JOINT.ALIAS.NAME,this.uuid]).join('.');
-		return `${ this.LHS } ${ this.DIR } ${ this.RHS }`;
+		return `${ this.LHS } ${ this.OPERATOR } ${ this.RHS }`;
 	}
 
 	/**
 	 * @inheritdoc
 	 */
 	static parse(context, expr, parseCallback) {
-		const { tokens, matches } = Lexer.lex(expr, [this.ARR_LEFT, this.ARR_RIGHT], { preserveDelims: true, limit: 1 }) || {};
-		if (tokens.length !== 2) return;
+		const { tokens, matches } = Lexer.lex(expr, [this.ARR_LEFT, this.ARR_RIGHT], { limit: 1 });
+		if (!matches.length) return;
 		const instance = new this(context);
-		instance.path(
-			parseCallback(instance, tokens[0], [Identifier]),
-			matches[0],
-			parseCallback(instance, tokens[0], [Identifier,this]),
-		);
+		const lhs = parseCallback(instance, tokens[0], [Identifier]);
+		const rhs = parseCallback(instance, tokens[1], matches[0] === this.ARR_LEFT ? [this] : [this,JsonPath,Identifier]);
+		instance.path(lhs, matches[0], rhs);
 		return instance;
 	}
+
+	static factoryMethods = { path: (context, lhs, operator, rhs) => [this.ARR_LEFT,this.ARR_RIGHT].includes(operator) && new this(context) };
 }

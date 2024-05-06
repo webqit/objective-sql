@@ -1,9 +1,10 @@
 
 import AbstractAliasableExpr from './abstracts/AbstractAliasableExpr.js';
 import CaseConstruct from './case/CaseConstruct.js';
+import JsonPath from './json/JsonPath.js';
+import Path from './Path.js';
 import Func from './Func.js';
 import Aggr from './Aggr.js';
-import Path from './Path.js';
 
 export default class Field extends AbstractAliasableExpr {
 
@@ -14,7 +15,7 @@ export default class Field extends AbstractAliasableExpr {
 	 * 
 	 * @returns this
 	 */
-	path(...args) { return (this.build('$EXPR', args, Path, 'path'), this); }
+	path(lhs, operator, rhs) { return (this.build('$EXPR', [lhs, operator, rhs], JsonPath.OPERATORS.includes(operator) ? JsonPath : Path, 'path'), this); }
 
 	/**
 	 * Function call

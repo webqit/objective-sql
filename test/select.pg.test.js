@@ -22,7 +22,7 @@ const sqlClient = new SQLClient(pgClient, { dialect: 'postgres' });
 
 describe(`SELECT QUERIES`, function() {
 
-    const expr1 = `SELECT ALL aaaa, "bbb"."bb" "a li", age || \'kk\' || table_schema || \'...\' || $2 concatenation, 5 + 5 "s..|""um", 'You''re cool' ffff, JSON_AGG('{dd:2}') is distinct from 4, CASE subject WHEN a=1 THEN 'one' END ff, SUM(all id order by rrrrrr), (SELECT GG AS INNERALIAS FROM jj) ALIAS FROM (SELECT age as aaaa, time2 as bbbbb from table2 as t2) ta WHERE kk = 4 order by CASE WHEN 4=3 THEN 5 ELSE 6 END desc with rollup`;
+    const expr1 = `SELECT ALL aaaa::int, a ~> b -> '{c,d}', "bbb"."bb" "a li", age || \'kk\' || table_schema || \'...\' || $2 concatenation, 5 + 5 "s..|""um", 'You''re cool' ffff, JSON_AGG('{dd:2}') is distinct from 4, CASE subject WHEN a=1 THEN 'one' END ff, SUM(all id order by rrrrrr), (SELECT GG AS INNERALIAS FROM jj) ALIAS FROM (SELECT age as aaaa, time2 as bbbbb from table2 as t2) ta WHERE kk = 4 order by CASE WHEN 4=3 THEN 5 ELSE 6 END desc with rollup`;
     describe(`Parse a complex select statement`, function() {
 
         it(`"parse()" the expression and stringify to compare with original`, async function() {
@@ -59,7 +59,7 @@ describe(`SELECT QUERIES`, function() {
                 field => field.expr({ name: ['base6','col-6'] }).as('alias6/1'),
                 // Use a callback there too
                 field => field.expr(
-                    expr => expr.name(['base6','col-6'])
+                    q => q.name(['base6','col-6'])
                 ).as('alias6/2'),
                 // Pass in an identifier string
                 field => field.expr('col7').as('alias7'),
@@ -72,15 +72,15 @@ describe(`SELECT QUERIES`, function() {
                 // Try more complex expressions
                 field => field.expr(
                     // Use magic method
-                    expr => expr.sum('col11', 'col12')
+                    q => q.sum('col11', 'col12')
                 ).as('sum'),
                 field => field.expr(
                     // Use magic method
-                    expr => expr.equals('col13', 'col14')
+                    q => q.equals('col13', 'col14')
                 ).as('assertion1'),
                 field => field.expr(
                     // Use magic method
-                    expr => expr.isDistinctFrom('col13', 'col14')
+                    q => q.isDistinctFrom('col13', 'col14')
                 ).as('assertion2'),
                 field => field.case(
                     // Use magic method
@@ -94,17 +94,18 @@ describe(`SELECT QUERIES`, function() {
                     q => q.from(['base0','t1'], ['base0','t2']),
                     q => q.leftJoin( j => j.name('j1') ).as('j1').using('correlation1'),
                     q => q.crossJoin(['base2','j2']).as('j2').on(
-                        expr => expr.equals(['j2','col1'], ['j1','col1'])
+                        q => q.equals(['j2','col1'], ['j1','col1'])
                     ),
                 ).as('subValue', false),
-                field => field.call('max', 'col2').as('MX'),
+                field => field.call('max', q => q.cast('col2', 'text', true)).as('MX'),
                 field => field.expr(
-                    expr => expr.call('max', 'col2').over(),
+                    q => q.call('max', 'col2').over(),
                 ).as('MX'),
-                //field => field.path('author1', '~>', expr => expr.path('parent', '~>', 'fname')).as('path'),
-                field => field.path('parent', '<~', expr => expr.path('author1', '<~', expr => expr.path(['new_db_name','books'], '~>', 'isbn'))),//.as('path1'),
-                field => field.path('parent', '<~', expr => expr.path(['new_db_name','users'], '~>', 'fname')),//.as('path2'),
-                field => field.path('author1', '<~', expr => expr.path(['new_db_name','books'], '~>', 'isbn')),//.as('path3'),
+                //field => field.path('author1', '~>', q => q.path('parent', '~>', 'fname')).as('path'),
+                field => field.path('parent', '<~', q => q.path('author1', '<~', q => q.path(['new_db_name','books'], '~>', 'isbn'))),//.as('path1'),
+                field => field.path('parent', '<~', q => q.path(['new_db_name','users'], '~>', 'fname')),//.as('path2'),
+                field => field.path('author1', '<~', q => q.path(['new_db_name','books'], '~>', 'isbn')),//.as('path3'),
+                field => field.path('author1', '<~', q => q.path(['new_db_name','books'], '~>', q => q.path('isbn', '->', 3))),//.as('path3'),
             )
             //query1.from(['new_db_name','books']).as('base_alias');
             query1.from(['new_db_name','users']).as('base_alias');

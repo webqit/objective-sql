@@ -3,17 +3,19 @@ import Identifier from '../Identifier.js';
 import CaseConstruct from '../case/CaseConstruct.js';
 import Condition from '../Condition.js';
 import Assertion from '../Assertion.js';
+import TypeCast from '../TypeCast.js';
 import Parens from '../Parens.js';
+import Path from '../Path.js';
 import Math from '../Math.js';
 import Aggr from '../Aggr.js';
 import Func from '../Func.js';
-import Json from '../Json.js';
+import Json from '../json/Json.js';
+import JsonPath from '../json/JsonPath.js';
+import Str from '../str/Str.js';
+import StrJoin from '../str/StrJoin.js';
+import Num from '../Num.js';
 import Prim from '../Prim.js';
 import Placeholder from '../Placeholder.js';
-import StrJoin from '../str/StrJoin.js';
-import Path from '../Path.js';
-import Str from '../str/Str.js';
-import Num from '../Num.js';
 
 export default class Expr {
 
@@ -64,15 +66,17 @@ export default class Expr {
 			CaseConstruct,
 			StrJoin,
 			Condition,
+			Path, // Must come before Assertion; think: ~> vs >
+			JsonPath, // ...
 			Assertion,
 			Math,
+			TypeCast, // After anything with operators, but before function types; think CAST(c as text) vs CAST()
 			Aggr,
 			Func,
 			Json,
 			Str,
 			Num,
 			Prim,
-			Path,
 			Placeholder,
 			Identifier,
 		];

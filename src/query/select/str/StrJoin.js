@@ -14,11 +14,6 @@ export default class StrJoin extends Node {
 	 * @inheritdoc
 	 */
 	join(...strings) { return this.build('STRINGS', strings, Expr.Types); }
-	
-	/**
-	 * @inheritdoc
-	 */
-	stringify() { return this.STRINGS.join(' || '); }
 
 	/**
 	 * @inheritdoc
@@ -34,13 +29,19 @@ export default class StrJoin extends Node {
 		instance.join(...json.strings);
 		return instance;
 	}
+	
+	/**
+	 * @inheritdoc
+	 */
+	stringify() { return this.STRINGS.join(' || '); }
 	 
 	/**
 	 * @inheritdoc
 	 */
 	static parse(context, expr, parseCallback) {
-		let { tokens, matches } = Lexer.lex(expr, [`||`]);
-		if (!matches.length) return;
+		if ((context?.params?.inputDialect || context?.params?.dialect) === 'mysql') return;
+		const tokens = Lexer.split(expr, [`||`]);
+		if (tokens.length < 2) return;
 		const instance = new this(context);
 		instance.join(...tokens.map(expr => parseCallback(instance, expr.trim())));
 		return instance;

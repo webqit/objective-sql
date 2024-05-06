@@ -1,6 +1,7 @@
 
 import Lexer from '../Lexer.js';
 import StatementNode from '../abstracts/StatementNode.js';
+import Placeholder from './Placeholder.js';
 import Path from './Path.js';
 import JoinClause from './JoinClause.js';
 import GroupByClause from './GroupByClause.js';
@@ -9,7 +10,6 @@ import WindowClause from './window/WindowClause.js';
 import Condition from './Condition.js';
 import Assertion from './Assertion.js';
 import Field from './Field.js';
-import Parens from './Parens.js';
 import Table from './Table.js';
 import Aggr from './Aggr.js';
 
@@ -39,6 +39,7 @@ export default class Select extends StatementNode {
 	 */
 	AGGRS = [];
 	PATHS = [];
+	VARS = [];
 	SUBQUERIES = [];
 
 	/**
@@ -233,6 +234,7 @@ export default class Select extends StatementNode {
     connectedNodeCallback(node) {
 		if (node instanceof Aggr) this.AGGRS.push(node);
 		if (node instanceof Path && !(node.CONTEXT instanceof Path)) this.PATHS.push(node);
+		if (node instanceof Placeholder) this.VARS.push(node);
 		if (node instanceof Select) this.SUBQUERIES.push(node);
 	}
 

@@ -25,7 +25,9 @@ export default class Num extends Node {
 	 * @inheritdoc
 	 */
 	static fromJson(context, json) {
-		if (typeof json?.value !== 'number') return;
+		if (typeof json === 'number' || (typeof json === 'string' && /^[.\d]+$/.test(json) && (json = parseFloat(json)))) {
+			json = { value: json };
+		} else if (typeof json?.value !== 'number') return;
 		return (new this(context, json.value)).withFlag(...(json.flags || []));
 	}
 	

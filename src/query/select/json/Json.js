@@ -3,8 +3,8 @@
  * @imports
  */
 import { _wrapped } from '@webqit/util/str/index.js';
-import Lexer from '../Lexer.js';
-import Str from './str/Str.js';
+import Lexer from '../../Lexer.js';
+import Str from '../str/Str.js';
 
 export default class Json extends Str {
 
