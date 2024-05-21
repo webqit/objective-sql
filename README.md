@@ -1,4 +1,4 @@
-# Objective SQL
+# Objective SQL (Now [LinkedQL](https://github.com/linked-db/linked-ql))
 
 <!-- BADGES/ -->
 
